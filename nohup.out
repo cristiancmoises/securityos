@@ -1,0 +1,828 @@
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 1973ms
+ ○ Compiling /404 ...
+ ✓ Compiled /404 in 7.1s (1566 modules)
+
+Could not open index.ts in the editor.
+The editor process exited with an error: Terminal editors can only be used on macOS.
+
+To set up the editor integration, add something like REACT_EDITOR=atom to the .env.local file in your project folder and restart the development server.
+
+
+Could not open index.ts in the editor.
+The editor process exited with an error: Terminal editors can only be used on macOS.
+
+To set up the editor integration, add something like REACT_EDITOR=atom to the .env.local file in your project folder and restart the development server.
+
+
+Could not open index.ts in the editor.
+The editor process exited with an error: Terminal editors can only be used on macOS.
+
+To set up the editor integration, add something like REACT_EDITOR=atom to the .env.local file in your project folder and restart the development server.
+
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 2.6s
+ ○ Compiling / ...
+ ✓ Compiled / in 6.8s (1562 modules)
+ ✓ Compiled /404 in 1139ms (1566 modules)
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 6s
+ ○ Compiling / ...
+ ✓ Compiled /404 in 6.4s (1566 modules)
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 2.1s
+ ○ Compiling / ...
+ ✓ Compiled / in 4.9s (1562 modules)
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 1996ms
+ ○ Compiling / ...
+ ✓ Compiled / in 10.5s (1566 modules)
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 1875ms
+ ○ Compiling / ...
+ ✓ Compiled / in 4.3s (1562 modules)
+ ✓ Compiled /404 in 935ms (1566 modules)
+
+Could not open browserfs.min.js in the editor.
+The editor process exited with an error: Terminal editors can only be used on macOS.
+
+To set up the editor integration, add something like REACT_EDITOR=atom to the .env.local file in your project folder and restart the development server.
+
+ ✓ Compiled /_error in 786ms (1566 modules)
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 2s
+ ○ Compiling / ...
+ ✓ Compiled / in 4.4s (1562 modules)
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 1833ms
+ ○ Compiling / ...
+ ✓ Compiled / in 4s (1562 modules)
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 11.6s
+ ○ Compiling / ...
+ ⨯ ./components/system/Desktop/Wallpapers/constants.ts
+Error: 
+  [31mx[0m Unexpected token `#`. Expected identifier, string literal, numeric literal or [ for the computed key
+    ,-[[36;1;4m/root/secos/components/system/Desktop/Wallpapers/constants.ts[0m:16:1]
+ [2m16[0m |   COASTAL_LANDSCAPE: () =>
+ [2m17[0m |     import("components/system/Desktop/Wallpapers/ShaderToy/CoastalLandscape"),
+ [2m18[0m |   HEXELLS: () => import("components/system/Desktop/Wallpapers/hexells"),
+ [2m19[0m | #  MATRIX: () => import("components/system/Desktop/Wallpapers/Matrix"),
+    : [31;1m^[0m
+ [2m20[0m |   VANTA: () => import("components/system/Desktop/Wallpapers/vantaWaves"),
+ [2m21[0m | };
+ [2m21[0m | 
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/system/Desktop/Wallpapers/constants.ts
+./components/system/Desktop/Wallpapers/useWallpaper.ts
+./components/system/Desktop/index.tsx
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/root/secos/.next/cache/webpack/client-development-fallback/0.pack.gz_' -> '/root/secos/.next/cache/webpack/client-development-fallback/0.pack.gz'
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/root/secos/.next/cache/webpack/client-development-fallback/0.pack.gz_' -> '/root/secos/.next/cache/webpack/client-development-fallback/0.pack.gz'
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/root/secos/.next/cache/webpack/client-development-fallback/0.pack.gz_' -> '/root/secos/.next/cache/webpack/client-development-fallback/0.pack.gz'
+ ⨯ ./components/system/Desktop/Wallpapers/constants.ts
+Error: 
+  [31mx[0m Unexpected token `#`. Expected identifier, string literal, numeric literal or [ for the computed key
+    ,-[[36;1;4m/root/secos/components/system/Desktop/Wallpapers/constants.ts[0m:16:1]
+ [2m16[0m |   COASTAL_LANDSCAPE: () =>
+ [2m17[0m |     import("components/system/Desktop/Wallpapers/ShaderToy/CoastalLandscape"),
+ [2m18[0m |   HEXELLS: () => import("components/system/Desktop/Wallpapers/hexells"),
+ [2m19[0m | #  MATRIX: () => import("components/system/Desktop/Wallpapers/Matrix"),
+    : [31;1m^[0m
+ [2m20[0m |   VANTA: () => import("components/system/Desktop/Wallpapers/vantaWaves"),
+ [2m21[0m | };
+ [2m21[0m | 
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/system/Desktop/Wallpapers/constants.ts
+./components/system/Desktop/Wallpapers/useWallpaper.ts
+./components/system/Desktop/index.tsx
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 11.5s
+ ○ Compiling / ...
+ ✓ Compiled / in 4.3s (1562 modules)
+ ✓ Compiled /404 in 693ms (1566 modules)
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 1844ms
+ ○ Compiling / ...
+ ✓ Compiled / in 4.3s (1558 modules)
+ ✓ Compiled /404 in 909ms (1562 modules)
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 1873ms
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 1743ms
+ ○ Compiling / ...
+ ✓ Compiled / in 4s (1558 modules)
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 1819ms
+ ○ Compiling / ...
+ ✓ Compiled / in 5.1s (1535 modules)
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 1643ms
+ ○ Compiling / ...
+ ⨯ ./components/system/Desktop/Wallpapers/useWallpaper.ts
+Error: 
+  [31mx[0m Expected ',', got 'else'
+    ,-[[36;1;4m/root/secos/components/system/Desktop/Wallpapers/useWallpaper.ts[0m:74:1]
+ [2m74[0m | 
+ [2m75[0m |     let config: WallpaperConfig | undefined;
+ [2m76[0m |       vantaConfig.material.options.wireframe = vantaWireframe;
+ [2m77[0m |     } else if (wallpaperImage === "SLIDESHOW") {
+    : [31;1m      ^^^^[0m
+ [2m78[0m |       config = { volumetric: true };
+ [2m79[0m |     }
+ [2m79[0m | 
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/system/Desktop/Wallpapers/useWallpaper.ts
+./components/system/Desktop/index.tsx
+ ⨯ ./components/system/Desktop/Wallpapers/useWallpaper.ts
+Error: 
+  [31mx[0m Expected ',', got 'else'
+    ,-[[36;1;4m/root/secos/components/system/Desktop/Wallpapers/useWallpaper.ts[0m:74:1]
+ [2m74[0m | 
+ [2m75[0m |     let config: WallpaperConfig | undefined;
+ [2m76[0m |       vantaConfig.material.options.wireframe = vantaWireframe;
+ [2m77[0m |     } else if (wallpaperImage === "SLIDESHOW") {
+    : [31;1m      ^^^^[0m
+ [2m78[0m |       config = { volumetric: true };
+ [2m79[0m |     }
+ [2m79[0m | 
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/system/Desktop/Wallpapers/useWallpaper.ts
+./components/system/Desktop/index.tsx
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 1770ms
+ ○ Compiling / ...
+ ✓ Compiled / in 4s (1535 modules)
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 6.7s
+ ○ Compiling / ...
+ ✓ Compiled / in 4.3s (1535 modules)
+ ✓ Compiled /404 in 779ms (1539 modules)
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 1894ms
+ ○ Compiling /404 ...
+ ✓ Compiled /404 in 4.8s (1539 modules)
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 7.7s
+ ○ Compiling / ...
+ ✓ Compiled / in 4.4s (1535 modules)
+ ✓ Compiled in 1060ms (1535 modules)
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Port 3000 is in use, trying 3001 instead.
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3001
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 2.1s
+ ✓ Compiled /404 in 658ms (1539 modules)
+ ✓ Compiled /_error in 411ms (1539 modules)
+[?25h
+ ✓ Compiled in 779ms (1539 modules)
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Port 3000 is in use, trying 3001 instead.
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3001
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 11.6s
+[?25h
+ ✓ Compiled in 758ms (1539 modules)
+ ✓ Compiled in 666ms (1539 modules)
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 1735ms
+ ○ Compiling / ...
+ ✓ Compiled / in 3.9s (1535 modules)
+ ✓ Compiled /404 in 536ms (1539 modules)
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 1885ms
+ ○ Compiling / ...
+ ✓ Compiled / in 4.9s (1535 modules)
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 1750ms
+ ○ Compiling / ...
+ ✓ Compiled / in 4.1s (1535 modules)
+ ✓ Compiled /404 in 949ms (1539 modules)
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 1808ms
+ ○ Compiling / ...
+ ✓ Compiled / in 4.6s (1535 modules)
+ ✓ Compiled /404 in 912ms (1539 modules)
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 1905ms
+ ○ Compiling / ...
+ ✓ Compiled / in 4.4s (1535 modules)
+ ✓ Compiled /404 in 806ms (1539 modules)
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 11.6s
+ ○ Compiling /404 ...
+ ✓ Compiled /404 in 5.4s (1539 modules)
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 1836ms
+ ○ Compiling / ...
+ ✓ Compiled / in 4.9s (1539 modules)
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 1921ms
+ ○ Compiling / ...
+ ✓ Compiled / in 4.9s (1535 modules)
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 3.8s
+ ○ Compiling / ...
+ ✓ Compiled / in 4.6s (1535 modules)
+ ✓ Compiled /404 in 1688ms (1539 modules)
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 1775ms
+ ○ Compiling / ...
+ ✓ Compiled / in 4.1s (1535 modules)
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 4.1s
+ ○ Compiling / ...
+ ✓ Compiled / in 4.5s (1535 modules)
+ ✓ Compiled /404 in 1403ms (1539 modules)
+
+Could not open browserfs.min.js in the editor.
+The editor process exited with an error: Terminal editors can only be used on macOS.
+
+To set up the editor integration, add something like REACT_EDITOR=atom to the .env.local file in your project folder and restart the development server.
+
+ ✓ Compiled /_error in 2.1s (1535 modules)
+ ✓ Compiled /404 in 445ms (1539 modules)
+ ✓ Compiled /_error in 1258ms (1535 modules)
+ ○ Compiling /404 ...
+ ✓ Compiled /404 in 4.2s (1539 modules)
+[?25h
+
+> SecurityOS@2.3.0 dev
+> next dev
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'legacyBrowsers', 'swcFileReading' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+warning ../package.json: No license field
+Browserslist: caniuse-lite is outdated. Please run:
+  npx browserslist@latest --update-db
+  Why you should do it regularly: https://github.com/browserslist/browserslist#browsers-data-updating
+  ▲ Next.js 13.5.6
+  - Local:        http://localhost:3000
+  - Experiments (use at your own risk):
+     · legacyBrowsers
+     · swcFileReading
+
+ ✓ Ready in 1857ms
+ ○ Compiling / ...
+ ✓ Compiled / in 4.7s (1535 modules)
+ ○ Compiling /404 ...
+ ✓ Compiled /404 in 4s (1539 modules)
