@@ -52,7 +52,8 @@
     "@babel/helpers": "^7.26.10",
     "postcss": "^8.5.10",
     "brace-expansion": "^2.0.2",
-    "music-metadata": "^11.12.3"
+    "music-metadata": "^11.12.3",
+    "dompurify": "^3.4.9"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -79,7 +80,7 @@
     "next": "^16.2.9",
     "node": "^22.0.0",
     "opentype.js": "^2.0.0",
-    "playlist-parser": "^0.0.12",
+    "playlist-parser": "^0.0.11",
     "prettier": "2.8.4",
     "print-js": "^1.6.0",
     "react": "^18.3.1",

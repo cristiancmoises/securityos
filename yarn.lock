@@ -2769,10 +2769,10 @@ domexception@^4.0.0:
   dependencies:
     webidl-conversions "^7.0.0"
 
-dompurify@3.2.7:
-  version "3.2.7"
-  resolved "https://registry.yarnpkg.com/dompurify/-/dompurify-3.2.7.tgz#721d63913db5111dd6dfda8d3a748cfd7982d44a"
-  integrity sha512-WhL/YuveyGXJaerVlMYGWhvQswa7myDG17P7Vu65EWC05o8vfeNbvNf4d/BOvH99+ZW+LlQsc1GDKMa1vNK6dw==
+dompurify@3.2.7, dompurify@^3.4.9:
+  version "3.4.9"
+  resolved "https://registry.yarnpkg.com/dompurify/-/dompurify-3.4.9.tgz#b036637b2df8997126b58837bc90f85dbcad6b2f"
+  integrity sha512-4dPSRMRDqHvs0V4YDFCsaIZo4if5u0xM+llyxiM2fwuZFdKArUBAF3VtI2+n8NKg9P870WMdYk0UhqQNoWXbfQ==
   optionalDependencies:
     "@types/trusted-types" "^2.0.7"
 
@@ -6107,12 +6107,10 @@ pkg-dir@^4.2.0:
   dependencies:
     find-up "^4.0.0"
 
-playlist-parser@^0.0.12:
-  version "0.0.12"
-  resolved "https://registry.yarnpkg.com/playlist-parser/-/playlist-parser-0.0.12.tgz#4250e5b11771ad68213983bf9bb6ecab64ddf526"
-  integrity sha512-eMC1F79YUOd4eH5t+e8ejfE93x4/ikUddICAqByAVehAePF1tBBgU03wmUFXXzobgTd1qL46ynsxByUSIKpVLA==
-  dependencies:
-    xmldom "0.1.16"
+playlist-parser@^0.0.11:
+  version "0.0.11"
+  resolved "https://registry.yarnpkg.com/playlist-parser/-/playlist-parser-0.0.11.tgz#f71f6509fe09c3e2a2f732313a4e1d3684197f89"
+  integrity sha512-yhVK4ZLRmxrWESnOwZmjWwsUu58yhPnxMArfH4eEaP6id7ZE+LQ1bdt66YsYNe5a3F/6H3x7J11fUFTwC/LDsQ==
 
 pluralize@^8.0.0:
   version "8.0.0"
@@ -8164,11 +8162,6 @@ xmlchars@^2.2.0:
   version "2.2.0"
   resolved "https://registry.npmjs.org/xmlchars/-/xmlchars-2.2.0.tgz"
   integrity sha512-JZnDKK8B0RCDw84FNdDAIpZK+JuJw+s7Lz8nksI7SIuU3UXJJslUthsi+uWBUYOwPFwW7W7PRLRfUKpxjtjFCw==
-
-xmldom@0.1.16:
-  version "0.1.16"
-  resolved "https://registry.yarnpkg.com/xmldom/-/xmldom-0.1.16.tgz#cf2602832b1ab5c3e6813fca08fe70196ba15e8c"
-  integrity sha512-BAf7j3VCoH0YKmJkdN1yXDeHRj+T9Z2oxIhuaSvX3NigmNEInT9o9We6T+Ruh75hLZQBnATmekSmd0nd6GGrow==
 
 xterm-addon-fit@^0.2.1:
   version "0.2.1"
