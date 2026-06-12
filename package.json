@@ -43,7 +43,15 @@
     "node": ">=16"
   },
   "resolutions": {
-    "styled-components": "^5"
+    "styled-components": "^5",
+    "cross-spawn": "^7.0.6",
+    "ws": "^8.20.1",
+    "micromatch": "^4.0.8",
+    "yaml": "^2.8.3",
+    "js-yaml": "^4.1.1",
+    "@babel/helpers": "^7.26.10",
+    "postcss": "^8.5.10",
+    "brace-expansion": "^2.0.2"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.4.6",
@@ -80,9 +88,8 @@
     "resedit": "^2.0.0",
     "rtf.js": "^3.0.9",
     "styled-components": "^5.3.8",
-    "utif": "https://github.com/photopea/UTIF.js",
+    "utif": "https://github.com/photopea/UTIF.js#588351078202eebccdb3ba996f5b98c640e4265a",
     "wasi-js": "^1.7.3",
-    "xmldom": "^0.6.0",
     "yarn": "^1.22.22"
   },
   "devDependencies": {
@@ -129,7 +136,7 @@
     "lint-staged": "^13.2.0",
     "lunr": "^2.3.9",
     "monaco-editor": "^0.36.1",
-    "pdfjs-dist": "^3.4.120",
+    "pdfjs-dist": "^4.2.67",
     "postcss-styled-syntax": "^0.4.0",
     "postcss-syntax": "^0.36.2",
     "stylelint": "^15.2.0",
