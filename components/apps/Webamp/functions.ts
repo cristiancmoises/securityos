@@ -276,7 +276,7 @@ export const parseTrack = async (
   file: Buffer,
   fileName: string
 ): Promise<Track> => {
-  const { parseBuffer } = await import("music-metadata-browser");
+  const { parseBuffer } = await import("music-metadata");
   const {
     common: { album = "", artist = "", title = fileName },
     format: { duration = 0 },
