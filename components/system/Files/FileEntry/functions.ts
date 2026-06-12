@@ -473,7 +473,7 @@ export const getInfoWithExtension = (
         (signal) =>
           fs.readFile(path, (error, contents = Buffer.from("")) => {
             if (!error && !signal.aborted) {
-              import("music-metadata-browser").then(
+              import("music-metadata").then(
                 ({ parseBuffer, selectCover }) => {
                   if (signal.aborted) return;
 
