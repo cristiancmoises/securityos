@@ -57,24 +57,34 @@ SecurityOS ships **two** browsers — pick by threat model:
   `.onion` sites and any browsing where your IP must stay hidden.
 
 ### 🌍 Clearnet Browser — *usability first*
-- Opens ordinary `https://` sites **inside** the webOS. Pages are fetched
-  server-side through the privacy proxy, which strips `X-Frame-Options`
-  and `Content-Security-Policy` so sites that normally block embedding
-  still load. Links that would open a new tab are kept **inside the app**
-  (no escaping to your host browser).
-- **JavaScript policy — only "good" JS runs.** Scripts are filtered
-  **LibreJS-style**: first-party scripts and trivial/free-licensed inline
-  scripts are kept, while **third-party / nonfree JavaScript** (trackers,
-  ads, fingerprinting) is **blocked**. A site whose JS is free-licensed
-  (e.g. our own `*.securityops.co` apps) stays fully usable; commercial
-  sites load with their nonfree JS disabled.
-  - The **JS** toolbar button toggles **"Allow all JS"** per page when a
-    site needs everything to run.
-- The **shield** button switches between **proxied** (recommended) and a
-  direct load. Keep it **ON** for `*.securityops.co` apps — they send
-  `X-Frame-Options` and only embed through the proxy.
+- Opens ordinary `https://` sites **inside** the webOS. Home page and
+  default **search engine** are **`securityops.co`**.
+- **First-party SecurityOps sites load directly.** `securityops.co` and
+  every `*.securityops.co` / `*.securityops.com.br` app is loaded from its
+  **real origin** — full JavaScript, cookies, login and WebSockets — because
+  these are interactive apps the rewriting proxy would break. (This is the
+  fix for *"Couldn't load securityops.co through the privacy proxy"*.)
+- **Every other site is fetched through the privacy proxy**, which:
+  - strips `X-Frame-Options` / `Content-Security-Policy` so sites that
+    normally block embedding still load in-app;
+  - **blocks ads & trackers** — requests to known ad/tracking domains
+    (a curated **EasyList + EasyPrivacy** subset, see
+    [`utils/adblock.ts`](utils/adblock.ts)) are dropped at the network
+    level and leftover ad containers are hidden, so you browse **ad-free**;
+  - filters JavaScript **LibreJS-style** — first-party + trivial/free-licensed
+    scripts run; **third-party / nonfree JS** (trackers, ads, fingerprinting)
+    is blocked. The **JS** toolbar button toggles **"Allow all JS"** per page;
+  - keeps "new tab" links **inside the app** (no escaping to your host browser).
+- The **shield** button switches a third-party page between **proxied**
+  (recommended — Tor-strippable, ad-blocked, JS-filtered) and a **direct**
+  load (its real origin) for interactive/login sites.
 - Typing a `.onion` URL here automatically hands it off to the **Tor
   Browser** (onions require Tor).
+
+> **Note:** the built-in ad blocker is a curated, high-impact subset of
+> EasyList/EasyPrivacy maintained in `utils/adblock.ts`; extend that file (or
+> point it at a generated list) to broaden coverage. Ad/JS filtering applies to
+> **proxied** pages only — first-party sites load direct and unmodified.
 
 ---
 
