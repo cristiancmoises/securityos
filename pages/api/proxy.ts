@@ -129,13 +129,20 @@ const isBlockedHostname = (hostname: string): boolean => {
   );
 };
 
-const assertAllowedUrl = async (u: URL, forceCheck = false): Promise<void> => {
+// Returns the validated IP to PIN for the actual connection (direct mode only), so
+// a low-TTL domain can't rebind public->private between this check and the socket
+// (DNS rebinding SSRF). Returns undefined when no local resolve happened (Tor mode
+// / .onion — Tor resolves at the exit and can't reach the LAN anyway).
+const assertAllowedUrl = async (
+  u: URL,
+  forceCheck = false
+): Promise<string | undefined> => {
   if (!/^https?:$/.test(u.protocol)) throw new Error("scheme");
 
   // Tor hidden services resolve/route only inside Tor and are never a LAN IP.
   // (In direct/clearnet mode an .onion can't be reached anyway — fall through so
   // the DNS lookup fails it.)
-  if (!forceCheck && u.hostname.toLowerCase().endsWith(".onion")) return;
+  if (!forceCheck && u.hostname.toLowerCase().endsWith(".onion")) return undefined;
 
   // In Tor mode Tor cannot reach the LAN/metadata, and a local DNS lookup would
   // leak the hostname — so skip the local resolve and let Tor handle it. BUT a
@@ -143,12 +150,12 @@ const assertAllowedUrl = async (u: URL, forceCheck = false): Promise<void> => {
   // Gate on socksAgent (NOT TOR_PROXY): if TOR_PROXY is set but the agent failed
   // to build, the fetch would connect DIRECT, so we must still run the SSRF guard
   // rather than skip it on the false assumption that Tor will contain the request.
-  if (socksAgent && !forceCheck) return;
+  if (socksAgent && !forceCheck) return undefined;
 
   if (isBlockedHostname(u.hostname)) throw new Error("blocked-host");
 
   const addresses = await lookup(u.hostname, { all: true }).catch(
-    () => [] as { address: string }[]
+    () => [] as { address: string; family: number }[]
   );
 
   if (addresses.length === 0) throw new Error("dns");
@@ -156,6 +163,8 @@ const assertAllowedUrl = async (u: URL, forceCheck = false): Promise<void> => {
   for (const { address } of addresses) {
     if (isPrivateIp(address)) throw new Error("private-ip");
   }
+
+  return addresses[0].address;
 };
 
 type ProxyResponse = {
@@ -169,7 +178,8 @@ type ProxyResponse = {
 const httpGet = (
   urlStr: string,
   maxBytes: number = MAX_RESPONSE_BYTES,
-  useTor = true
+  useTor = true,
+  pinnedIp?: string
 ): Promise<ProxyResponse> =>
   new Promise((resolve, reject) => {
     // Fail CLOSED: in Tor mode, never fall back to a direct (clearnet) connection
@@ -189,6 +199,32 @@ const httpGet = (
         agent: useTor ? socksAgent : undefined,
         headers: BROWSER_HEADERS,
         method: "GET",
+        // Pin the IP the SSRF guard already validated so DNS can't rebind to a
+        // private address between the check and connect (direct mode only; Tor
+        // resolves at the exit). Host/SNI/cert still use the URL hostname.
+        ...(pinnedIp
+          ? {
+              lookup: (
+                _h: string,
+                o: { all?: boolean } | number,
+                cb: (
+                  e: null,
+                  a: string | { address: string; family: number }[],
+                  f?: number
+                ) => void
+              ): void => {
+                const family = pinnedIp.includes(":") ? 6 : 4;
+
+                // Node's happy-eyeballs calls lookup with { all: true } and expects
+                // an array; the legacy form expects (address, family).
+                if (o && typeof o === "object" && o.all) {
+                  cb(null, [{ address: pinnedIp, family }]);
+                } else {
+                  cb(null, pinnedIp, family);
+                }
+              },
+            }
+          : {}),
       },
       (response) => {
         const chunks: Buffer[] = [];
@@ -764,9 +800,9 @@ const handler = async (
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
       // eslint-disable-next-line no-await-in-loop
-      await assertAllowedUrl(current, isDirect);
+      const pinnedIp = await assertAllowedUrl(current, isDirect);
       // eslint-disable-next-line no-await-in-loop
-      response = await httpGet(current.href, budget, !isDirect);
+      response = await httpGet(current.href, budget, !isDirect, pinnedIp);
 
       budget -= response.body.length;
       if (budget <= 0 && response.status >= 300 && response.status < 400) {
