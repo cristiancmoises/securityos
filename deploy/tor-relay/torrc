@@ -15,6 +15,16 @@ DNSPort 0.0.0.0:5353
 AutomapHostsOnResolve 1
 VirtualAddrNetworkIPv4 10.192.0.0/10
 
+# --- Local control socket (for the container healthcheck only) --------------
+# A unix-socket control port (no TCP listener) lets the Docker healthcheck ask
+# Tor whether it has actually finished bootstrapping (status/bootstrap-phase)
+# rather than just checking that the SOCKS port is open — Tor opens SOCKS at
+# startup, before it can reach the network, so a port check reports healthy on a
+# Tor that is in fact dead. The socket lives inside the 0700 DataDirectory and is
+# cookie-authenticated, so only the in-container tor user can use it.
+ControlPort unix:/var/lib/tor/control.sock
+CookieAuthentication 1
+
 # --- Optional: publish SecurityOS itself as a Tor hidden service (.onion) ----
 # Uncomment and point HiddenServicePort at your SecurityOS web server (the Node
 # `next start` container or your nginx/Caddy from deploy/). After first start,

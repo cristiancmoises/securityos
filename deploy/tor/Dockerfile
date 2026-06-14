@@ -5,19 +5,27 @@
 # SOCKS + transparent proxy + DNS per deploy/tor-relay/torrc. Build context = deploy/.
 FROM alpine:latest
 
-# netcat is only used by the healthcheck below to confirm the SOCKS port is up.
+# netcat (nc -U) is used by the healthcheck below to talk to Tor's control socket.
 RUN apk add --no-cache tor netcat-openbsd
 
 COPY tor-relay/torrc /etc/tor/torrc
 
+# Bootstrap-aware healthcheck. Root-owned 0755 so the unprivileged tor user can
+# execute it; it only reads the cookie + connects to the control socket (both in
+# the tor-owned DataDirectory), so it needs no extra privileges.
+COPY tor/healthcheck.sh /usr/local/bin/tor-healthcheck
+RUN chmod 0755 /usr/local/bin/tor-healthcheck
+
 USER tor
 EXPOSE 9050 9040 5353
 
-# Report healthy once the SOCKS5 port accepts connections, so the web container's
-# `depends_on: condition: service_healthy` waits for Tor before starting (this is
-# what makes "onions load + Tor enabled by default" reliable). The proxy still
-# retries, so a brief bootstrap delay after the port opens is handled gracefully.
-HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=18 \
-  CMD nc -z 127.0.0.1 9050 || exit 1
+# Report healthy only once Tor has actually finished bootstrapping — NOT merely
+# once the SOCKS listener opens (Tor opens that at startup, before it can reach
+# the network). A plain `nc -z 9050` would flip to healthy on a half-dead Tor and
+# make `depends_on: condition: service_healthy` start the proxy/web on a lie. The
+# script asks Tor's cookie-authed control socket for status/bootstrap-phase.
+# Generous start-period/retries cover a slow first consensus fetch.
+HEALTHCHECK --interval=10s --timeout=10s --start-period=60s --retries=30 \
+  CMD ["/usr/local/bin/tor-healthcheck"]
 
 ENTRYPOINT ["tor", "-f", "/etc/tor/torrc"]
