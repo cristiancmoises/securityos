@@ -33,11 +33,11 @@ const directory: Processes = {
     title: "Clearnet Browser",
   },
   Vaptvupt: {
-    Component: dynamic(() => import("components/apps/VaptvuptGui")),
+    Component: dynamic(() => import("components/apps/Vaptvupt")),
     backgroundColor: "#150f1b",
     defaultSize: {
-      height: 560,
-      width: 600,
+      height: 680,
+      width: 1000,
     },
     icon: "/System/Icons/vaptvupt.webp",
     singleton: true,
