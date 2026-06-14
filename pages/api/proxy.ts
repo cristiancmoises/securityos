@@ -482,32 +482,39 @@ const rewriteHtml = (
     : `${head}${out}`;
 };
 
-const errorPage = (targetHost: string, torDown = false): string =>
+type ErrorKind = "tor-down" | "onion-down" | "load-failed";
+
+const errorPage = (targetHost: string, kind: ErrorKind): string =>
   `<!doctype html><html><head><meta charset="utf-8"><meta name="referrer" content="no-referrer">` +
   `<style>html{color-scheme:dark}body{background:#150f1b;color:#e8e2ee;font:14px/1.6 system-ui,sans-serif;` +
   `display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center}` +
   `div{max-width:460px;padding:24px}h1{font-size:18px;color:#b98be0}code{color:#d7c2ec}</style></head><body><div>` +
-  (torDown
+  (kind === "tor-down"
     ? `<h1>🧅 Tor is unreachable</h1>` +
       `<p>Couldn't reach the Tor SOCKS proxy, so <code>${targetHost}</code> (and any <code>.onion</code>) can't load.</p>` +
       `<p>The <b>tor</b> service may not be running. Check <b>Tor Control</b>, or bring the Tor container up ` +
       `(<code>docker compose up -d tor</code>). Onion routing resumes automatically once Tor is back.</p>`
-    : `<h1>🧅 Couldn't load <code>${targetHost}</code> through the privacy proxy</h1>` +
-      `<p>The site may block proxies, require JavaScript/login, or Tor may be unreachable.</p>` +
-      `<p>For interactive or logged-in sites, toggle the <b>shield</b> in the toolbar to load directly. ` +
-      `For serious anonymous browsing, use the Linux VM via Tor Control.</p>`) +
+    : kind === "onion-down"
+      ? `<h1>🧅 This .onion looks offline</h1>` +
+        `<p><b>Tor is working</b>, but the hidden service <code>${targetHost}</code> didn't answer ` +
+        `(Tor replied <code>Host unreachable</code>). The service is most likely down, or its address changed.</p>` +
+        `<p>Try another bookmark, or make sure the hidden service is published and running on its host.</p>`
+      : `<h1>🧅 Couldn't load <code>${targetHost}</code> through the privacy proxy</h1>` +
+        `<p>The site may block proxies, require JavaScript/login, or be temporarily down.</p>` +
+        `<p>For interactive or logged-in sites, toggle the <b>shield</b> in the toolbar to load directly. ` +
+        `For serious anonymous browsing, use the Linux VM via Tor Control.</p>`) +
   `</div></body></html>`;
 
 const sendError = (
   res: NextApiResponse,
   status: number,
   host: string,
-  torDown = false
+  kind: ErrorKind = "load-failed"
 ): void => {
   res
     .status(status)
     .setHeader("Content-Type", "text/html; charset=utf-8")
-    .end(errorPage(host || "that address", torDown));
+    .end(errorPage(host || "that address", kind));
 };
 
 const handler = async (
@@ -697,18 +704,36 @@ const handler = async (
       res.end(response.body);
     }
   } catch (error) {
-    // Distinguish "Tor isn't reachable" (the SOCKS hop failed) from a normal
-    // upstream failure, so .onion users get an actionable message rather than a
-    // generic error. A missing/socks-rejected agent surfaces as a connection error.
+    // Classify the failure so the message is actionable instead of always blaming
+    // Tor — that mislabeling is what made a simply-offline .onion look like
+    // "Tor won't start":
+    //   • tor-down    — the SOCKS hop itself failed (only possible when we routed
+    //                   through Tor, i.e. NOT ?direct=1).
+    //   • onion-down  — Tor IS up and answered, but the .onion didn't: the socks
+    //                   library reports "Socks5 proxy rejected connection - …"
+    //                   (Host unreachable) when the hidden service is offline.
+    //   • load-failed — any other upstream failure (clearnet host down/blocking).
     const message = (error as Error)?.message?.toLowerCase() || "";
+    const isOnion = target.hostname.endsWith(".onion");
+    // "socks5 proxy rejected connection - …" means Tor accepted the request and
+    // tried to connect: Tor is UP, the destination is what failed. A genuine Tor
+    // outage is a failure to reach the SOCKS endpoint itself (ECONNREFUSED on the
+    // proxy, no agent configured) and can only happen on the Tor (non-direct) path.
+    const torAnswered = /proxy rejected connection/.test(message);
     const torDown =
-      (!!TOR_PROXY || target.hostname.endsWith(".onion")) &&
+      !isDirect &&
+      !torAnswered &&
       (!socksAgent ||
-        /socks|econnrefused|etimedout|ehostunreach|enetunreach|proxy|getaddrinfo/.test(
+        /econnrefused|etimedout|ehostunreach|enetunreach|getaddrinfo|socks/.test(
           message
         ));
+    const kind: ErrorKind = torDown
+      ? "tor-down"
+      : isOnion
+        ? "onion-down"
+        : "load-failed";
 
-    sendError(res, 502, target.hostname, torDown);
+    sendError(res, 502, target.hostname, kind);
   }
 };
 
