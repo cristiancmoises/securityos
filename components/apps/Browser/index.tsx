@@ -152,11 +152,11 @@ const Browser: FC<ComponentProcessProps> = ({ id }) => {
 
       if (addressInput.startsWith("ipfs://")) {
         setIcon(id, "/System/Icons/Favicons/osint.webp");
-      } else if (useProxy) {
-        // Don't probe the remote favicon directly in proxy mode — it would leak
-        // the visited host (bypassing Tor). Use the bookmark icon if known.
-        if (bookmarkIcon) setIcon(id, bookmarkIcon);
-      } else if (isHttpUrl(addressUrl)) {
+      } else if (firstParty) {
+        // ONLY first-party (trusted SecurityOps) sites probe their real favicon.
+        // A direct probe reveals the visited host to the network, so proxied AND
+        // third-party-direct (shield-off) loads use the bookmark icon instead —
+        // never leak an arbitrary host's favicon.
         const favicon = new Image();
         const faviconUrl = `${new URL(addressUrl).origin}${FAVICON_BASE_PATH}`;
 
@@ -173,6 +173,8 @@ const Browser: FC<ComponentProcessProps> = ({ id }) => {
           ONE_TIME_PASSIVE_EVENT
         );
         favicon.src = faviconUrl;
+      } else if (bookmarkIcon) {
+        setIcon(id, bookmarkIcon);
       }
     },
     [

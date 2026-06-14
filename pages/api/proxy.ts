@@ -140,7 +140,10 @@ const assertAllowedUrl = async (u: URL, forceCheck = false): Promise<void> => {
   // In Tor mode Tor cannot reach the LAN/metadata, and a local DNS lookup would
   // leak the hostname — so skip the local resolve and let Tor handle it. BUT a
   // clearnet (direct=1) fetch CAN reach the LAN, so it must run the full guard.
-  if (TOR_PROXY && !forceCheck) return;
+  // Gate on socksAgent (NOT TOR_PROXY): if TOR_PROXY is set but the agent failed
+  // to build, the fetch would connect DIRECT, so we must still run the SSRF guard
+  // rather than skip it on the false assumption that Tor will contain the request.
+  if (socksAgent && !forceCheck) return;
 
   if (isBlockedHostname(u.hostname)) throw new Error("blocked-host");
 
@@ -169,6 +172,14 @@ const httpGet = (
   useTor = true
 ): Promise<ProxyResponse> =>
   new Promise((resolve, reject) => {
+    // Fail CLOSED: in Tor mode, never fall back to a direct (clearnet) connection
+    // just because the SOCKS agent is missing/broken — that would silently leak the
+    // real IP while the user believes they are on Tor. Surface it as a Tor error.
+    if (useTor && !socksAgent) {
+      reject(new Error("tor-not-configured"));
+      return;
+    }
+
     const lib = new URL(urlStr).protocol === "https:" ? https : http;
     const request = lib.request(
       urlStr,
@@ -209,21 +220,65 @@ const httpGet = (
     request.end();
   });
 
+const PINNED_ORIGIN = (process.env.SECURITYOS_ORIGIN || "").replace(/\/+$/, "");
+
 const ourOrigin = (req: NextApiRequest): string => {
-  const proto = (req.headers["x-forwarded-proto"] as string) || "http";
+  // Prefer an explicit pinned origin so a spoofed/poisoned Host header can't point
+  // the injected clientShim / extension URLs (and thus the page's re-proxied
+  // fetch/XHR/beacon) at an attacker host. Falls back to the request host (Node
+  // already rejects CRLF/garbage Hosts) with the scheme constrained to http/https.
+  if (PINNED_ORIGIN) return PINNED_ORIGIN;
+
+  const proto =
+    (req.headers["x-forwarded-proto"] as string) === "https" ? "https" : "http";
 
   return `${proto}://${req.headers.host || ""}`;
 };
 
-const SKIP_URL = /^(?:#|data:|blob:|javascript:|mailto:|tel:|about:|\{)/i;
+const SKIP_URL =
+  /^(?:#|data:|blob:|javascript:|vbscript:|view-source:|mhtml:|mailto:|tel:|about:|\{)/i;
+
+// CSP for proxied HTML: a same-origin network choke point so that any URL the
+// rewriter MISSED still cannot reach a remote host directly (anonymity defense in
+// depth — a leaked request would reveal the real IP and defeat Tor). Everything
+// loadable is pinned to 'self' (our /api/proxy) + data:/blob:. script-src is 'none'
+// in no-JS mode; otherwise 'self' + 'unsafe-inline' (the injected clientShim is
+// inline; page scripts may run but their network calls are re-proxied, and
+// connect-src 'self' blocks any direct attempt).
+const proxiedCsp = (noJs: boolean): string =>
+  [
+    "default-src 'self' data: blob:",
+    noJs ? "script-src 'none'" : "script-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "media-src 'self' data: blob:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "frame-src 'self'",
+    "object-src 'none'",
+    "form-action 'self'",
+  ].join("; ");
+
+// Mode flags carried on every rewritten URL so that navigating a link/resource
+// keeps the exact same proxy mode (no-JS, extension, adblock, LibreJS, direct/Tor).
+type ProxyFlags = {
+  noJs: boolean;
+  injectExt: boolean;
+  adblock: boolean;
+  libreJs: boolean;
+  isDirect: boolean;
+};
+
+const flagQuery = (f: ProxyFlags): string =>
+  `${f.noJs ? "&nojs=1" : ""}${f.injectExt ? "&ext=1" : ""}${
+    f.adblock ? "&adblock=1" : ""
+  }${f.libreJs ? "&librejs=1" : ""}${f.isDirect ? "&direct=1" : ""}`;
 
 const proxify = (
   rawUrl: string,
   base: string,
   origin: string,
-  noJs: boolean,
-  injectExt: boolean,
-  adblock: boolean
+  flags: ProxyFlags
 ): string => {
   if (!rawUrl || SKIP_URL.test(rawUrl.trim())) return rawUrl;
 
@@ -234,12 +289,13 @@ const proxify = (
 
     // Ad/tracker host: neutralize the URL so the resource never loads (no script,
     // beacon or pixel). `data:,` is an inert empty resource for src/href alike.
-    if (adblock && isAdUrl(absolute)) return "data:,";
+    if (flags.adblock && isAdUrl(absolute)) return "data:,";
 
-    // Carry no-JS + extension + adblock flags so navigation keeps the same mode.
-    return `${origin}/api/proxy?url=${encodeURIComponent(absolute)}${
-      noJs ? "&nojs=1" : ""
-    }${injectExt ? "&ext=1" : ""}${adblock ? "&adblock=1" : ""}`;
+    // Carry all mode flags so navigation keeps the same mode (incl. direct/Tor and
+    // LibreJS — previously dropped, which silently switched mode on every click).
+    return `${origin}/api/proxy?url=${encodeURIComponent(absolute)}${flagQuery(
+      flags
+    )}`;
   } catch {
     return rawUrl;
   }
@@ -357,11 +413,12 @@ const rewriteHtml = (
   noJs: boolean,
   injectExt: boolean,
   libreJs: boolean,
-  adblock: boolean
+  adblock: boolean,
+  isDirect: boolean
 ): string => {
   const proxyPrefix = `${origin}/api/proxy?url=`;
-  const px = (u: string): string =>
-    proxify(u, base, origin, noJs, injectExt, adblock);
+  const flags: ProxyFlags = { noJs, injectExt, adblock, libreJs, isDirect };
+  const px = (u: string): string => proxify(u, base, origin, flags);
   let out = html;
 
   out = out.replace(/\sintegrity\s*=\s*("[^"]*"|'[^']*')/gi, "");
@@ -387,16 +444,80 @@ const rewriteHtml = (
     out = applyLibreJs(out, base);
   }
 
+  // Proxify every URL-bearing attribute, INCLUDING unquoted values (e.g.
+  // `<img src=//attacker/x>`) and the older leak-prone attributes (background,
+  // cite, manifest, usemap, longdesc). An unrewritten URL makes the browser fire a
+  // direct request, leaking the real IP and defeating Tor — the opaque-origin
+  // sandbox does NOT stop the outbound request, so this must catch them all.
   out = out.replace(
-    /(\s(?:href|src|action|poster|formaction|data-src|data|ping)\s*=\s*)("([^"]*)"|'([^']*)')/gi,
-    (_m, pre: string, _q: string, dq: string, sq: string) => {
-      const url = dq ?? sq ?? "";
+    /(\s(?:href|src|action|poster|formaction|data-src|data|ping|background|cite|manifest|usemap|longdesc)\s*=\s*)("([^"]*)"|'([^']*)'|([^\s"'>]+))/gi,
+    (_m, pre: string, _q: string, dq: string, sq: string, unq: string) => {
+      const url = dq ?? sq ?? unq ?? "";
 
-      return `${pre}${dq == null ? "'" : '"'}${px(url)}${
-        dq == null ? "'" : '"'
-      }`;
+      // Always re-emit double-quoted (also normalizes unquoted values safely).
+      return `${pre}"${px(url).replace(/"/g, "%22")}"`;
     }
   );
+  // GET forms: a GET submit REPLACES the action's query string with the form
+  // fields, which drops our injected ?url=<target> (and the mode flags) -> the
+  // request reaches the proxy with no url and 400s ("internal error" when a page's
+  // search box is used). Move the target + flags into hidden inputs (which survive
+  // as query params) and bare the action; the handler's __pxurl path reassembles
+  // the real URL + appends the form fields. POST forms keep their body untouched.
+  out = out.replace(/<form\b([^>]*)>/gi, (whole: string, attrs: string) => {
+    const methodMatch = /\smethod\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(
+      attrs
+    );
+    const method = (
+      methodMatch?.[2] ??
+      methodMatch?.[3] ??
+      methodMatch?.[4] ??
+      "get"
+    )
+      .trim()
+      .toLowerCase();
+
+    if (method !== "get") return whole;
+
+    const actionMatch = /\saction\s*=\s*("([^"]*)"|'([^']*)')/i.exec(attrs);
+
+    if (!actionMatch) return whole;
+
+    const action = actionMatch[2] ?? actionMatch[3] ?? "";
+    let pxTarget = "";
+
+    try {
+      const au = new URL(action);
+
+      // Only touch actions WE rewrote to this proxy.
+      if (!au.pathname.endsWith("/api/proxy")) return whole;
+      pxTarget = au.searchParams.get("url") || "";
+    } catch {
+      return whole;
+    }
+
+    if (!pxTarget) return whole;
+
+    const esc = (s: string): string =>
+      s
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;");
+    const newAttrs = attrs.replace(
+      /\saction\s*=\s*("[^"]*"|'[^']*')/i,
+      ` action="${origin}/api/proxy"`
+    );
+    const hidden =
+      `<input type="hidden" name="__pxurl" value="${esc(pxTarget)}">` +
+      (noJs ? `<input type="hidden" name="nojs" value="1">` : "") +
+      (injectExt ? `<input type="hidden" name="ext" value="1">` : "") +
+      (libreJs ? `<input type="hidden" name="librejs" value="1">` : "") +
+      (adblock ? `<input type="hidden" name="adblock" value="1">` : "") +
+      (isDirect ? `<input type="hidden" name="direct" value="1">` : "");
+
+    return `<form${newAttrs}>${hidden}`;
+  });
+
   out = out.replace(
     /(\sxlink:href\s*=\s*)("([^"]*)"|'([^']*)')/gi,
     (_m, pre: string, _q: string, dq: string, sq: string) => {
@@ -569,6 +690,7 @@ const handler = async (
         "direct",
         "bin",
         "librejs",
+        "adblock",
       ]);
 
       Object.entries(req.query).forEach(([key, value]) => {
@@ -622,11 +744,8 @@ const handler = async (
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       res.setHeader("Referrer-Policy", "no-referrer");
       res.setHeader("X-Content-Type-Options", "nosniff");
-      if (noJs) {
-        res.setHeader(
-          "Content-Security-Policy",
-          "script-src 'none'; object-src 'none'"
-        );
+      if (/\b(text\/html|application\/xhtml\+xml)\b/i.test(contentType || "")) {
+        res.setHeader("Content-Security-Policy", proxiedCsp(noJs));
       }
       res.end(buffer);
       return;
@@ -638,16 +757,21 @@ const handler = async (
   try {
     let current = target;
     let response: ProxyResponse | undefined;
+    // Byte budget is CUMULATIVE across redirect hops, so a redirect chain can't
+    // multiply the per-hop cap (6 hops * 512 MB) into an OOM. Each hop is capped at
+    // whatever budget remains.
+    let budget = isBin ? MAX_BIN_BYTES : MAX_RESPONSE_BYTES;
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
       // eslint-disable-next-line no-await-in-loop
       await assertAllowedUrl(current, isDirect);
       // eslint-disable-next-line no-await-in-loop
-      response = await httpGet(
-        current.href,
-        isBin ? MAX_BIN_BYTES : MAX_RESPONSE_BYTES,
-        !isDirect
-      );
+      response = await httpGet(current.href, budget, !isDirect);
+
+      budget -= response.body.length;
+      if (budget <= 0 && response.status >= 300 && response.status < 400) {
+        throw new Error("too-large");
+      }
 
       const location = response.headers.location;
 
@@ -684,11 +808,9 @@ const handler = async (
 
     if (/\b(text\/html|application\/xhtml\+xml)\b/i.test(contentType)) {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
-      // No-JS mode: enforce script-src 'none' so nothing executes even if the
-      // rewriter missed something (the iframe also drops allow-scripts).
-      if (noJs) {
-        res.setHeader("Content-Security-Policy", "script-src 'none'; object-src 'none'");
-      }
+      // Same-origin CSP so anything the rewriter missed still can't reach a remote
+      // host (no-JS also gets script-src 'none'; the iframe drops allow-scripts).
+      res.setHeader("Content-Security-Policy", proxiedCsp(noJs));
       res.end(
         rewriteHtml(
           response.body.toString("utf8"),
@@ -697,7 +819,8 @@ const handler = async (
           noJs,
           injectExt,
           libreJs,
-          adblock
+          adblock,
+          isDirect
         )
       );
     } else {
