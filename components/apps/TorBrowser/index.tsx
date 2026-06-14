@@ -13,21 +13,22 @@ import {
 } from "utils/constants";
 import { getUrlOrSearch, label } from "utils/functions";
 
-// The Tor Browser start page. The operator's SecurityOps search is a SearXNG
-// metasearch reachable both as a clearnet host and (when published) as a hidden
-// service. We default to the clearnet host fetched OVER TOR: it stays up even when
-// the .onion listeners are down, and SearXNG needs no JavaScript, so it renders in
-// the JS-disabled "Safest" sandbox. The .onion services are bookmarked below and
-// resolve once the operator's hidden-service listeners are running again.
-const TOR_HOME = "https://securityops.co/";
+// The Tor Browser start page: the verified live darknet search hidden service.
+// It needs no JavaScript, so it renders in the JS-disabled "Safest" sandbox. If it
+// ever goes down, the proxy shows a clear "this .onion looks offline" page and Tor
+// itself keeps working.
+const TOR_HOME =
+  "http://2fd6cemt4gmccflhm6imvdfvli3nf7zn6rfrwpsy7uhxrgbypvwf5fad.onion/";
 
-// The operator's SearXNG search endpoint, for address-bar queries (over Tor).
-const TOR_SEARCH_QUERY = "https://securityops.co/web?s=";
+// Address-bar search → the home onion's own search (GET /search?query=). To use
+// the operator's clearnet Security Search instead, set this to
+// "https://securityops.co/web?s=".
+const TOR_SEARCH_QUERY =
+  "http://2fd6cemt4gmccflhm6imvdfvli3nf7zn6rfrwpsy7uhxrgbypvwf5fad.onion/search?query=";
 
-// SecurityOps bookmarks. "Search" is the SearXNG above (reached over Tor); the
-// rest are the operator's .onion hidden services — they resolve only while the
-// operator's onion listeners are running (otherwise the proxy shows a clear
-// "this .onion looks offline" page, not a Tor error).
+// Bookmarks. "Search" is the home onion above; the rest are the operator's .onion
+// hidden services — they resolve only while their listeners are running (otherwise
+// the proxy shows a clear "this .onion looks offline" page, not a Tor error).
 const BOOKMARKS: { name: string; url: string }[] = [
   { name: "Search", url: TOR_HOME },
   {
