@@ -57,8 +57,9 @@ nodes. Using the bundled Tor (see `deploy/tor-relay/torrc`):
 4. Because the CSP/headers work on any deploy target (see SECURITY-HEADERS.md),
    the .onion mirror is hardened identically.
 
-**Tip for the .onion:** keep the in-OS Browser, IPFS and other clearnet features
-disabled so a Tor-Browser user gets no clearnet leaks.
+**Tip for the .onion:** keep IPFS and other clearnet features disabled so a
+Tor-Browser user gets no clearnet leaks. (SecurityOS is Tor-only — there is no
+clearnet browser.)
 
 ---
 

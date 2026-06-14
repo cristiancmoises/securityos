@@ -45,7 +45,9 @@ const types = {
     type: "Picture File",
   },
   HtmlDocument: {
-    process: ["Browser", ...TEXT_EDITORS],
+    // No clearnet browser app — .html opens in the text editors (view source).
+    // Remote pages/onions are reached through the Tor Browser.
+    process: [...TEXT_EDITORS],
     type: "HTML Document",
   },
   JsdosBundle: {

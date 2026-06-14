@@ -2,8 +2,8 @@
 #
 # The `securityos` web container's privacy proxy (/api/proxy) routes every fetch
 # through the `tor` service over SOCKS5h (DNS + .onion resolved AT Tor, so onions
-# work and clearnet hostnames never leak to a local resolver). The in-OS Browser
-# and Tor Browser therefore exit over Tor by default. Served on http://localhost:8088.
+# work and clearnet hostnames never leak to a local resolver). The Tor Browser
+# therefore exits over Tor by default. Served on http://localhost:8088.
 #
 #   docker compose -f deploy/docker-compose.yml up -d --build
 #   # verify the server is exiting via Tor:

@@ -22,16 +22,6 @@ const directory: Processes = {
     singleton: true,
     title: "BoxedWine",
   },
-  Browser: {
-    Component: dynamic(() => import("components/apps/Browser")),
-    backgroundColor: "#FFF",
-    defaultSize: {
-      height: 480,
-      width: 640,
-    },
-    icon: "/System/Icons/chromium.webp",
-    title: "Clearnet Browser",
-  },
   Vaptvupt: {
     Component: dynamic(() => import("components/apps/Vaptvupt")),
     backgroundColor: "#150f1b",

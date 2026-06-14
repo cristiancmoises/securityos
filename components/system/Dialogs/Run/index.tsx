@@ -119,7 +119,7 @@ const Run: FC<ComponentProcessProps> = () => {
           if (pid) {
             open(pid, {
               url:
-                pid === "Browser" && isIpfs
+                pid === "TorBrowser" && isIpfs
                   ? resourceUrl.join(" ")
                   : resourcePath,
             });
@@ -140,7 +140,7 @@ const Run: FC<ComponentProcessProps> = () => {
 
             if (basePid) {
               open(basePid, {
-                url: basePid === "Browser" && isIpfs ? resource : resourcePath,
+                url: basePid === "TorBrowser" && isIpfs ? resource : resourcePath,
               });
             }
           }

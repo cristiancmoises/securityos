@@ -11,14 +11,13 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
 
 ## ✨ Highlights
 
-- **🧅 Two tabbed browsers, by threat model** — the **Tor Browser** routes every
-  request through a server-side privacy proxy over Tor (SOCKS5h, so `.onion`
-  resolves and clear-net hostnames never leak), while the **Clearnet Browser**
-  opens any site in-app with a **LibreJS-style "good JS only"** filter. Both have
-  real **tabs** (per-tab history; Ctrl/⌘- or middle-click for a new tab). The
-  proxy is SSRF-guarded, fails closed if Tor is misconfigured, pins the
-  SSRF-validated IP, forwards only an allowlist of response headers, rewrites
-  links/forms to stay in-app, and logs nothing. See [Browsers](#-browsers).
+- **🧅 Tor Browser (anonymity-only)** — all web access goes through the **Tor
+  Browser**: a server-side privacy proxy routes every request over Tor (SOCKS5h,
+  so `.onion` resolves and clear-net hostnames never leak), with **tabs** and a
+  **NoScript-style 3-state JS control** (Off / first-party-only / All). There is
+  no clearnet browser. The proxy is SSRF-guarded, fails closed if Tor is
+  misconfigured, pins the SSRF-validated IP, forwards only an allowlist of
+  response headers, and logs nothing. See [Tor Browser](#-tor-browser).
 - **🦀 Memory-safe proxy sidecar** — the untrusted fetch + HTML-rewriting path is also
   available as a Rust sidecar (Tor SOCKS5h, DNS-pinned SSRF guard, `lol_html`
   streaming rewriter); the OS delegates to it and transparently falls back to the
@@ -50,59 +49,34 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
 
 ---
 
-## 🌐 Browsers
+## 🧅 Tor Browser
 
-SecurityOS ships **two** browsers — pick by threat model. Both are **tabbed**
-(per‑tab history; Ctrl/⌘‑ or middle‑click a link to open it in a new tab; `＋`
-for a blank tab).
+SecurityOS browses the web through **one** browser — the **Tor Browser**,
+anonymity first. (There is intentionally **no clearnet browser**: all web access
+goes over Tor.)
 
-### 🧅 Tor Browser — *anonymity first*
-- Every request is routed through **Tor** (SOCKS5h, including DNS), so `.onion`
-  resolves and your IP is never revealed.
-- **JavaScript is OFF by default** (toolbar toggle) to minimize the
-  fingerprint and attack surface — Tor-Browser-"Safest" style.
-- Bookmarks point at the SecurityOps **hidden services**. Use it for
-  `.onion` sites and any browsing where your IP must stay hidden.
+- Every request is routed through **Tor** (SOCKS5h, including DNS) via a
+  server-side privacy proxy, so `.onion` resolves and your real IP is never
+  revealed. Clear-net sites load over Tor too; hostnames never leak to a local
+  resolver.
+- **Tabbed** — per-tab history; Ctrl/⌘- or middle-click a link to open it in a
+  new tab; `＋` for a blank tab. Tab labels show the page title.
+- **NoScript-style 3-state JavaScript control** (toolbar): **Off** — *Safest*,
+  all JS blocked + `script-src 'none'`; **NoScript** — first-party scripts only,
+  third-party stripped server-side by the LibreJS filter; **All** — every script
+  runs. Off by default.
+- Bookmarks point at the SecurityOps **hidden services**.
+- The proxy is SSRF-guarded, **fails closed** if Tor is misconfigured, **pins the
+  SSRF-validated IP** (no DNS rebinding), forwards only an allowlist of response
+  headers, rewrites links/forms to stay in-app, and **logs nothing**.
 
-### 🌍 Clearnet Browser — *usability first*
-- Opens ordinary `https://` sites **inside** the webOS. Home page and
-  default **search engine** are **`securityops.co`**.
-- **First-party SecurityOps sites load directly.** `securityops.co` and
-  every `*.securityops.co` / `*.securityops.com.br` app is loaded from its
-  **real origin** — full JavaScript, cookies, login and WebSockets — because
-  these are interactive apps the rewriting proxy would break. (This is the
-  fix for *"Couldn't load securityops.co through the privacy proxy"*.)
-- **Every other site is fetched through the privacy proxy**, which:
-  - strips `X-Frame-Options` / `Content-Security-Policy` so sites that
-    normally block embedding still load in-app;
-  - **blocks ads & trackers** — requests to known ad/tracking domains
-    (a curated **EasyList + EasyPrivacy** subset, see
-    [`utils/adblock.ts`](utils/adblock.ts)) are dropped at the network
-    level and leftover ad containers are hidden, so you browse **ad-free**;
-  - filters JavaScript **LibreJS-style** — first-party + trivial/free-licensed
-    scripts run; **third-party / nonfree JS** (trackers, ads, fingerprinting)
-    is blocked. The **JS** toolbar button toggles **"Allow all JS"** per page;
-  - keeps "new tab" links **inside the app** (no escaping to your host browser).
-- The **shield** button switches a third-party page between **proxied**
-  (recommended — Tor-strippable, ad-blocked, JS-filtered) and a **direct**
-  load (its real origin) for interactive/login sites.
-- Typing a `.onion` URL here automatically hands it off to the **Tor
-  Browser** (onions require Tor).
-
-> **Note:** the built-in ad blocker is a curated, high-impact subset of
-> EasyList/EasyPrivacy maintained in `utils/adblock.ts`; extend that file (or
-> point it at a generated list) to broaden coverage. Ad/JS filtering applies to
-> **proxied** pages only — first-party sites load direct and unmodified.
-
-> **What loads, and what won't.** The rewriting proxy renders pages **server-side
-> in an opaque, no-/limited-JS sandbox**, so it's deliberately *not* a full
-> browser. First-party SecurityOps sites (loaded direct) and simple, mostly-static
-> sites render cleanly; many arbitrary sites **won't** — they block datacenter/VPN/
-> Tor exit IPs (Cloudflare challenges), require JavaScript + login, or break under
-> URL rewriting. That's the inherent ceiling of a privacy proxy, not a bug. For
-> those: use the **shield** toggle (loads any framable site at its real origin — no
-> Tor/adblock), or the **Linux VM via Tor Control** for genuinely full, anonymous
-> browsing of arbitrary sites.
+> **What loads, and what won't.** The proxy renders pages **server-side in an
+> opaque sandbox**, so it's deliberately *not* a full browser: onions and simple,
+> mostly-static sites render cleanly, but many arbitrary sites **won't** — they
+> block Tor exit IPs (Cloudflare challenges), require JavaScript + login, or break
+> under URL rewriting. That's the inherent ceiling of a privacy proxy, not a bug.
+> For genuinely full, anonymous browsing of arbitrary sites, use the **Linux VM
+> via Tor Control**.
 
 ---
 
