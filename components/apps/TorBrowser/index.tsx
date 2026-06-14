@@ -19,9 +19,7 @@ import { getUrlOrSearch, label } from "utils/functions";
 const TOR_HOME =
   "http://2fd6cemt4gmccflhm6imvdfvli3nf7zn6rfrwpsy7uhxrgbypvwf5fad.onion/";
 
-// Address-bar search → the home onion's own search (GET /search?query=). To use
-// the operator's clearnet Security Search instead, set this to
-// "https://securityops.co/web?s=".
+// Address-bar search → the home onion's own search (GET /search?query=).
 const TOR_SEARCH_QUERY =
   "http://2fd6cemt4gmccflhm6imvdfvli3nf7zn6rfrwpsy7uhxrgbypvwf5fad.onion/search?query=";
 
@@ -122,6 +120,29 @@ const tabLabel = (tab: Tab): string => {
   }
 };
 
+// NoScript-style three-state script control (the "block everything" half of
+// NoScript ships as the default "off"; the middle state is NoScript's typical
+// "allow this site, block third parties", enforced server-side by the proxy's
+// LibreJS filter — same-origin scripts kept, cross-origin stripped, before they
+// ever reach the client):
+//   off      -> ?nojs=1   : ALL scripts stripped + CSP script-src 'none' (Safest)
+//   noscript -> ?librejs=1: first-party scripts only; third-party blocked
+//   all      -> (none)    : every script runs
+type JsMode = "off" | "noscript" | "all";
+
+const NEXT_JS_MODE: Record<JsMode, JsMode> = {
+  off: "noscript",
+  noscript: "all",
+  all: "off",
+};
+
+const JS_MODE_LABEL: Record<JsMode, string> = {
+  off: "Scripts: OFF — Safest (all JavaScript blocked). Click for NoScript mode (first-party scripts only).",
+  noscript:
+    "Scripts: NoScript — first-party scripts only, third-party blocked. Click to allow ALL scripts.",
+  all: "Scripts: ALL allowed. Click to block everything (Safest).",
+};
+
 const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
   const {
     processes: { [id]: process },
@@ -132,7 +153,7 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const keyCounter = useRef(0);
-  const [jsEnabled, setJsEnabled] = useState(false);
+  const [jsMode, setJsMode] = useState<JsMode>("off");
   const [extEnabled, setExtEnabled] = useState(false);
   const [tabs, setTabs] = useState<Tab[]>(() => [blankTab(0, initialUrl)]);
   const [activeKey, setActiveKey] = useState(0);
@@ -158,12 +179,16 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
 
       return {
         src: `${PROXY_PATH}${encodeURIComponent(addressUrl)}${
-          jsEnabled ? "" : "&nojs=1"
+          jsMode === "off"
+            ? "&nojs=1"
+            : jsMode === "noscript"
+              ? "&librejs=1"
+              : ""
         }${extEnabled ? "&ext=1" : ""}`,
         address: addressInput,
       };
     },
-    [extEnabled, jsEnabled]
+    [extEnabled, jsMode]
   );
 
   const navigateTab = useCallback(
@@ -246,7 +271,10 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
     [tabs]
   );
 
-  const toggleJs = useCallback((): void => setJsEnabled((prev) => !prev), []);
+  const toggleJs = useCallback(
+    (): void => setJsMode((prev) => NEXT_JS_MODE[prev]),
+    []
+  );
   const toggleExt = useCallback((): void => setExtEnabled((prev) => !prev), []);
 
   const didInit = useRef(false);
@@ -304,7 +332,7 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
   useEffect(() => {
     if (activeTab?.address) void navigateTab(activeKey, activeTab.address, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jsEnabled, extEnabled]);
+  }, [jsMode, extEnabled]);
 
   const canGoBack = (activeTab?.position ?? 0) > 0;
   const canGoForward =
@@ -385,15 +413,11 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
           </Button>
           <Button
             onClick={toggleJs}
-            {...label(
-              jsEnabled
-                ? "JavaScript ENABLED — click to disable (Safest)"
-                : "JavaScript disabled (Safest) — click to enable"
-            )}
+            {...label(JS_MODE_LABEL[jsMode])}
           >
             <svg
               height="16"
-              opacity={jsEnabled ? 1 : 0.4}
+              opacity={jsMode === "all" ? 1 : jsMode === "noscript" ? 0.7 : 0.35}
               viewBox="0 0 24 24"
               width="16"
             >
@@ -477,7 +501,9 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
           src={tab.src || undefined}
           style={{ display: tab.key === activeKey ? undefined : "none" }}
           title={`${id}-${tab.key}`}
-          {...(jsEnabled ? SANDBOXED_IFRAME_CONFIG : NOSCRIPT_IFRAME_CONFIG)}
+          {...(jsMode === "off"
+            ? NOSCRIPT_IFRAME_CONFIG
+            : SANDBOXED_IFRAME_CONFIG)}
         />
       ))}
     </StyledBrowser>
