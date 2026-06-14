@@ -274,26 +274,33 @@ const ourOrigin = (req: NextApiRequest): string => {
 const SKIP_URL =
   /^(?:#|data:|blob:|javascript:|vbscript:|view-source:|mhtml:|mailto:|tel:|about:|\{)/i;
 
-// CSP for proxied HTML: a same-origin network choke point so that any URL the
-// rewriter MISSED still cannot reach a remote host directly (anonymity defense in
-// depth — a leaked request would reveal the real IP and defeat Tor). Everything
-// loadable is pinned to 'self' (our /api/proxy) + data:/blob:. script-src is 'none'
-// in no-JS mode; otherwise 'self' + 'unsafe-inline' (the injected clientShim is
-// inline; page scripts may run but their network calls are re-proxied, and
-// connect-src 'self' blocks any direct attempt).
+// CSP for proxied HTML.
+//
+// NO-JS ("Safest") mode is the anonymity mode: nothing dynamic runs, so pin every
+// loadable resource to 'self' (our /api/proxy) + data:/blob:. Any URL the rewriter
+// MISSED then still cannot reach a remote host (a leaked request would reveal the
+// real IP and defeat Tor).
+//
+// JS mode is the Clearnet Browser's "usability first" mode: the page's own scripts
+// run and lazy-load images/embeds/resources at runtime, which a strict CSP would
+// break ("refused to connect", broken images). So we only block plugins; the
+// rewriter (static URLs) + clientShim (re-proxies fetch/XHR/beacon, blocks
+// WebSocket) still reduce leaks. Full anonymity is the no-JS / Tor Browser path.
 const proxiedCsp = (noJs: boolean): string =>
-  [
-    "default-src 'self' data: blob:",
-    noJs ? "script-src 'none'" : "script-src 'self' 'unsafe-inline'",
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
-    "media-src 'self' data: blob:",
-    "font-src 'self' data:",
-    "connect-src 'self'",
-    "frame-src 'self'",
-    "object-src 'none'",
-    "form-action 'self'",
-  ].join("; ");
+  noJs
+    ? [
+        "default-src 'self' data: blob:",
+        "script-src 'none'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: blob:",
+        "media-src 'self' data: blob:",
+        "font-src 'self' data:",
+        "connect-src 'self'",
+        "frame-src 'self'",
+        "object-src 'none'",
+        "form-action 'self'",
+      ].join("; ")
+    : "object-src 'none'";
 
 // Mode flags carried on every rewritten URL so that navigating a link/resource
 // keeps the exact same proxy mode (no-JS, extension, adblock, LibreJS, direct/Tor).
