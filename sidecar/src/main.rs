@@ -284,6 +284,13 @@ fn rewrite_html(html: &str, base: &Url, nojs: bool) -> Result<String, ()> {
         Ok(())
     }));
 
+    // Keep "new tab" links inside the in-OS browser: force any target to _self so
+    // links navigate this iframe instead of opening a real browser tab.
+    element_content_handlers.push(element!("[target]", |el| {
+        let _ = el.set_attribute("target", "_self");
+        Ok(())
+    }));
+
     // Fail CLOSED: if rewriting errors we must NOT return the original HTML (its
     // links/resources would point straight at the origin, bypassing the proxy/Tor).
     rewrite_str(

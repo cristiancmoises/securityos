@@ -13,27 +13,62 @@ import {
 } from "utils/constants";
 import { getUrlOrSearch, label } from "utils/functions";
 
-// The user's SecurityOps search hidden service: the Tor Browser start page.
+// The SecurityOps search hidden service: the Tor Browser start page.
 const TOR_HOME =
-  "http://2fd6cemkrkm5dfsjnuxzbpf6jcscm37fplcfih4htiteoaesoj4cauid.onion/";
+  "http://secopsi47k4idy5pw3wrm2zkmn3d5ghaad3s7ulnrze3h53sbzzg5gad.onion/";
 
-// The SecurityOps ecosystem, surfaced as Tor Browser bookmarks (each opens
-// through the Tor proxy). Replaces the standalone hosted-apps.
+// Every live SecurityOps .onion hidden service, surfaced as Tor Browser
+// bookmarks (each opens through the Tor proxy — they only resolve over Tor).
+// Sourced from the operator's hidden-service directory at https://securityops.co/.
+// Only services with a running upstream listener are bookmarked; the disabled
+// onions (Evelin, BrutePass, Zupt, Extension — keys on disk but no listener) and
+// the duplicate SecTube alias are intentionally omitted so no bookmark dead-ends.
 const BOOKMARKS: { name: string; url: string }[] = [
   { name: "Search", url: TOR_HOME },
-  { name: "SecurityOps", url: "https://securityops.co/" },
-  { name: "SecTube", url: "https://yt.securityops.co/" },
-  { name: "BTP", url: "https://btp.securityops.co/" },
-  { name: "Chat", url: "https://chat.securityops.co/" },
-  { name: "Scan", url: "https://scan.securityops.co/" },
-  { name: "Git", url: "https://git.securityops.co/" },
-  { name: "Guix", url: "https://guix.securityops.co/" },
-  { name: "Paste", url: "https://paste.securityops.co/" },
-  { name: "News", url: "https://news.securityops.co/" },
-  { name: "Quantico", url: "https://quantico.securityops.co/" },
-  { name: "Wiki", url: "https://wiki.securityops.co/" },
-  { name: "Vaptvupt", url: "https://vaptvupt.securityops.co/" },
-  { name: "Evelin", url: "https://evelin.securityops.co/" },
+  {
+    name: "Hacker News",
+    url: "http://secopss43hhdlot4xf7iinqknjdzjczrhnabgub3rjl3nrrwki26q6id.onion/",
+  },
+  {
+    name: "SecTube",
+    url: "http://secopsenznutinn7xhhpmqnsutbprf4ppefhznsmspa54x4kwx6olgqd.onion/",
+  },
+  {
+    name: "Binternet",
+    url: "http://secopspz6zsdlmbkfjnvqlp4hdyvxtvutnfzesj5tf66u2vui2e7kvad.onion/",
+  },
+  {
+    name: "WebCheck",
+    url: "http://secopspqmua4vjdpkhuu6b3dh45o5t7bdch4wl2xadicpksbwi2xp2qd.onion/",
+  },
+  {
+    name: "Keywave",
+    url: "http://secopshnfap6cllndkzxf7345kjlbgqvfdkyrv6jfwkkfcwxtdfcqgid.onion/",
+  },
+  {
+    name: "SecChat",
+    url: "http://secops5qrrxmlsv3nezdyxc77v7cg57civtre6tqr2phk6uwvrxccjqd.onion/",
+  },
+  {
+    name: "PrivateBin",
+    url: "http://secopslhalclg4yet3mn6ftp25ncxsfrkrjsvkzfq4rrlxhf2zujbtyd.onion/",
+  },
+  {
+    name: "Passky",
+    url: "http://secopsqofiycgsnq2oksndqed2bbeh5ggeskiuy6jet326mhnm6rc7id.onion/",
+  },
+  {
+    name: "Forgejo Git",
+    url: "http://secopsrcfow4lzndhjsgetvwgxfc4h6citkc6alwy4tw7xluvjouytad.onion/",
+  },
+  {
+    name: "Zupt Web",
+    url: "http://secopsuwwht2unomwt3jofl33kfqsfd2z6cwip6rbqlapi7s4pys5vyd.onion/",
+  },
+  {
+    name: "URL Shortener",
+    url: "http://secops6ajpd6ggqtqbcgesq3f6ma67lzti4xj5qdyv3yirtl2mzatvyd.onion/",
+  },
 ];
 
 // A dedicated anonymous browser: every site is fetched server-side through Tor

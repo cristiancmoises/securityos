@@ -11,10 +11,12 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
 
 ## ✨ Highlights
 
-- **🧅 Tor by default** — the in-OS **Browser** and **Tor Browser** route every request
+- **🧅 Two browsers, by threat model** — the **Tor Browser** routes every request
   through a server-side privacy proxy over Tor (SOCKS5h, so `.onion` resolves and
-  clear-net hostnames never leak). The proxy is SSRF-guarded, forwards only an
-  allowlist of response headers, rewrites links/forms to stay on Tor, and logs nothing.
+  clear-net hostnames never leak), while the **Clearnet Browser** opens any site
+  in-app with a **LibreJS-style "good JS only"** filter. The proxy is SSRF-guarded,
+  forwards only an allowlist of response headers, rewrites links/forms to stay
+  in-app, and logs nothing. See [Browsers](#-browsers).
 - **🦀 Memory-safe proxy sidecar** — the untrusted fetch + HTML-rewriting path is also
   available as a Rust sidecar (Tor SOCKS5h, DNS-pinned SSRF guard, `lol_html`
   streaming rewriter); the OS delegates to it and transparently falls back to the
@@ -39,6 +41,40 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
   `df`, `tree`, `stat`, and more.
 - **🖼️ Custom wallpaper** — set a background from an image URL or a proxied link;
   adjustable fit. **📋 Paste** any file/image from the clipboard straight onto the Desktop.
+
+---
+
+## 🌐 Browsers
+
+SecurityOS ships **two** browsers — pick by threat model:
+
+### 🧅 Tor Browser — *anonymity first*
+- Every request is routed through **Tor** (SOCKS5h, including DNS) via the
+  default obfs4 bridge, so `.onion` resolves and your IP is never revealed.
+- **JavaScript is OFF by default** (toolbar toggle) to minimize the
+  fingerprint and attack surface — Tor-Browser-"Safest" style.
+- Bookmarks point at the SecurityOps **hidden services**. Use it for
+  `.onion` sites and any browsing where your IP must stay hidden.
+
+### 🌍 Clearnet Browser — *usability first*
+- Opens ordinary `https://` sites **inside** the webOS. Pages are fetched
+  server-side through the privacy proxy, which strips `X-Frame-Options`
+  and `Content-Security-Policy` so sites that normally block embedding
+  still load. Links that would open a new tab are kept **inside the app**
+  (no escaping to your host browser).
+- **JavaScript policy — only "good" JS runs.** Scripts are filtered
+  **LibreJS-style**: first-party scripts and trivial/free-licensed inline
+  scripts are kept, while **third-party / nonfree JavaScript** (trackers,
+  ads, fingerprinting) is **blocked**. A site whose JS is free-licensed
+  (e.g. our own `*.securityops.co` apps) stays fully usable; commercial
+  sites load with their nonfree JS disabled.
+  - The **JS** toolbar button toggles **"Allow all JS"** per page when a
+    site needs everything to run.
+- The **shield** button switches between **proxied** (recommended) and a
+  direct load. Keep it **ON** for `*.securityops.co` apps — they send
+  `X-Frame-Options` and only embed through the proxy.
+- Typing a `.onion` URL here automatically hands it off to the **Tor
+  Browser** (onions require Tor).
 
 ---
 

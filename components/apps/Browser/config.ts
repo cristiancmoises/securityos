@@ -82,6 +82,31 @@ export const bookmarks: Bookmark[] = [
     name: "News",
     url: "https://news.securityops.co",
   },
+  {
+    icon: "/System/Icons/vaptvupt.webp",
+    name: "Vaptvupt",
+    url: "https://vaptvupt.securityops.co",
+  },
+  {
+    icon: "/System/Icons/Favicons/chat.webp",
+    name: "WhatsAppEl",
+    url: "https://whatsappel.securityops.co",
+  },
+  {
+    icon: "/System/Icons/Favicons/jitsi.webp",
+    name: "TurboRec",
+    url: "https://turborec.securityops.co",
+  },
+  {
+    icon: "/System/Icons/Favicons/news.webp",
+    name: "Redlib",
+    url: "https://libre.securityops.co",
+  },
+  {
+    icon: "/System/Icons/Favicons/home.webp",
+    name: "Portfolio Ops",
+    url: "https://portfolio.securityops.co",
+  },
 ];
 
 export const HOME_PAGE = "https://securityops.co";

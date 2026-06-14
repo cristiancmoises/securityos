@@ -1,7 +1,6 @@
 import {
   bookmarks,
   HOME_PAGE,
-  isFirstPartyUrl,
   PROXY_ENABLED_BY_DEFAULT,
   PROXY_PATH,
 } from "components/apps/Browser/config";
@@ -59,6 +58,11 @@ const Browser: FC<ComponentProcessProps> = ({ id }) => {
   // Tor + strips X-Frame-Options/CSP so sites that block embedding load). OFF loads
   // the page directly (its real origin + cookies) — for interactive/login sites.
   const [proxyEnabled, setProxyEnabled] = useState(PROXY_ENABLED_BY_DEFAULT);
+  // LibreJS-style filter (ON by default): the proxy keeps only first-party +
+  // trivial/free-licensed JavaScript and strips third-party/nonfree scripts
+  // (trackers, ads, fingerprinting). Toggle OFF to allow all JS on a page that
+  // needs it. Only meaningful while the privacy proxy is ON.
+  const [libreJsEnabled, setLibreJsEnabled] = useState(true);
   const currentUrl = useRef("");
   const changeHistory = (step: number): void => {
     moveHistory(step);
@@ -87,26 +91,28 @@ const Browser: FC<ComponentProcessProps> = ({ id }) => {
 
       const addressUrl = await getUrlOrSearch(addressInput);
 
-      // Full external websites open in the dedicated Tor Browser (anonymous, JS
-      // off by default). This Browser stays for first-party SecurityOps apps +
-      // local files. .onion and search also go to the Tor Browser.
-      if (isHttpUrl(addressUrl) && !isFirstPartyUrl(addressUrl)) {
+      // This is the CLEARNET browser — it opens any website in the webOS. .onion
+      // sites need Tor, so hand those off to the dedicated Tor Browser.
+      if (isHttpUrl(addressUrl) && isOnionUrl(addressUrl)) {
         open("TorBrowser", { url: addressInput });
         setLoading(false);
         if (inputRef.current) inputRef.current.value = currentUrl.current;
         return;
       }
 
-      // First-party SecurityOps sites (incl. securityops.co) send
-      // X-Frame-Options: SAMEORIGIN, so loading them directly is blocked (blank).
-      // Route them through the Tor proxy by default too (it strips the framing
-      // header) so they actually render. The shield toggle still forces direct.
-      const useProxy =
-        isHttpUrl(addressUrl) && (isOnionUrl(addressUrl) || proxyEnabled);
+      // Route clearnet pages through the proxy with ?direct=1 (no Tor) — it strips
+      // X-Frame-Options/CSP so sites that block embedding still load in-app, and
+      // exits over the normal connection. The shield toggle loads the page directly
+      // (its real origin) instead.
+      const useProxy = isHttpUrl(addressUrl) && proxyEnabled;
 
       setSrcDoc("");
       setSrc(
-        useProxy ? `${PROXY_PATH}${encodeURIComponent(addressUrl)}` : addressUrl
+        useProxy
+          ? `${PROXY_PATH}${encodeURIComponent(addressUrl)}&direct=1${
+              libreJsEnabled ? "&librejs=1" : ""
+            }`
+          : addressUrl
       );
       setIcon(id, processDirectory.Browser.icon);
 
@@ -158,12 +164,25 @@ const Browser: FC<ComponentProcessProps> = ({ id }) => {
         favicon.src = faviconUrl;
       }
     },
-    [exists, id, open, prependFileToTitle, proxyEnabled, readFile, setIcon]
+    [
+      exists,
+      id,
+      libreJsEnabled,
+      open,
+      prependFileToTitle,
+      proxyEnabled,
+      readFile,
+      setIcon,
+    ]
   );
   const toggleProxy = useCallback((): void => {
     // Force the navigation effect to reload the current page in the new mode.
     currentUrl.current = "";
     setProxyEnabled((prev) => !prev);
+  }, []);
+  const toggleLibreJs = useCallback((): void => {
+    currentUrl.current = "";
+    setLibreJsEnabled((prev) => !prev);
   }, []);
 
   useEffect(() => {
@@ -227,6 +246,32 @@ const Browser: FC<ComponentProcessProps> = ({ id }) => {
                 stroke="currentColor"
                 strokeLinejoin="round"
                 strokeWidth="1.7"
+              />
+            </svg>
+          </Button>
+          <Button
+            disabled={!proxyEnabled}
+            onClick={toggleLibreJs}
+            {...label(
+              libreJsEnabled
+                ? "JavaScript: LibreJS filter ON (only free-licensed/first-party JS) — click to allow all JS"
+                : "JavaScript: all allowed — click to re-enable the LibreJS filter"
+            )}
+          >
+            <svg height="16" viewBox="0 0 24 24" width="16">
+              <path
+                d="M3 3h18v18H3z"
+                fill={libreJsEnabled ? "currentColor" : "none"}
+                fillOpacity={libreJsEnabled ? 0.18 : 0}
+                stroke="currentColor"
+                strokeWidth="1.6"
+              />
+              <path
+                d="M13 8v6.2a2.3 2.3 0 1 1-1.6-2.2"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeWidth="1.9"
               />
             </svg>
           </Button>

@@ -7,7 +7,7 @@ const StyledLoading = styled.div`
 
   &::before {
     color: #fff;
-    content: "Carregando na velocidade da luz...";
+    content: "Loading at the speed of light...";
     display: flex;
     font-size: 12px;
     justify-content: center;

@@ -47,13 +47,13 @@ const Sidebar: FC<SidebarProps> = ({ height }) => {
     {
       heading: true,
       icon: <SideMenu />,
-      name: "Iniciar",
+      name: "Start",
       ...(collapsed && { tooltip: "Expand" }),
     },
     {
       active: true,
       icon: <AllApps />,
-      name: "Todos os Programas",
+      name: "All Programs",
       ...(collapsed && { tooltip: "All apps" }),
     },
   ];

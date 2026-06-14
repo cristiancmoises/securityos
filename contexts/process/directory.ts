@@ -30,7 +30,7 @@ const directory: Processes = {
       width: 640,
     },
     icon: "/System/Icons/chromium.webp",
-    title: "Browser",
+    title: "Clearnet Browser",
   },
   Vaptvupt: {
     Component: dynamic(() => import("components/apps/VaptvuptGui")),

@@ -128,15 +128,18 @@ const isBlockedHostname = (hostname: string): boolean => {
   );
 };
 
-const assertAllowedUrl = async (u: URL): Promise<void> => {
+const assertAllowedUrl = async (u: URL, forceCheck = false): Promise<void> => {
   if (!/^https?:$/.test(u.protocol)) throw new Error("scheme");
 
   // Tor hidden services resolve/route only inside Tor and are never a LAN IP.
-  if (u.hostname.toLowerCase().endsWith(".onion")) return;
+  // (In direct/clearnet mode an .onion can't be reached anyway — fall through so
+  // the DNS lookup fails it.)
+  if (!forceCheck && u.hostname.toLowerCase().endsWith(".onion")) return;
 
   // In Tor mode Tor cannot reach the LAN/metadata, and a local DNS lookup would
-  // leak the hostname — so skip the local resolve and let Tor handle it.
-  if (TOR_PROXY) return;
+  // leak the hostname — so skip the local resolve and let Tor handle it. BUT a
+  // clearnet (direct=1) fetch CAN reach the LAN, so it must run the full guard.
+  if (TOR_PROXY && !forceCheck) return;
 
   if (isBlockedHostname(u.hostname)) throw new Error("blocked-host");
 
@@ -161,13 +164,20 @@ type ProxyResponse = {
 // body size and never auto-follows redirects (the caller revalidates each hop).
 const httpGet = (
   urlStr: string,
-  maxBytes: number = MAX_RESPONSE_BYTES
+  maxBytes: number = MAX_RESPONSE_BYTES,
+  useTor = true
 ): Promise<ProxyResponse> =>
   new Promise((resolve, reject) => {
     const lib = new URL(urlStr).protocol === "https:" ? https : http;
     const request = lib.request(
       urlStr,
-      { agent: socksAgent, headers: BROWSER_HEADERS, method: "GET" },
+      {
+        // Tor by default; the Clearnet Browser passes ?direct=1 (useTor=false) to
+        // fetch over the normal connection. SSRF guard still applies either way.
+        agent: useTor ? socksAgent : undefined,
+        headers: BROWSER_HEADERS,
+        method: "GET",
+      },
       (response) => {
         const chunks: Buffer[] = [];
         let total = 0;
@@ -232,14 +242,115 @@ const proxify = (
 const clientShim = (proxyPrefix: string, base: string): string =>
   `<script>(function(){var P=${JSON.stringify(proxyPrefix)},B=${JSON.stringify(
     base
-  )};function abs(u){try{return new URL(u,B).href}catch(e){return u}}function px(u){if(u==null)return u;var s=String(u);if(/^(data:|blob:|javascript:|about:|#|mailto:|tel:)/i.test(s))return u;if(s.indexOf(P)===0)return u;var a=abs(s);if(!/^https?:/i.test(a))return u;return P+encodeURIComponent(a)}try{var of=window.fetch;if(of)window.fetch=function(i,init){try{if(typeof i==="string")i=px(i);else if(i&&i.url)i=new Request(px(i.url),i)}catch(e){}return of.call(this,i,init)};var xo=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u){var a=[].slice.call(arguments);try{a[1]=px(u)}catch(e){}return xo.apply(this,a)};if(navigator.sendBeacon){var sb=navigator.sendBeacon.bind(navigator);navigator.sendBeacon=function(u,d){try{u=px(u)}catch(e){}return sb(u,d)}}var ES=window.EventSource;if(ES){window.EventSource=function(u,c){try{u=px(u)}catch(e){}return new ES(u,c)};window.EventSource.prototype=ES.prototype}window.WebSocket=function(){throw new Error("WebSocket blocked by SecurityOS privacy proxy (would bypass Tor)")}}catch(e){}})();</script>`;
+  )};function abs(u){try{return new URL(u,B).href}catch(e){return u}}function px(u){if(u==null)return u;var s=String(u);if(/^(data:|blob:|javascript:|about:|#|mailto:|tel:)/i.test(s))return u;if(s.indexOf(P)===0)return u;var a=abs(s);if(!/^https?:/i.test(a))return u;return P+encodeURIComponent(a)}try{var of=window.fetch;if(of)window.fetch=function(i,init){try{if(typeof i==="string")i=px(i);else if(i&&i.url)i=new Request(px(i.url),i)}catch(e){}return of.call(this,i,init)};var xo=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u){var a=[].slice.call(arguments);try{a[1]=px(u)}catch(e){}return xo.apply(this,a)};if(navigator.sendBeacon){var sb=navigator.sendBeacon.bind(navigator);navigator.sendBeacon=function(u,d){try{u=px(u)}catch(e){}return sb(u,d)}}var ES=window.EventSource;if(ES){window.EventSource=function(u,c){try{u=px(u)}catch(e){}return new ES(u,c)};window.EventSource.prototype=ES.prototype}window.open=function(u){try{if(u)top.location.href=px(String(u))}catch(e){}return null};window.WebSocket=function(){throw new Error("WebSocket blocked by SecurityOS privacy proxy (would bypass Tor)")}}catch(e){}})();</script>`;
+
+// LibreJS-style "good JavaScript only" filter. GNU LibreJS lets a script run only
+// when it is either trivial or carries a recognized free-software license. We apply
+// a pragmatic, fully synchronous variant (no extra network round-trips) tuned to
+// make the Clearnet Browser usable while still blocking the nonfree JS that powers
+// tracking/ads/fingerprinting:
+//   - third-party (cross-origin) <script src> is removed outright;
+//   - first-party (same-origin) <script src> is kept (the site's own code);
+//   - inline <script> is kept only when trivial OR free-licensed, else removed;
+//   - inline on*= event handlers are removed (nonfree-by-default per LibreJS).
+// A site whose JS is fully free-licensed (e.g. our own *.securityops.co apps) keeps
+// working; commercial sites load but with their nonfree JS disabled. Users can opt
+// out per page with the browser's "Allow all JS" toggle (drops &librejs=1).
+const FREE_LICENSE_RE =
+  /@licstart|@license/i;
+const FREE_LICENSE_NAME_RE =
+  /\b(GPL|AGPL|LGPL|MIT|Expat|X11|BSD|ISC|Apache(?:[-\s]?2)?|MPL|Mozilla Public|CC0|CC[-\s]?0|Public Domain|Unlicense|WTFPL|Boost|zlib|Artistic)\b/i;
+// LibreJS only ever emits magnet links for genuinely free licenses.
+const FREE_LICENSE_MAGNET_RE = /@license\s+magnet:\?xt=urn:btih:/i;
+// "Trivial" ≈ short and free of dynamic/AJAX constructs that LibreJS treats as
+// nonfree-by-default.
+const NONTRIVIAL_JS_RE =
+  /\b(eval|new\s+Function|Function\s*\(|XMLHttpRequest|fetch\s*\(|import\s*\(|require\s*\(|WebSocket|document\.write|innerHTML|insertAdjacentHTML)\b/i;
+
+const isFreeLicensedScript = (body: string): boolean =>
+  FREE_LICENSE_MAGNET_RE.test(body) ||
+  (FREE_LICENSE_RE.test(body) && FREE_LICENSE_NAME_RE.test(body));
+
+const isTrivialScript = (body: string): boolean => {
+  const trimmed = body.trim();
+
+  return trimmed.length <= 1000 && !NONTRIVIAL_JS_RE.test(trimmed);
+};
+
+const sameOrigin = (rawSrc: string, base: string): boolean => {
+  try {
+    return new URL(rawSrc.trim(), base).host === new URL(base).host;
+  } catch {
+    return false;
+  }
+};
+
+const applyLibreJs = (html: string, base: string): string => {
+  let out = html;
+
+  // Drop inline event-handler attributes (onclick=, onload=, …) — nonfree by
+  // default under LibreJS.
+  out = out.replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+
+  // Filter every <script> element.
+  out = out.replace(
+    /<script\b([^>]*)>([\s\S]*?)<\/script>/gi,
+    (match, attrs: string, body: string) => {
+      // Leave non-JS script blocks (JSON-LD, importmap, templates) untouched.
+      const typeMatch = /\stype\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(
+        attrs
+      );
+      const type = (
+        typeMatch?.[2] ??
+        typeMatch?.[3] ??
+        typeMatch?.[4] ??
+        ""
+      ).toLowerCase();
+      const isJs =
+        type === "" ||
+        type === "text/javascript" ||
+        type === "application/javascript" ||
+        type === "module";
+
+      if (!isJs) return match;
+
+      const srcMatch = /\ssrc\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(
+        attrs
+      );
+
+      if (srcMatch) {
+        const src = srcMatch[2] ?? srcMatch[3] ?? srcMatch[4] ?? "";
+
+        // Keep first-party scripts; strip third-party (tracking/ad) scripts.
+        return sameOrigin(src, base) ? match : "";
+      }
+
+      // Inline script: keep only if trivial or free-licensed.
+      return isTrivialScript(body) || isFreeLicensedScript(body) ? match : "";
+    }
+  );
+
+  // Self-closing external scripts: keep first-party only.
+  out = out.replace(/<script\b([^>]*)\/>/gi, (match, attrs: string) => {
+    const srcMatch = /\ssrc\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attrs);
+
+    if (!srcMatch) return "";
+
+    const src = srcMatch[2] ?? srcMatch[3] ?? srcMatch[4] ?? "";
+
+    return sameOrigin(src, base) ? match : "";
+  });
+
+  return out;
+};
 
 const rewriteHtml = (
   html: string,
   base: string,
   origin: string,
   noJs: boolean,
-  injectExt: boolean
+  injectExt: boolean,
+  libreJs: boolean
 ): string => {
   const proxyPrefix = `${origin}/api/proxy?url=`;
   const px = (u: string): string => proxify(u, base, origin, noJs, injectExt);
@@ -250,6 +361,10 @@ const rewriteHtml = (
     /<meta[^>]+http-equiv\s*=\s*["']?(?:content-security-policy|refresh)["']?[^>]*>/gi,
     ""
   );
+  // Keep "new tab" links INSIDE the in-OS browser: force target=_blank (and any
+  // other target) to _self so they navigate this iframe instead of opening a real
+  // browser tab.
+  out = out.replace(/\starget\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, ' target="_self"');
 
   if (noJs) {
     // Tor-Browser-"Safest" style: remove all scripts, inline handlers and
@@ -259,6 +374,9 @@ const rewriteHtml = (
     out = out.replace(/<script\b[^>]*\/>/gi, "");
     out = out.replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
     out = out.replace(/<\/?noscript[^>]*>/gi, "");
+  } else if (libreJs) {
+    // LibreJS-style filter: keep only first-party + trivial/free-licensed JS.
+    out = applyLibreJs(out, base);
   }
 
   out = out.replace(
@@ -396,6 +514,16 @@ const handler = async (
   const isBin =
     req.query.bin === "1" ||
     (Array.isArray(req.query.bin) && req.query.bin.includes("1"));
+  // Clearnet Browser: fetch over the normal connection (no Tor), framing stripped
+  // so any site embeds. Still SSRF-guarded. (The Tor Browser omits this.)
+  const isDirect =
+    req.query.direct === "1" ||
+    (Array.isArray(req.query.direct) && req.query.direct.includes("1"));
+  // LibreJS-style filter: keep only first-party + trivial/free-licensed JS, strip
+  // third-party/nonfree scripts (the Clearnet Browser enables this by default).
+  const libreJs =
+    req.query.librejs === "1" ||
+    (Array.isArray(req.query.librejs) && req.query.librejs.includes("1"));
 
   // GET-form support: rewritten forms submit to /api/proxy with the real target in
   // __pxurl plus the form fields as normal query params (a GET submit drops the
@@ -408,7 +536,16 @@ const handler = async (
 
     try {
       const merged = new URL(pxurl);
-      const reserved = new Set(["url", "__pxurl", "nojs", "ext", "origin"]);
+      const reserved = new Set([
+        "url",
+        "__pxurl",
+        "nojs",
+        "ext",
+        "origin",
+        "direct",
+        "bin",
+        "librejs",
+      ]);
 
       Object.entries(req.query).forEach(([key, value]) => {
         if (reserved.has(key)) return;
@@ -437,7 +574,7 @@ const handler = async (
   // Delegate to the memory-safe Rust sidecar when configured. Extension-injection
   // requests stay on the Node path (that feature lives here). On ANY sidecar error
   // we fall through to the built-in proxy below, so browsing never hard-fails.
-  if (PROXY_SIDECAR_URL && !injectExt && !isBin) {
+  if (PROXY_SIDECAR_URL && !injectExt && !isBin && !isDirect && !libreJs) {
     try {
       const sidecar = `${PROXY_SIDECAR_URL.replace(/\/+$/, "")}/proxy?url=${encodeURIComponent(
         target.href
@@ -473,11 +610,12 @@ const handler = async (
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
       // eslint-disable-next-line no-await-in-loop
-      await assertAllowedUrl(current);
+      await assertAllowedUrl(current, isDirect);
       // eslint-disable-next-line no-await-in-loop
       response = await httpGet(
         current.href,
-        isBin ? MAX_BIN_BYTES : MAX_RESPONSE_BYTES
+        isBin ? MAX_BIN_BYTES : MAX_RESPONSE_BYTES,
+        !isDirect
       );
 
       const location = response.headers.location;
@@ -526,7 +664,8 @@ const handler = async (
           current.href,
           ourOrigin(req),
           noJs,
-          injectExt
+          injectExt,
+          libreJs
         )
       );
     } else {
