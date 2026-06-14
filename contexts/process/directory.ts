@@ -43,6 +43,17 @@ const directory: Processes = {
     singleton: true,
     title: "Vaptvupt",
   },
+  SecChat: {
+    Component: dynamic(() => import("components/apps/SecChat")),
+    backgroundColor: "#150f1b",
+    defaultSize: {
+      height: 600,
+      width: 820,
+    },
+    icon: "/System/Icons/secchat.webp",
+    singleton: true,
+    title: "SecChat",
+  },
   SecTube: {
     Component: dynamic(() => import("components/apps/SecTube")),
     backgroundColor: "#0f0f0f",

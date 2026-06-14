@@ -60,6 +60,3 @@ id_ed25519
 secrets.json
 .tor/
 deploy/secrets/
-
-!public/Users/Public/Start Menu/SecurityOps
-!public/Users/Public/Start Menu/SecurityOps/*.url

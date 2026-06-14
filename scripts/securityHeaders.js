@@ -86,18 +86,21 @@ const PERMISSIONS_POLICY = [
   "accelerometer=()",
   // SecTube (yt.securityops.co) is embedded cross-origin and needs these features
   // DELEGATED to it; (self) alone blocks delegation, so the video player can't play.
-  'autoplay=(self "https://yt.securityops.co")',
-  "camera=()",
-  "display-capture=()",
+  'autoplay=(self "https://yt.securityops.co" "https://chat.securityops.co")',
+  // SecChat (chat.securityops.co) is an end-to-end video chat embedded cross-origin;
+  // its webcam/mic/screen-share need these features DELEGATED to it, or WebRTC's
+  // getUserMedia is blocked regardless of the iframe `allow` attribute.
+  'camera=(self "https://chat.securityops.co")',
+  'display-capture=(self "https://chat.securityops.co")',
   'encrypted-media=(self "https://yt.securityops.co")',
-  'fullscreen=(self "https://yt.securityops.co")',
+  'fullscreen=(self "https://yt.securityops.co" "https://chat.securityops.co")',
   "gamepad=(self)",
   "geolocation=()",
   "gyroscope=()",
   "hid=()",
   "idle-detection=()",
   "magnetometer=()",
-  "microphone=()",
+  'microphone=(self "https://chat.securityops.co")',
   "midi=()",
   "payment=()",
   "publickey-credentials-get=()",
