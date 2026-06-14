@@ -1,21 +1,23 @@
+import { PROXY_PATH } from "components/apps/Browser/config";
 import type { ComponentProcessProps } from "components/system/Apps/RenderComponent";
 import styled from "styled-components";
-import { IFRAME_CONFIG } from "utils/constants";
+import { SANDBOXED_IFRAME_CONFIG } from "utils/constants";
 
-// VaptVupt — the SecurityOps file share (share.securityops.co), loaded DIRECTLY
-// (real origin, cookies, full JavaScript) so the site is FULLY usable: login,
-// upload, manage and download shares — everything a real browser tab can do.
+// VaptVupt — the SecurityOps file share (share.securityops.co).
 //
-// Like SecChat, this only renders if share.securityops.co allows being framed by
-// the SecurityOS origin. It currently sends `X-Frame-Options: DENY` and CSP
-// `frame-ancestors 'none'`, which block ALL embedding (the iframe stays blank).
-// To enable full usage, on share.securityops.co:
-//   • remove `X-Frame-Options: DENY`
-//   • set `Content-Security-Policy: frame-ancestors 'self' https://<your-SecurityOS-origin>`
-// (Routing it through the privacy proxy would strip those headers and render it
-// now, but in an opaque sandbox where login/cookies don't persist — i.e. NOT full
-// usage — so we load it direct, the way an interactive first-party app needs.)
+// share.securityops.co sends `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'`,
+// which block ALL direct embedding — the iframe shows "refused to connect". So we
+// load it through the privacy proxy (`?direct=1`: server-side fetch over the normal
+// connection), which strips those framing headers and rewrites the page so it
+// renders here, in an opaque-origin sandbox. Full JavaScript runs (no nojs/librejs
+// flag), so browsing/upload/download work.
+//
+// Trade-off: because the sandbox is opaque (no allow-same-origin) and the proxy
+// doesn't forward Set-Cookie, a login session won't persist. For full login/cookies,
+// allow framing on share.securityops.co (drop X-Frame-Options; set
+// `frame-ancestors 'self' https://<your-SecurityOS-origin>`) and load it direct.
 const VAPTVUPT_URL = "https://share.securityops.co/";
+const VAPTVUPT_SRC = `${PROXY_PATH}${encodeURIComponent(VAPTVUPT_URL)}&direct=1`;
 const VAPTVUPT_ALLOW = "clipboard-read; clipboard-write; fullscreen";
 
 const StyledVaptvupt = styled.iframe`
@@ -29,9 +31,9 @@ const StyledVaptvupt = styled.iframe`
 const Vaptvupt: FC<ComponentProcessProps> = ({ id }) => (
   <StyledVaptvupt
     allow={VAPTVUPT_ALLOW}
-    src={VAPTVUPT_URL}
+    src={VAPTVUPT_SRC}
     title={id}
-    {...IFRAME_CONFIG}
+    {...SANDBOXED_IFRAME_CONFIG}
   />
 );
 
