@@ -11,12 +11,14 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
 
 ## ✨ Highlights
 
-- **🧅 Two browsers, by threat model** — the **Tor Browser** routes every request
-  through a server-side privacy proxy over Tor (SOCKS5h, so `.onion` resolves and
-  clear-net hostnames never leak), while the **Clearnet Browser** opens any site
-  in-app with a **LibreJS-style "good JS only"** filter. The proxy is SSRF-guarded,
-  forwards only an allowlist of response headers, rewrites links/forms to stay
-  in-app, and logs nothing. See [Browsers](#-browsers).
+- **🧅 Two tabbed browsers, by threat model** — the **Tor Browser** routes every
+  request through a server-side privacy proxy over Tor (SOCKS5h, so `.onion`
+  resolves and clear-net hostnames never leak), while the **Clearnet Browser**
+  opens any site in-app with a **LibreJS-style "good JS only"** filter. Both have
+  real **tabs** (per-tab history; Ctrl/⌘- or middle-click for a new tab). The
+  proxy is SSRF-guarded, fails closed if Tor is misconfigured, pins the
+  SSRF-validated IP, forwards only an allowlist of response headers, rewrites
+  links/forms to stay in-app, and logs nothing. See [Browsers](#-browsers).
 - **🦀 Memory-safe proxy sidecar** — the untrusted fetch + HTML-rewriting path is also
   available as a Rust sidecar (Tor SOCKS5h, DNS-pinned SSRF guard, `lol_html`
   streaming rewriter); the OS delegates to it and transparently falls back to the
@@ -25,8 +27,8 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
   - **Password mode:** PBKDF2-SHA256 → AES-256-CTR + HMAC-SHA256 (encrypt-then-MAC) → `.zupt`.
   - **Post-quantum public-key mode:** **ML-KEM-768 + X25519 hybrid** — generate a
     keypair, encrypt to a public key, decrypt with the private key.
-  - Exposed in the **Vaptvupt app**, the **Terminal** (`vaptvupt`/`encrypt`/`decrypt`),
-    and the file-manager right-click menu.
+  - Exposed in the **Terminal** (`vaptvupt`/`encrypt`/`decrypt`) and the
+    file-manager right-click **Encrypt/Decrypt** menu.
 - **🗑️ Secure delete** — right-click any file/folder → overwrite with **random (3-pass)**
   or **zeros**, then delete.
 - **🧠 Amnesia** — containers run read-only with RAM-only `tmpfs` (no volumes, no logs);
@@ -36,6 +38,10 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
 - **🧅 TAILS** — a launcher with **CI-verified** (OpenPGP signature + SHA-256) downloads,
   auto-updated by the `tails-iso` GitHub/Forgejo action.
 - **📺 SecTube** — the SecurityOps video frontend, embedded for playback.
+- **📁 Vaptvupt file share & SecChat** — first-party SecurityOps apps embedded
+  in-OS at their real origin for full usage: **Vaptvupt** opens the file share
+  (`share.securityops.co`); **SecChat** is encrypted video chat. (Both require the
+  site to allow framing from the SecurityOS origin.)
 - **🧰 Security Tools** — an offline suite (hashing, encoding, entropy, UUID, …).
 - **⌨️ Expanded terminal** — UNIX-style commands plus `curl`/`wget` over Tor, `du`,
   `df`, `tree`, `stat`, and more.
