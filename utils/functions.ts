@@ -516,7 +516,10 @@ export const getTZOffsetISOString = (): string => {
   ).toISOString();
 };
 
-export const getUrlOrSearch = async (input: string): Promise<string> => {
+export const getUrlOrSearch = async (
+  input: string,
+  searchQuery: string = SEARCH_QUERY
+): Promise<string> => {
   const isIpfs = input.startsWith("ipfs://");
   const hasHttpSchema =
     input.startsWith("http://") || input.startsWith("https://");
@@ -549,12 +552,12 @@ export const getUrlOrSearch = async (input: string): Promise<string> => {
     // (javascript:, data:, blob:, file:, vbscript:, …) is treated as a search
     // query so the address bar can never be used to script the embedder.
     if (url.protocol !== "http:" && url.protocol !== "https:") {
-      return `${SEARCH_QUERY}${input}`;
+      return `${searchQuery}${input}`;
     }
 
     return url.href;
   } catch {
-    return `${SEARCH_QUERY}${input}`;
+    return `${searchQuery}${input}`;
   }
 };
 

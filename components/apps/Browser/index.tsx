@@ -1,6 +1,8 @@
 import {
   bookmarks,
+  CLEARNET_SEARCH_QUERY,
   HOME_PAGE,
+  isFirstPartyUrl,
   PROXY_ENABLED_BY_DEFAULT,
   PROXY_PATH,
 } from "components/apps/Browser/config";
@@ -22,7 +24,7 @@ import {
   ONE_TIME_PASSIVE_EVENT,
   SANDBOXED_IFRAME_CONFIG,
 } from "utils/constants";
-import { getUrlOrSearch, label, SEARCH_QUERY } from "utils/functions";
+import { getUrlOrSearch, label } from "utils/functions";
 
 const isHttpUrl = (value: string): boolean =>
   value.startsWith("http://") || value.startsWith("https://");
@@ -89,7 +91,10 @@ const Browser: FC<ComponentProcessProps> = ({ id }) => {
         return;
       }
 
-      const addressUrl = await getUrlOrSearch(addressInput);
+      const addressUrl = await getUrlOrSearch(
+        addressInput,
+        CLEARNET_SEARCH_QUERY
+      );
 
       // This is the CLEARNET browser — it opens any website in the webOS. .onion
       // sites need Tor, so hand those off to the dedicated Tor Browser.
@@ -100,16 +105,22 @@ const Browser: FC<ComponentProcessProps> = ({ id }) => {
         return;
       }
 
-      // Route clearnet pages through the proxy with ?direct=1 (no Tor) — it strips
-      // X-Frame-Options/CSP so sites that block embedding still load in-app, and
-      // exits over the normal connection. The shield toggle loads the page directly
-      // (its real origin) instead.
-      const useProxy = isHttpUrl(addressUrl) && proxyEnabled;
+      // First-party SecurityOps sites are interactive (login, cookies, WebSockets),
+      // so load them DIRECT from their real origin. The rewriting proxy strips
+      // cookies + opaque-sandboxes the page, which breaks these apps — that's why
+      // securityops.co failed to load through the proxy before.
+      const firstParty = isHttpUrl(addressUrl) && isFirstPartyUrl(addressUrl);
+
+      // Route THIRD-party clearnet pages through the proxy with ?direct=1 (no Tor):
+      // it strips X-Frame-Options/CSP so sites that block embedding still load,
+      // blocks ads/trackers (&adblock=1), and filters JavaScript LibreJS-style.
+      // The shield toggle loads the page directly (its real origin) instead.
+      const useProxy = isHttpUrl(addressUrl) && proxyEnabled && !firstParty;
 
       setSrcDoc("");
       setSrc(
         useProxy
-          ? `${PROXY_PATH}${encodeURIComponent(addressUrl)}&direct=1${
+          ? `${PROXY_PATH}${encodeURIComponent(addressUrl)}&direct=1&adblock=1${
               libreJsEnabled ? "&librejs=1" : ""
             }`
           : addressUrl
@@ -120,13 +131,13 @@ const Browser: FC<ComponentProcessProps> = ({ id }) => {
       if (
         inputRef.current &&
         document.activeElement !== inputRef.current &&
-        !addressUrl.startsWith(SEARCH_QUERY)
+        !addressUrl.startsWith(CLEARNET_SEARCH_QUERY)
       ) {
         inputRef.current.value = addressInput;
       }
 
-      if (addressUrl.startsWith(SEARCH_QUERY)) {
-        prependFileToTitle(`${addressInput} - DuckDuckGo Search`);
+      if (addressUrl.startsWith(CLEARNET_SEARCH_QUERY)) {
+        prependFileToTitle(`${addressInput} - SecurityOps Search`);
       } else {
         const { name = "" } =
           bookmarks?.find(({ url: bookmarkUrl }) => bookmarkUrl === addressInput) ||

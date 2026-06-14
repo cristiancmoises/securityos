@@ -3,6 +3,7 @@ import https from "https";
 import { lookup } from "dns/promises";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { SocksProxyAgent } from "socks-proxy-agent";
+import { ADBLOCK_COSMETIC_CSS, isAdUrl } from "utils/adblock";
 
 /**
  * SecurityOS privacy proxy.
@@ -221,7 +222,8 @@ const proxify = (
   base: string,
   origin: string,
   noJs: boolean,
-  injectExt: boolean
+  injectExt: boolean,
+  adblock: boolean
 ): string => {
   if (!rawUrl || SKIP_URL.test(rawUrl.trim())) return rawUrl;
 
@@ -230,10 +232,14 @@ const proxify = (
 
     if (!/^https?:$/i.test(new URL(absolute).protocol)) return rawUrl;
 
-    // Carry no-JS + extension flags so navigation keeps the same mode.
+    // Ad/tracker host: neutralize the URL so the resource never loads (no script,
+    // beacon or pixel). `data:,` is an inert empty resource for src/href alike.
+    if (adblock && isAdUrl(absolute)) return "data:,";
+
+    // Carry no-JS + extension + adblock flags so navigation keeps the same mode.
     return `${origin}/api/proxy?url=${encodeURIComponent(absolute)}${
       noJs ? "&nojs=1" : ""
-    }${injectExt ? "&ext=1" : ""}`;
+    }${injectExt ? "&ext=1" : ""}${adblock ? "&adblock=1" : ""}`;
   } catch {
     return rawUrl;
   }
@@ -350,10 +356,12 @@ const rewriteHtml = (
   origin: string,
   noJs: boolean,
   injectExt: boolean,
-  libreJs: boolean
+  libreJs: boolean,
+  adblock: boolean
 ): string => {
   const proxyPrefix = `${origin}/api/proxy?url=`;
-  const px = (u: string): string => proxify(u, base, origin, noJs, injectExt);
+  const px = (u: string): string =>
+    proxify(u, base, origin, noJs, injectExt, adblock);
   let out = html;
 
   out = out.replace(/\sintegrity\s*=\s*("[^"]*"|'[^']*')/gi, "");
@@ -458,12 +466,16 @@ const rewriteHtml = (
               `<script src="${ext}/youtube-adblock.js"></script>`
             : ""));
 
+  // Cosmetic ad-hiding stylesheet (hides ad containers left behind once their
+  // network requests are blocked). Works even with scripts stripped.
+  const adblockStyle = adblock ? `<style>${ADBLOCK_COSMETIC_CSS}</style>` : "";
+
   const head = `${
     noJs ? "" : clientShim(proxyPrefix, base)
   }<base href="${base.replace(
     /"/g,
     "&quot;"
-  )}"><meta name="referrer" content="no-referrer">${extension}`;
+  )}"><meta name="referrer" content="no-referrer">${extension}${adblockStyle}`;
 
   return /<head[^>]*>/i.test(out)
     ? out.replace(/(<head[^>]*>)/i, `$1${head}`)
@@ -524,6 +536,11 @@ const handler = async (
   const libreJs =
     req.query.librejs === "1" ||
     (Array.isArray(req.query.librejs) && req.query.librejs.includes("1"));
+  // Ad/tracker blocking: drop requests to known ad/tracking hosts and hide the
+  // leftover ad containers (the Clearnet Browser enables this by default).
+  const adblock =
+    req.query.adblock === "1" ||
+    (Array.isArray(req.query.adblock) && req.query.adblock.includes("1"));
 
   // GET-form support: rewritten forms submit to /api/proxy with the real target in
   // __pxurl plus the form fields as normal query params (a GET submit drops the
@@ -574,7 +591,14 @@ const handler = async (
   // Delegate to the memory-safe Rust sidecar when configured. Extension-injection
   // requests stay on the Node path (that feature lives here). On ANY sidecar error
   // we fall through to the built-in proxy below, so browsing never hard-fails.
-  if (PROXY_SIDECAR_URL && !injectExt && !isBin && !isDirect && !libreJs) {
+  if (
+    PROXY_SIDECAR_URL &&
+    !injectExt &&
+    !isBin &&
+    !isDirect &&
+    !libreJs &&
+    !adblock
+  ) {
     try {
       const sidecar = `${PROXY_SIDECAR_URL.replace(/\/+$/, "")}/proxy?url=${encodeURIComponent(
         target.href
@@ -665,7 +689,8 @@ const handler = async (
           ourOrigin(req),
           noJs,
           injectExt,
-          libreJs
+          libreJs,
+          adblock
         )
       );
     } else {
