@@ -1,0 +1,233 @@
+/*
+ * Security Ops — Privacy-focused browser extension
+ * Copyright (C) 2024-2026 Cristian Cezar Moises <ethicalhacker@riseup.net>
+ *
+ * This program is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation, either version 3 of the License, or (at your
+ * option) any later version.
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+/* dark-theme.css — Security Ops v8.0.0 site dark theme
+ *
+ * Architecture:
+ *   - Single class hook: html.secops-dark on <html>
+ *   - Color is read from CSS variable --secops-fc (set by content script)
+ *   - Aggressive exclusion list to avoid breaking interactive UI
+ *
+ * v8 changes:
+ *   - Comprehensive YouTube player exclusions (Bug 1: black rectangle)
+ *   - Extended button/icon exclusions (Bug 5: like buttons broken)
+ *   - Custom-element exclusions (yt-*, tp-yt-*, ytd-*, ytmusic-*)
+ *   - Role-based exclusions ([role="button"], [aria-pressed], etc.)
+ */
+
+/* ============================================================
+ * 1) Top-level page background and text color
+ * ============================================================ */
+html.secops-dark,
+html.secops-dark body {
+  background-color: #000000 !important;
+  color: var(--secops-fc, #4dd0e1) !important;
+}
+
+/* ============================================================
+ * 2) The big universal rule — applies black bg + accent color
+ *    to "regular" content elements only.
+ *
+ *    EXCLUDES (by tag):
+ *      Media: video, img, svg, canvas, picture, iframe, object, embed
+ *      Interactive: button, a, input, textarea, select, label
+ *      Code: code, pre, kbd, samp
+ *      Custom: any element with a hyphen in tag name (custom elements)
+ *
+ *    EXCLUDES (by class — YouTube player layers):
+ *      .html5-video-player, .html5-video-container, .video-stream,
+ *      .ytp-* (any YT player chrome), .ytd-player, .ytp-fullerscreen-edu,
+ *      .ytp-cards-button, .ytp-tooltip, .ytp-popup, etc.
+ *
+ *    EXCLUDES (by class — YT app shells):
+ *      .ytd-app, .ytd-watch-flexy, .ytd-page-manager, ytd-thumbnail
+ *
+ *    EXCLUDES (by class — common UI patterns):
+ *      .thumbnail, .avatar, .icon
+ *
+ *    EXCLUDES (by attribute):
+ *      [role="button"], [aria-pressed], [aria-checked]
+ * ============================================================ */
+html.secops-dark *:not(video):not(img):not(svg):not(canvas):not(picture):not(iframe):not(object):not(embed):not(button):not(a):not(input):not(textarea):not(select):not(label):not(code):not(pre):not(kbd):not(samp):not([role="button"]):not([aria-pressed]):not([aria-checked]):not(.thumbnail):not(.avatar):not(.icon):not(.html5-video-player):not(.html5-video-container):not(.video-stream):not(.html5-main-video):not(.ytd-player):not(.ytd-thumbnail):not(.ytd-watch-flexy):not(.ytd-page-manager):not(.ytd-app):not(.ytp-chrome-bottom):not(.ytp-chrome-top):not(.ytp-title-text):not(.ytp-button):not(.ytp-tooltip):not(.ytp-popup) {
+  background-color: #000000 !important;
+  color: var(--secops-fc, #4dd0e1) !important;
+  border-color: #2a3a4d !important;
+  -webkit-text-fill-color: var(--secops-fc, #4dd0e1) !important;
+}
+
+/* ============================================================
+ * 3) YouTube player layers — keep transparent so video shows
+ * ============================================================ */
+html.secops-dark .html5-video-player,
+html.secops-dark .html5-video-container,
+html.secops-dark .video-stream,
+html.secops-dark .html5-main-video,
+html.secops-dark .ytd-player,
+html.secops-dark #player-container,
+html.secops-dark #ytd-player,
+html.secops-dark .ytp-chrome-bottom,
+html.secops-dark .ytp-chrome-top,
+html.secops-dark .ytp-progress-bar-container,
+html.secops-dark .ytp-cued-thumbnail-overlay,
+html.secops-dark .ytp-pause-overlay,
+html.secops-dark .ytp-spinner,
+html.secops-dark .ytp-tooltip,
+html.secops-dark .ytp-popup,
+html.secops-dark .ytp-ce-element,
+html.secops-dark .ytp-iv-player-content,
+html.secops-dark [class*="ytp-"]:not(.ytp-button),
+html.secops-dark .ytd-thumbnail {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* Video element itself — never theme */
+html.secops-dark video,
+html.secops-dark img,
+html.secops-dark svg,
+html.secops-dark canvas,
+html.secops-dark picture,
+html.secops-dark iframe,
+html.secops-dark object,
+html.secops-dark embed {
+  background-color: transparent !important;
+  filter: none !important;
+}
+
+/* ============================================================
+ * 4) Form controls — keep usable
+ * ============================================================ */
+html.secops-dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html.secops-dark textarea,
+html.secops-dark select {
+  background-color: #16222e !important;
+  border: 1px solid #2a3a4d !important;
+  color: var(--secops-fc, #4dd0e1) !important;
+  -webkit-text-fill-color: var(--secops-fc, #4dd0e1) !important;
+}
+html.secops-dark input:focus,
+html.secops-dark textarea:focus,
+html.secops-dark select:focus {
+  background-color: #1f2e3d !important;
+  border-color: var(--secops-fc, #4dd0e1) !important;
+  outline-color: var(--secops-fc, #4dd0e1) !important;
+}
+
+/* Checkboxes and radios keep their native look */
+html.secops-dark input[type="checkbox"],
+html.secops-dark input[type="radio"] {
+  accent-color: var(--secops-fc, #4dd0e1) !important;
+}
+
+/* ============================================================
+ * 5) Buttons — preserve interactivity, only style text
+ * ============================================================ */
+html.secops-dark button,
+html.secops-dark [role="button"] {
+  /* Don't force backgrounds — let the page render its button look */
+  color: var(--secops-fc, #4dd0e1) !important;
+}
+html.secops-dark button *,
+html.secops-dark [role="button"] * {
+  /* But descendants of buttons inherit accent color too */
+  color: var(--secops-fc, #4dd0e1) !important;
+}
+
+/* ============================================================
+ * 6) Links
+ * ============================================================ */
+html.secops-dark a,
+html.secops-dark a:visited,
+html.secops-dark a:active {
+  color: var(--secops-fc, #4dd0e1) !important;
+  -webkit-text-fill-color: var(--secops-fc, #4dd0e1) !important;
+}
+html.secops-dark a:hover {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  text-decoration: underline !important;
+}
+
+/* ============================================================
+ * 7) Code blocks — readable
+ * ============================================================ */
+html.secops-dark code,
+html.secops-dark pre,
+html.secops-dark kbd,
+html.secops-dark samp {
+  background-color: #0a0e14 !important;
+  color: #e6edf3 !important;
+}
+
+/* ============================================================
+ * 8) Force-light overrides — common "white" classes
+ * ============================================================ */
+html.secops-dark .white,
+html.secops-dark .bg-white,
+html.secops-dark .background-white,
+html.secops-dark [class*="bg-white"],
+html.secops-dark [class*="background-white"] {
+  background-color: #000000 !important;
+}
+
+/* ============================================================
+ * 9) YouTube Focus Mode (v8 NEW: youtubeFocusMode setting)
+ * Hides distractions on YouTube watch pages. Activated via
+ * additional class html.secops-yt-focus on documentElement.
+ * ============================================================ */
+html.secops-yt-focus #masthead,
+html.secops-yt-focus #masthead-container,
+html.secops-yt-focus ytd-mini-guide-renderer,
+html.secops-yt-focus tp-yt-app-drawer#guide,
+html.secops-yt-focus #secondary,
+html.secops-yt-focus ytd-watch-next-secondary-results-renderer,
+html.secops-yt-focus #related,
+html.secops-yt-focus ytd-comments,
+html.secops-yt-focus #comments,
+html.secops-yt-focus ytd-merch-shelf-renderer,
+html.secops-yt-focus ytd-rich-shelf-renderer,
+html.secops-yt-focus ytd-mealbar-promo-renderer,
+html.secops-yt-focus ytd-promoted-sparkles-web-renderer,
+html.secops-yt-focus ytd-button-renderer.ytd-watch-metadata,
+html.secops-yt-focus #chips-wrapper,
+html.secops-yt-focus #chips,
+html.secops-yt-focus ytd-feed-filter-chip-bar-renderer,
+html.secops-yt-focus ytd-rich-grid-renderer,
+html.secops-yt-focus ytd-shelf-renderer,
+html.secops-yt-focus ytd-reel-shelf-renderer,
+html.secops-yt-focus ytd-shorts,
+html.secops-yt-focus ytm-pivot-bar-renderer,
+html.secops-yt-focus ytd-notification-topbar-button-renderer,
+html.secops-yt-focus #voice-search-button,
+html.secops-yt-focus ytd-toggle-button-renderer,
+html.secops-yt-focus ytd-button-renderer#share,
+html.secops-yt-focus .ytp-ce-element,
+html.secops-yt-focus .ytp-endscreen-content,
+html.secops-yt-focus .ytp-suggestions,
+html.secops-yt-focus .ytp-pause-overlay,
+html.secops-yt-focus .ytp-cards-teaser,
+html.secops-yt-focus #info-strings,
+html.secops-yt-focus ytd-sentiment-bar-renderer {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* In focus mode, expand the player to fill the page */
+html.secops-yt-focus ytd-watch-flexy[is-two-columns_] #primary,
+html.secops-yt-focus ytd-watch-flexy #primary {
+  margin-right: 0 !important;
+  max-width: none !important;
+  width: 100% !important;
+}
+html.secops-yt-focus ytd-watch-flexy[is-two-columns_] #primary-inner {
+  max-width: 100% !important;
+}

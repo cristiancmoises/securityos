@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SecurityOS — DOM XSS Lab</title>
+<style>
+  body { background:#150f1b; color:#e8e2ee; font:14px/1.5 system-ui, sans-serif; margin:0; padding:20px; }
+  h1 { font-size:18px; } code,pre { background:#0f0b14; color:#d7c2ec; border-radius:4px; padding:2px 6px; font-family:monospace; }
+  .card { background:#1d1526; border:1px solid #3a2f44; border-radius:8px; padding:14px; margin:14px 0; }
+  input { width:100%; box-sizing:border-box; background:#0f0b14; color:#e8e2ee; border:1px solid #4a3a5c; border-radius:5px; padding:8px; font-family:monospace; }
+  button { background:#7d4eaf; color:#fff; border:0; border-radius:5px; padding:7px 14px; cursor:pointer; margin-top:8px; }
+  #out { min-height:40px; border:1px dashed #4a3a5c; border-radius:5px; padding:10px; margin-top:10px; }
+  .warn { color:#e0a83a; }
+</style>
+</head>
+<body>
+  <h1>🧪 DOM XSS Lab <span class="warn">(training sandbox)</span></h1>
+  <p>
+    This page is deliberately vulnerable, <strong>for learning only</strong>. In
+    SecurityOS it is rendered inside the Browser's hardened iframe sandbox
+    (<code>srcDoc</code> with no <code>allow-same-origin</code>), so it runs in an
+    <em>opaque origin</em> and <strong>cannot touch SecurityOS</strong> — a safe
+    place to practice.
+  </p>
+
+  <div class="card">
+    <p><strong>Goal:</strong> make a JavaScript <code>alert()</code> fire by abusing
+    the unsafe sink below.</p>
+    <label for="payload">Your input → rendered with <code>innerHTML</code>:</label>
+    <input id="payload" placeholder="try:  &lt;img src=x onerror=alert(1)&gt;">
+    <button onclick="render()">Render (vulnerable)</button>
+    <div id="out"></div>
+  </div>
+
+  <p class="warn">Stuck? See <code>CTF Practice.md</code> for the walkthrough and the fix.</p>
+
+<script>
+  // VULNERABLE ON PURPOSE: assigns untrusted input straight to innerHTML.
+  function render() {
+    var value = document.getElementById('payload').value;
+    document.getElementById('out').innerHTML = value;   // <-- the bug
+  }
+
+  // --- The FIX (commented out) — how you'd remediate this sink ---
+  // function renderSafe() {
+  //   var value = document.getElementById('payload').value;
+  //   document.getElementById('out').textContent = value;  // textContent never executes markup
+  //   // or sanitize with DOMPurify.sanitize(value) before assigning innerHTML
+  // }
+</script>
+</body>
+</html>

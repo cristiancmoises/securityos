@@ -1,0 +1,28 @@
+[package]
+name = "securityos-proxy"
+version = "0.1.0"
+edition = "2021"
+description = "Memory-safe privacy-proxy sidecar for SecurityOS: Tor SOCKS5h fetch, SSRF guard, streaming HTML rewriting, zero logging."
+license = "MIT"
+
+[[bin]]
+name = "securityos-proxy"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
+axum = "0.7"
+serde = { version = "1", features = ["derive"] }
+# rustls (not OpenSSL) keeps the build self-contained; socks enables Tor SOCKS5h.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "socks", "gzip", "brotli", "deflate"] }
+lol_html = "1"
+url = "2"
+percent-encoding = "2"
+bytes = "1"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

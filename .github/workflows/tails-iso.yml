@@ -1,0 +1,67 @@
+name: tails-iso
+
+# Keep TAILS always current + cryptographically verified. Daily (and on demand),
+# fetch the latest Tails, verify its OpenPGP signature + SHA-256 (deploy/tails/
+# verify-tails.sh, fail-closed), publish the ~1.5GB ISO as a RELEASE ASSET (never
+# committed to git), and commit only the small verified manifest the OS reads.
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # daily 06:00 UTC
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Pin a specific Tails version (optional; blank = latest)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tails-iso
+  cancel-in-progress: false
+
+jobs:
+  verify-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install verification tools
+        run: sudo apt-get update && sudo apt-get install -y gnupg jq curl
+
+      - name: Fetch + verify latest Tails (OpenPGP signature + SHA-256)
+        id: verify
+        run: |
+          bash deploy/tails/verify-tails.sh "${{ inputs.version }}"
+          echo "version=$(jq -r .version tails-out/manifest.json)" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(jq -r .sha256 tails-out/manifest.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish verified ISO as a release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${{ steps.verify.outputs.version }}"
+          TAG="tails-$V"
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" \
+            --title "TAILS $V (signature + SHA-256 verified)" \
+            --notes "Verified against the pinned Tails OpenPGP signing key. SHA-256: ${{ steps.verify.outputs.sha256 }}"
+          gh release upload "$TAG" \
+            "tails-out/tails-amd64-$V.iso" \
+            "tails-out/tails-amd64-$V.iso.sig" \
+            "tails-out/manifest.json" --clobber
+          echo "REL=${{ github.server_url }}/${{ github.repository }}/releases/download/$TAG/tails-amd64-$V.iso" >> "$GITHUB_ENV"
+
+      - name: Commit the verified manifest (read by the OS Tails launcher)
+        run: |
+          DEST="public/Program Files/Tails/manifest.json"
+          mkdir -p "$(dirname "$DEST")"
+          jq --arg r "$REL" '. + {release_url:$r}' tails-out/manifest.json > "$DEST"
+          if ! git diff --quiet "$DEST"; then
+            git config user.name "tails-verify-bot"
+            git config user.email "noreply@securityops.co"
+            git add "$DEST"
+            git commit -m "chore(tails): verified Tails ${{ steps.verify.outputs.version }} (sha256 ${{ steps.verify.outputs.sha256 }})"
+            git push
+          fi

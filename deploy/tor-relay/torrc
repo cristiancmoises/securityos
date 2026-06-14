@@ -1,0 +1,35 @@
+# SecurityOS Tor configuration for the v86 relay + browser gateway (and optional
+# .onion mirror).
+
+DataDirectory /var/lib/tor
+
+# SOCKS5 (for tools that speak SOCKS directly).
+SocksPort 0.0.0.0:9050
+
+# Transparent proxy + DNS — the relay container redirects its TCP/DNS here so
+# the v86 guest's traffic exits over Tor. (See relay/entrypoint.sh.)
+TransPort 0.0.0.0:9040
+DNSPort 0.0.0.0:5353
+
+# Resolve .onion and route Tor-internal DNS.
+AutomapHostsOnResolve 1
+VirtualAddrNetworkIPv4 10.192.0.0/10
+
+# --- Optional: publish SecurityOS itself as a Tor hidden service (.onion) ----
+# Uncomment and point HiddenServicePort at your SecurityOS web server (the Node
+# `next start` container or your nginx/Caddy from deploy/). After first start,
+# read the generated hostname:
+#   docker compose exec tor cat /var/lib/tor/securityos/hostname
+#
+# HiddenServiceDir /var/lib/tor/securityos
+# HiddenServiceVersion 3
+# HiddenServicePort 80 securityos-web:3000
+
+# Hardening / amnesia
+ClientOnly 1
+SafeLogging 1
+# Keep Tor state in RAM as much as possible and never log to disk — no forensic
+# trace of circuits or destinations survives a restart. The container is also
+# volume-less + read-only (see docker-compose), so /var/lib/tor is ephemeral.
+AvoidDiskWrites 1
+Log warn stderr

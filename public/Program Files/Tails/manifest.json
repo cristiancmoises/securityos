@@ -1,0 +1,11 @@
+{
+  "version": "",
+  "arch": "amd64",
+  "sha256": "",
+  "iso_url": "https://tails.net/install/download/",
+  "release_url": "https://tails.net/install/download/",
+  "official": "https://tails.net/install/",
+  "signing_key_fpr": "A490D0F4D311A4153E2BB7CADBB802B258ACD84F",
+  "verified": false,
+  "note": "Placeholder until the 'tails-iso' CI action (GitHub/Forgejo) runs and replaces this with a signature + SHA-256 verified build. TAILS is 64-bit (amd64) — run the .iso in a native VM, not the in-browser 32-bit emulator."
+}

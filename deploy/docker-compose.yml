@@ -1,0 +1,135 @@
+# SecurityOS — hardened, amnesic deployment with in-OS browsing routed through Tor.
+#
+# The `securityos` web container's privacy proxy (/api/proxy) routes every fetch
+# through the `tor` service over SOCKS5h (DNS + .onion resolved AT Tor, so onions
+# work and clearnet hostnames never leak to a local resolver). The in-OS Browser
+# and Tor Browser therefore exit over Tor by default. Served on http://localhost:8088.
+#
+#   docker compose -f deploy/docker-compose.yml up -d --build
+#   # verify the server is exiting via Tor:
+#   docker compose -f deploy/docker-compose.yml exec securityos \
+#     sh -c 'wget -qO- https://check.torproject.org/api/ip'   # IsTor: true
+#
+# AMNESIA: neither service has a named volume and both run read-only with RAM-only
+# (tmpfs) scratch space, so NOTHING is written to disk that survives the container.
+# Logging is disabled (no forensic trail). Tor is volume-less, so fresh keys/circuits
+# every run. `docker compose down` leaves no residue.
+#
+# Optional .onion mirror: uncomment the HiddenService block in tor-relay/torrc
+# (point HiddenServicePort 80 securityos-web:3000) and read the hostname from
+# /var/lib/tor inside the tor container.
+#
+# The proxy's SSRF guard (DNS-resolves every hop incl. redirects, blocks private/
+# metadata/IPv6-mapped ranges) protects the standalone case from internal targets.
+
+services:
+  tor:
+    # Built locally from Alpine (self-contained; no auth-gated external image).
+    build:
+      context: .
+      dockerfile: tor/Dockerfile
+    container_name: securityos-tor
+    restart: unless-stopped
+    init: true
+    # Hardening: no privilege escalation, no Linux capabilities (a SOCKS client on
+    # a high port needs none), immutable root filesystem. Tor's DataDirectory is a
+    # RAM-only tmpfs owned by the tor user (uid 100/gid 101, mode 0700) so circuits/
+    # keys/state never touch disk and are wiped on stop — real amnesia.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /var/lib/tor:uid=100,gid=101,mode=0700
+      - /tmp
+    mem_limit: 192m
+    pids_limit: 256
+    # No forensic trail.
+    logging:
+      driver: "none"
+    networks: [securenet]
+
+  # Memory-safe (Rust) privacy-proxy sidecar — does the untrusted fetch + SSRF +
+  # HTML rewriting. The web app delegates to it (PROXY_SIDECAR_URL below) and
+  # transparently falls back to its built-in Node proxy if this is unavailable.
+  proxy-sidecar:
+    build:
+      context: ../sidecar
+      dockerfile: Dockerfile
+    container_name: securityos-proxy-sidecar
+    restart: unless-stopped
+    init: true
+    depends_on:
+      tor:
+        condition: service_healthy
+    environment:
+      PORT: "8077"
+      TOR_PROXY: socks5h://tor:9050
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: 256m
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8077/healthz"]
+      interval: 10s
+      timeout: 4s
+      retries: 6
+      start_period: 5s
+    logging:
+      driver: "none"
+    networks: [securenet]
+
+  securityos:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: securityos-web
+    restart: unless-stopped
+    init: true
+    # Wait until Tor's SOCKS port is actually accepting connections, so the very
+    # first onion request can't fail with "Tor unreachable" on a cold start. The
+    # sidecar is only "started" (not "healthy") — the Node proxy falls back if it
+    # isn't ready yet, so the OS never blocks on the sidecar.
+    depends_on:
+      tor:
+        condition: service_healthy
+      proxy-sidecar:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      TMPDIR: /tmp
+      # The privacy proxy routes every fetch through Tor's SOCKS5h port (DNS +
+      # .onion resolved at Tor). Tor is ON by default; unset only for a non-Tor
+      # deployment (the proxy then just strips framing, no Tor exit).
+      TOR_PROXY: socks5h://tor:9050
+      # Delegate the untrusted fetch/rewrite work to the memory-safe Rust sidecar.
+      PROXY_SIDECAR_URL: http://proxy-sidecar:8077
+    # Hardening + amnesia: drop privileges/caps, immutable root filesystem, and
+    # mount only the few paths Next.js writes to as RAM-only tmpfs (wiped on stop).
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /SecurityOS/.next/cache
+      - /root/.cache
+    mem_limit: 1g
+    pids_limit: 512
+    logging:
+      driver: "none"
+    ports:
+      - "8088:3000"
+    networks: [securenet]
+
+networks:
+  securenet:
+    driver: bridge

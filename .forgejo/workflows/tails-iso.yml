@@ -1,0 +1,69 @@
+name: tails-iso
+
+# Forgejo Actions equivalent of .github/workflows/tails-iso.yml — keep TAILS
+# current + cryptographically verified, publish the verified ISO as a Forgejo
+# release asset (not committed), and commit the small verified manifest.
+# Requires a repo secret FORGEJO_TOKEN (scope: write:repository) for the release API.
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Pin a specific Tails version (optional; blank = latest)"
+        required: false
+        default: ""
+
+jobs:
+  verify-and-publish:
+    runs-on: docker
+    container:
+      image: ghcr.io/catthehacker/ubuntu:act-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install verification tools
+        run: apt-get update && apt-get install -y gnupg jq curl git
+
+      - name: Fetch + verify latest Tails (OpenPGP signature + SHA-256)
+        id: verify
+        run: |
+          bash deploy/tails/verify-tails.sh "${{ inputs.version }}"
+          echo "version=$(jq -r .version tails-out/manifest.json)" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(jq -r .sha256 tails-out/manifest.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish verified ISO as a Forgejo release asset
+        env:
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+          SERVER: ${{ github.server_url }}
+          REPO: ${{ github.repository }}
+        run: |
+          V="${{ steps.verify.outputs.version }}"
+          TAG="tails-$V"
+          API="$SERVER/api/v1/repos/$REPO/releases"
+          # Create the release if it doesn't exist, then capture its id.
+          ID="$(curl -fsSL -H "Authorization: token $TOKEN" "$API/tags/$TAG" 2>/dev/null | jq -r '.id // empty')"
+          if [ -z "$ID" ]; then
+            ID="$(curl -fsSL -X POST -H "Authorization: token $TOKEN" -H "Content-Type: application/json" \
+              -d "{\"tag_name\":\"$TAG\",\"name\":\"TAILS $V (signature + SHA-256 verified)\",\"body\":\"SHA-256: ${{ steps.verify.outputs.sha256 }}\"}" \
+              "$API" | jq -r '.id')"
+          fi
+          for f in "tails-amd64-$V.iso" "tails-amd64-$V.iso.sig" "manifest.json"; do
+            curl -fsSL -X POST -H "Authorization: token $TOKEN" \
+              -F "attachment=@tails-out/$f" "$API/$ID/assets?name=$f" >/dev/null
+          done
+          echo "REL=$SERVER/$REPO/releases/download/$TAG/tails-amd64-$V.iso" >> "$GITHUB_ENV"
+
+      - name: Commit the verified manifest
+        run: |
+          DEST="public/Program Files/Tails/manifest.json"
+          mkdir -p "$(dirname "$DEST")"
+          jq --arg r "$REL" '. + {release_url:$r}' tails-out/manifest.json > "$DEST"
+          if ! git diff --quiet "$DEST"; then
+            git config user.name "tails-verify-bot"
+            git config user.email "noreply@securityops.co"
+            git add "$DEST"
+            git commit -m "chore(tails): verified Tails ${{ steps.verify.outputs.version }} (sha256 ${{ steps.verify.outputs.sha256 }})"
+            git push
+          fi

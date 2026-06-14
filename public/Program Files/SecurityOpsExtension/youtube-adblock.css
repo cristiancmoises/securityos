@@ -1,0 +1,73 @@
+/*
+ * Security Ops — YouTube Ad CSS (v8.0.0)
+ * Copyright (C) 2024-2026 Cristian Cezar Moises <ethicalhacker@riseup.net>
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * Hides ad surfaces on YouTube.
+ * Does NOT recolor YouTube — that's handled by stable-content.js + dark-theme.css
+ */
+
+/* ============================================================
+ * Hide ad containers
+ * ============================================================ */
+ytd-display-ad-renderer,
+ytd-promoted-sparkles-web-renderer,
+ytd-promoted-video-renderer,
+ytd-ad-slot-renderer,
+ytd-in-feed-ad-layout-renderer,
+ytd-banner-promo-renderer,
+ytd-statement-banner-renderer,
+ytd-companion-slot-renderer,
+ytd-video-masthead-ad-v3-renderer,
+ytd-action-companion-ad-renderer,
+ytd-merch-shelf-renderer,
+ytd-mealbar-promo-renderer,
+ytd-product-shelf-renderer,
+ytd-promoted-sparkles-text-search-renderer,
+ytd-rich-item-renderer:has(ytd-ad-slot-renderer),
+ytd-rich-section-renderer:has(ytd-statement-banner-renderer) {
+  display: none !important;
+}
+
+/* Mobile */
+ytm-promoted-sparkles-web-renderer,
+ytm-companion-slot,
+ytm-promoted-video-renderer,
+ytm-display-ad-renderer {
+  display: none !important;
+}
+
+/* Player overlays */
+.ytp-ad-module,
+.ytp-ad-overlay-container,
+.ytp-featured-product,
+.ytp-paid-content-overlay,
+.ytp-ad-image-overlay,
+.ytp-ad-text-overlay,
+#masthead-ad,
+#player-ads,
+#offer-module {
+  display: none !important;
+}
+
+/* ============================================================
+ * Bug 1 v8 FIX: Force player layers transparent
+ * Even if our dark theme leaks through, player must render correctly
+ * ============================================================ */
+.html5-video-player,
+.html5-video-container,
+.html5-main-video,
+.video-stream,
+#movie_player,
+.ytd-player,
+#ytd-player {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Video element NEVER themed */
+.html5-video-player video,
+.html5-main-video {
+  background-color: transparent !important;
+  filter: none !important;
+}

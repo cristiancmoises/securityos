@@ -1,0 +1,63 @@
+.next
+.swc
+node_modules
+out
+
+# Build artifacts / non-yarn lockfiles (this project uses yarn.lock)
+tsconfig.tsbuildinfo
+package-lock.json
+
+public/robots.txt
+public/sitemap.xml
+public/.index/*
+public/Users/Public/**
+
+!public/Users/**/desktop.ini
+!public/Users/Public/Desktop
+!public/Users/Public/Desktop/My PC.url
+!public/Users/Public/Desktop/README.md
+!public/Users/Public/Documents
+!public/Users/Public/Documents/TOR.md
+!public/Users/Public/Documents/SecurityOS Handbook.md
+!public/Users/Public/Documents/CTF Practice.md
+!public/Users/Public/Documents/V86 Linux Toolkit.md
+!public/Users/Public/Documents/XSS Lab.html
+!public/Users/Public/Documents/Stream Notes
+!public/Users/Public/Documents/Stream Notes/*.md
+
+!public/Users/Public/Start Menu/Security
+!public/Users/Public/Start Menu/Security/*.url
+!public/Users/Public/Music
+!public/Users/Public/Pictures
+!public/Users/Public/Start Menu
+!public/Users/Public/Start Menu/*.url
+!public/Users/Public/Start Menu/Emulators
+!public/Users/Public/Start Menu/Emulators/*.url
+!public/Users/Public/Start Menu/Games
+!public/Users/Public/Start Menu/Games/ClassiCube.url
+!public/Users/Public/Start Menu/Games/DX-Ball.url
+!public/Users/Public/Start Menu/Games/Quake III Arena.url
+!public/Users/Public/Start Menu/Games/Space Cadet.url
+!public/Users/Public/Videos
+!public/Users/Public/Videos/Make an OS with ReactJS & Next.js
+!public/Users/Public/Videos/Make an OS with ReactJS & Next.js/*.url
+
+# Secrets — never commit credentials/keys (SecurityOS hardening)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+id_rsa
+id_ed25519
+*.credentials
+*credentials*.json
+secrets.json
+.tor/
+deploy/secrets/
+
+!public/Users/Public/Start Menu/SecurityOps
+!public/Users/Public/Start Menu/SecurityOps/*.url

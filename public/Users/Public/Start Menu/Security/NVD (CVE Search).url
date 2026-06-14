@@ -1,0 +1,5 @@
+[InternetShortcut]
+BaseURL=Browser
+URL=https://nvd.nist.gov/vuln/search
+Comment=National Vulnerability Database
+IconFile=/System/Icons/chromium.webp

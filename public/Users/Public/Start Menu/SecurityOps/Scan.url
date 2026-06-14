@@ -1,0 +1,5 @@
+[InternetShortcut]
+BaseURL=Browser
+Comment=Security scanner
+IconFile=/System/Icons/securityops.webp
+URL=https://scan.securityops.co/

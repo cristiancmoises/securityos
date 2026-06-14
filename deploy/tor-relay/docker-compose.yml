@@ -1,0 +1,60 @@
+# SecurityOS — Tor-routed v86 network relay.
+#
+# Bridges the in-browser Linux VM's network (a WebSocket "relay" speaking v86's
+# Ethernet-frame protocol) onto the internet *through Tor*.
+#
+# Architecture:
+#   v86 guest ──Ethernet frames──> [relay] ──TCP (transparently redirected)──> [tor] ──> internet
+#
+# The `relay` container runs the standard v86 websockproxy (the same protocol as
+# the public wss://relay.widgetry.org). Its egress is forced through Tor by
+# iptables rules in relay/entrypoint.sh (Tor TransPort + DNSPort), so every TCP
+# connection the guest opens exits via a Tor circuit. Point the Tor Control app
+# (or session emulatorRelayUrl) at  ws://YOUR_HOST:8081/ .
+#
+# ⚠️ Run this on infrastructure you control. Read deploy/tor-relay/README.md and
+#    docs/TOR.md for the threat model and limitations (Tor is TCP-only: the
+#    guest's UDP/ICMP won't work; DNS is resolved via Tor's DNSPort).
+
+services:
+  tor:
+    image: ghcr.io/hectorm/tor:latest
+    container_name: securityos-tor
+    restart: unless-stopped
+    # torrc enables SocksPort/DNSPort/TransPort and (optionally) the .onion
+    # hidden service for the SecurityOS site itself.
+    volumes:
+      - ./torrc:/etc/tor/torrc:ro
+      - tor-data:/var/lib/tor
+    networks:
+      - tornet
+
+  relay:
+    build: ./relay
+    container_name: securityos-relay
+    restart: unless-stopped
+    depends_on:
+      - tor
+    # NET_ADMIN is required so the entrypoint can install the iptables rules
+    # that transparently route the relay's traffic through Tor.
+    cap_add:
+      - NET_ADMIN
+    environment:
+      # Where Tor's transparent proxy + DNS live (the `tor` service).
+      TOR_HOST: tor
+      TOR_TRANS_PORT: "9040"
+      TOR_DNS_PORT: "5353"
+      RELAY_PORT: "8081"
+    ports:
+      # Expose the WebSocket relay to the browser. Put a TLS reverse proxy in
+      # front (see deploy/nginx.conf) and use wss:// in production.
+      - "8081:8081"
+    networks:
+      - tornet
+
+networks:
+  tornet:
+    driver: bridge
+
+volumes:
+  tor-data:
