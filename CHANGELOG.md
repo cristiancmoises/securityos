@@ -18,6 +18,17 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   (each browser only accepts its own `/api/proxy` URLs). In the Tor Browser's
   default no‑JS *Safest* mode the sandbox forbids scripts, so links open in the
   current tab and new tabs come from `＋`.
+- **UI/UX polish:** larger, clearer toolbar buttons (no longer clipped into a
+  fixed box) with proper hover/disabled states, an address bar that flexes to
+  fill, and a readable tab strip with an active‑tab accent.
+
+### Apps
+- **Vaptvupt** now opens the SecurityOps **file share** (`share.securityops.co`)
+  as a direct first‑party embed (real origin, cookies, full usage) — login,
+  upload, manage and download shares. (Requires the site to allow framing from
+  the SecurityOS origin.) File **encryption** is unchanged and still available
+  via the Terminal (`vaptvupt`/`encrypt`/`decrypt`) and the file‑manager
+  right‑click menu.
 
 ### Clearnet Browser
 - **First‑party SecurityOps sites load DIRECT** (real origin, cookies, login,
