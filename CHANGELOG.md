@@ -6,8 +6,8 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [2026-06-14]
 
-### Browsers — tabbed browsing
-- **Tabs in both the Clearnet Browser and the Tor Browser.** Tab strip with a
+### Tor Browser — tabbed browsing
+- **Tabs in the Tor Browser.** Tab strip with a
   `＋` new‑tab button and per‑tab close; tabs stay mounted so scroll/state is
   preserved on switch. Per‑tab history (back/forward), address bar and bookmarks
   act on the active tab. Tab labels show the page **title** (reported by the
@@ -30,22 +30,18 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   via the Terminal (`vaptvupt`/`encrypt`/`decrypt`) and the file‑manager
   right‑click menu.
 
-### Clearnet Browser
-- **First‑party SecurityOps sites load DIRECT** (real origin, cookies, login,
-  WebSockets); only third‑party sites go through the rewriting privacy proxy.
-  Fixes *"Couldn't load securityops.co through the privacy proxy."*
-- **Default search = Security Search** (`securityops.co/web?s=`).
-- **Ad/tracker blocking** via a curated EasyList/EasyPrivacy host list
-  (`utils/adblock.ts`) — requests to ad hosts are neutralized at the network
-  level and leftover containers hidden.
-- **LibreJS‑style JS filtering** on by default — first‑party + trivial/free‑
-  licensed scripts run; third‑party/nonfree JS is stripped. Toggleable per page.
+### Removed
+- **The Clearnet Browser app is removed** — SecurityOS is **Tor-only**: all web
+  access goes through the Tor Browser. `.html` files now open in the text editors
+  (view source); http links / the Run dialog open the Tor Browser.
 
 ### Tor Browser
 - Start page + address‑bar search point at the verified live darknet search
   hidden service; bookmarks are the operator's `.onion` services.
-- JavaScript **disabled by default** ("Safest"); the proxy strips scripts and
-  sets `script-src 'none'`, and the iframe drops `allow-scripts`.
+- **NoScript-style 3-state JavaScript control** (toolbar): **Off** — *Safest*,
+  all JS blocked + `script-src 'none'`; **NoScript** — first-party scripts only,
+  third-party stripped server-side by the LibreJS filter; **All** — every script
+  runs. Off by default; the iframe drops `allow-scripts` in Off mode.
 
 ### Privacy proxy & security hardening
 - **Mode‑aware CSP**: strict same‑origin CSP in no‑JS (anonymity) mode; minimal

@@ -66,5 +66,4 @@ target, so the .onion is protected identically.
 ## Most private posture
 
 Tor Browser + the .onion address, VM relay set to **Tor** (or **Disabled** if the
-VM needs no network), and all clearnet features (in-OS Browser, IPFS, server
-clock) turned off.
+VM needs no network), and all clearnet features (IPFS, server clock) turned off.

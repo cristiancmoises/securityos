@@ -27,7 +27,7 @@ const useUrlLoader = (): void => {
 
       try {
         urlExists =
-          (initialApp === "Browser" && url.startsWith("http")) ||
+          (initialApp === "TorBrowser" && url.startsWith("http")) ||
           (await exists(url));
       } catch {
         // Ignore error checking if url exists
