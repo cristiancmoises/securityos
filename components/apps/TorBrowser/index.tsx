@@ -13,16 +13,21 @@ import {
 } from "utils/constants";
 import { getUrlOrSearch, label } from "utils/functions";
 
-// The SecurityOps search hidden service: the Tor Browser start page.
-const TOR_HOME =
-  "http://secopsi47k4idy5pw3wrm2zkmn3d5ghaad3s7ulnrze3h53sbzzg5gad.onion/";
+// The Tor Browser start page. The operator's SecurityOps search is a SearXNG
+// metasearch reachable both as a clearnet host and (when published) as a hidden
+// service. We default to the clearnet host fetched OVER TOR: it stays up even when
+// the .onion listeners are down, and SearXNG needs no JavaScript, so it renders in
+// the JS-disabled "Safest" sandbox. The .onion services are bookmarked below and
+// resolve once the operator's hidden-service listeners are running again.
+const TOR_HOME = "https://securityops.co/";
 
-// Every live SecurityOps .onion hidden service, surfaced as Tor Browser
-// bookmarks (each opens through the Tor proxy — they only resolve over Tor).
-// Sourced from the operator's hidden-service directory at https://securityops.co/.
-// Only services with a running upstream listener are bookmarked; the disabled
-// onions (Evelin, BrutePass, Zupt, Extension — keys on disk but no listener) and
-// the duplicate SecTube alias are intentionally omitted so no bookmark dead-ends.
+// The operator's SearXNG search endpoint, for address-bar queries (over Tor).
+const TOR_SEARCH_QUERY = "https://securityops.co/web?s=";
+
+// SecurityOps bookmarks. "Search" is the SearXNG above (reached over Tor); the
+// rest are the operator's .onion hidden services — they resolve only while the
+// operator's onion listeners are running (otherwise the proxy shows a clear
+// "this .onion looks offline" page, not a Tor error).
 const BOOKMARKS: { name: string; url: string }[] = [
   { name: "Search", url: TOR_HOME },
   {
@@ -101,7 +106,7 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
     async (addressInput: string): Promise<void> => {
       setLoading(true);
 
-      const addressUrl = await getUrlOrSearch(addressInput);
+      const addressUrl = await getUrlOrSearch(addressInput, TOR_SEARCH_QUERY);
 
       if (!/^https?:/.test(addressUrl)) {
         setLoading(false);
