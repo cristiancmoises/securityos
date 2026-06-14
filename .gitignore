@@ -3,6 +3,12 @@
 node_modules
 out
 
+# AI assistant / editor scratch — never ship in the deployment
+.claude
+.cursor
+.aider*
+*.orig
+
 # Build artifacts / non-yarn lockfiles (this project uses yarn.lock)
 tsconfig.tsbuildinfo
 package-lock.json

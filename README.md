@@ -46,11 +46,13 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
 
 ## 🌐 Browsers
 
-SecurityOS ships **two** browsers — pick by threat model:
+SecurityOS ships **two** browsers — pick by threat model. Both are **tabbed**
+(per‑tab history; Ctrl/⌘‑ or middle‑click a link to open it in a new tab; `＋`
+for a blank tab).
 
 ### 🧅 Tor Browser — *anonymity first*
-- Every request is routed through **Tor** (SOCKS5h, including DNS) via the
-  default obfs4 bridge, so `.onion` resolves and your IP is never revealed.
+- Every request is routed through **Tor** (SOCKS5h, including DNS), so `.onion`
+  resolves and your IP is never revealed.
 - **JavaScript is OFF by default** (toolbar toggle) to minimize the
   fingerprint and attack surface — Tor-Browser-"Safest" style.
 - Bookmarks point at the SecurityOps **hidden services**. Use it for
@@ -133,7 +135,8 @@ docker run -d -p 8088:3000 -e TOR_PROXY=socks5h://tor:9050 securityos
 ```
 </details>
 
-See [`docs/`](docs) for [`TOR.md`](docs/TOR.md), [`LIVE-ISO.md`](docs/LIVE-ISO.md),
+See [`CHANGELOG.md`](CHANGELOG.md) for what's new, and [`docs/`](docs) for
+[`TOR.md`](docs/TOR.md), [`LIVE-ISO.md`](docs/LIVE-ISO.md),
 [`GUIX-SETUP.md`](docs/GUIX-SETUP.md), and [`deploy/SECURITY-HEADERS.md`](deploy/SECURITY-HEADERS.md).
 
 ---

@@ -111,8 +111,16 @@ const blankTab = (key: number, address: string): Tab => ({
   loading: false,
 });
 
-const tabLabel = (tab: Tab): string =>
-  (tab.title || tab.address || "New tab").replace(/^https?:\/\//, "");
+const tabLabel = (tab: Tab): string => {
+  if (tab.title) return tab.title;
+  if (!tab.address) return "New tab";
+
+  try {
+    return new URL(tab.address).hostname || tab.address;
+  } catch {
+    return tab.address.replace(/^https?:\/\//, "");
+  }
+};
 
 const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
   const {
@@ -252,11 +260,28 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
 
   useEffect(() => {
     const onMessage = (event: MessageEvent): void => {
-      const candidate = (event.data as { __sosNewTab?: unknown })?.__sosNewTab;
+      const data = event.data as {
+        __sosNewTab?: unknown;
+        __sosTitle?: unknown;
+        __sosHref?: unknown;
+      };
       const prefix = `${window.location.origin}/api/proxy?`;
 
-      if (typeof candidate === "string" && candidate.startsWith(prefix)) {
-        openProxiedTab(candidate);
+      if (typeof data?.__sosNewTab === "string" && data.__sosNewTab.startsWith(prefix)) {
+        openProxiedTab(data.__sosNewTab);
+      } else if (
+        typeof data?.__sosTitle === "string" &&
+        data.__sosTitle &&
+        typeof data?.__sosHref === "string"
+      ) {
+        const target = addressFromSrc(data.__sosHref);
+        const title = data.__sosTitle.slice(0, 120);
+
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.src && addressFromSrc(t.src) === target ? { ...t, title } : t
+          )
+        );
       }
     };
 
@@ -334,7 +359,7 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
         </button>
       </nav>
       <nav className="controls">
-        <div>
+        <div className="nav-buttons">
           <Button
             disabled={!canGoBack}
             onClick={() => go(-1)}
