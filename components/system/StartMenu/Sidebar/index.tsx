@@ -74,7 +74,7 @@ const Sidebar: FC<SidebarProps> = ({ height }) => {
               "/System/Icons/documents.webp"
             ),
           icon: <Documents />,
-          name: "Documentos",
+          name: "Documents",
           ...(collapsed && { tooltip: "Documents" }),
         }
       : undefined,
@@ -87,7 +87,7 @@ const Sidebar: FC<SidebarProps> = ({ height }) => {
               "/System/Icons/pictures.webp"
             ),
           icon: <Pictures />,
-          name: "Imagens",
+          name: "Pictures",
           ...(collapsed && { tooltip: "Pictures" }),
         }
       : undefined,
@@ -100,7 +100,7 @@ const Sidebar: FC<SidebarProps> = ({ height }) => {
               "/System/Icons/videos.webp"
             ),
           icon: <Videos />,
-          name: "Vídeos",
+          name: "Videos",
           ...(collapsed && { tooltip: "Videos" }),
         }
       : undefined,
@@ -110,8 +110,8 @@ const Sidebar: FC<SidebarProps> = ({ height }) => {
         resetStorage(rootFs).finally(() => window.location.reload());
       },
       icon: <Power />,
-      name: "Desligar",
-      tooltip: "Limpa a sessão e reinicia.",
+      name: "Power",
+      tooltip: "Clears the session and restarts.",
     },
   ].filter(Boolean) as SidebarButtons;
 

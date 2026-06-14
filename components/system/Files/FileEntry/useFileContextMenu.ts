@@ -112,8 +112,8 @@ const useFileContextMenu = (
           const defaultProcess = getProcessByFileExtension(urlExtension);
 
           menuItems.push(
-            { action: () => moveEntries(absoluteEntries()), label: "Cortar" },
-            { action: () => copyEntries(absoluteEntries()), label: "Copiar" },
+            { action: () => moveEntries(absoluteEntries()), label: "Cut" },
+            { action: () => copyEntries(absoluteEntries()), label: "Copy" },
             MENU_SEPERATOR
           );
 
@@ -132,7 +132,7 @@ const useFileContextMenu = (
 
                   newShortcut(entry, shortcutProcess);
                 }),
-              label: "Criar Atalho",
+              label: "Create Shortcut",
             });
           }
 
@@ -140,9 +140,9 @@ const useFileContextMenu = (
             {
               action: () =>
                 absoluteEntries().forEach((entry) => deleteLocalPath(entry)),
-              label: "Deletar",
+              label: "Delete",
             },
-            { action: () => setRenaming(baseName), label: "Renomear" }
+            { action: () => setRenaming(baseName), label: "Rename" }
           );
 
           if (!isShortcut) {
@@ -191,8 +191,8 @@ const useFileContextMenu = (
                 }
               },
               label: isEncryptedFile
-                ? "Descriptografar (Vaptvupt)"
-                : "Criptografar (Vaptvupt)",
+                ? "Decrypt (Vaptvupt)"
+                : "Encrypt (Vaptvupt)",
             });
 
             // Secure delete: overwrite the file's bytes (random or zeros) BEFORE
@@ -203,9 +203,9 @@ const useFileContextMenu = (
             const securePurge = async (mode: "random" | "zero"): Promise<void> => {
               if (
                 !window.confirm(
-                  `Apagar "${baseName}" com segurança? Será sobrescrito (${
-                    mode === "random" ? "aleatório, 3×" : "zeros"
-                  }) e removido — não pode ser desfeito.`
+                  `Securely delete "${baseName}"? It will be overwritten (${
+                    mode === "random" ? "random, 3×" : "zeros"
+                  }) and removed — this cannot be undone.`
                 )
               ) {
                 return;
@@ -256,13 +256,13 @@ const useFileContextMenu = (
             };
 
             menuItems.push({
-              label: "Apagar com segurança",
+              label: "Secure delete",
               menu: [
                 {
                   action: () => securePurge("random"),
-                  label: "Aleatório (sobrescreve 3×)",
+                  label: "Random (overwrite 3×)",
                 },
-                { action: () => securePurge("zero"), label: "Zeros (zero-fill)" },
+                { action: () => securePurge("zero"), label: "Zero-fill" },
               ],
             });
           }
@@ -296,7 +296,7 @@ const useFileContextMenu = (
                     ? [
                         {
                           action: () => mapFileSystemDirectory("/"),
-                          label: "Mapear Diretório",
+                          label: "Map Directory",
                         },
                       ]
                     : []),
@@ -313,7 +313,7 @@ const useFileContextMenu = (
                               // Ignore failure to map directory
                             }
                           },
-                          label: "Mapear OPFS",
+                          label: "Map OPFS",
                         },
                       ]
                     : []),
@@ -329,7 +329,7 @@ const useFileContextMenu = (
               ) {
                 menuItems.unshift({
                   action: () => extractFiles(path),
-                  label: "Extrair Aqui",
+                  label: "Extract Here",
                 });
               }
 
@@ -346,7 +346,7 @@ const useFileContextMenu = (
                   : IMAGE_ENCODE_FORMATS;
 
                 menuItems.unshift(MENU_SEPERATOR, {
-                  label: "Converter para",
+                  label: "Convert to",
                   menu: ENCODE_FORMATS.filter(
                     (format) => format !== pathExtension
                   ).map((format) => {
@@ -404,7 +404,7 @@ const useFileContextMenu = (
 
               if (canDecodeSpreadsheet) {
                 menuItems.unshift(MENU_SEPERATOR, {
-                  label: "Converter para",
+                  label: "Convert to",
                   menu: SPREADSHEET_FORMATS.filter(
                     (format) => format !== pathExtension
                   ).map((format) => {
@@ -476,14 +476,14 @@ const useFileContextMenu = (
                       );
                     });
                   },
-                  label: "Converter para M3U",
+                  label: "Convert to M3U",
                 });
               }
 
               menuItems.unshift(
                 {
                   action: () => archiveFiles(absoluteEntries()),
-                  label: "Adicionar ao arquivo...",
+                  label: "Add to archive...",
                 },
                 {
                   action: () => downloadFiles(absoluteEntries()),
@@ -510,7 +510,7 @@ const useFileContextMenu = (
         if (remoteMount) {
           menuItems.push(MENU_SEPERATOR, {
             action: () => unMapFs(path),
-            label: "Desconectar",
+            label: "Disconnect",
           });
         }
 
@@ -519,7 +519,7 @@ const useFileContextMenu = (
           !UNSUPPORTED_BACKGROUND_EXTENSIONS.has(pathExtension)
         ) {
           menuItems.unshift({
-            label: "Definir como Wallpaper",
+            label: "Set as Wallpaper",
             menu: [
               {
                 action: () => setWallpaper(path, "fill"),
@@ -527,7 +527,7 @@ const useFileContextMenu = (
               },
               {
                 action: () => setWallpaper(path, "fit"),
-                label: "Ajustar",
+                label: "Fit",
               },
               {
                 action: () => setWallpaper(path, "stretch"),
@@ -547,7 +547,7 @@ const useFileContextMenu = (
 
         if (openWithFiltered.length > 0) {
           menuItems.unshift({
-            label: "Abrir com",
+            label: "Open with",
             menu: openWithFiltered.map((id): MenuItem => {
               const { icon, title: label } = processDirectory[id] || {};
               const action = (): void => {
@@ -573,7 +573,7 @@ const useFileContextMenu = (
 
             menuItems.unshift({
               action: () => open("FileExplorer", { url: dirname(url) }, ""),
-              label: `Abrir ${isFolder ? "pasta" : "file"} local`,
+              label: `Open local ${isFolder ? "folder" : "file"}`,
             });
           }
 
@@ -586,7 +586,7 @@ const useFileContextMenu = (
               action: () => {
                 openFile(pid, pidIcon);
               },
-              label: "Abrir em nova janela",
+              label: "Open in new window",
             });
           }
 
@@ -603,7 +603,7 @@ const useFileContextMenu = (
               }
             },
             icon: pidIcon,
-            label: "Abrir",
+            label: "Open",
             primary: true,
           });
         }

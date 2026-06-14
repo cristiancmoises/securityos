@@ -233,7 +233,7 @@ const useFolderContextMenu = (
               .catch(() => {
                 // Ignore failure to map
               }),
-          label: "Mapear pasta",
+          label: "Map folder",
         };
         const FS_COMMANDS = [
           ADD_FILE,
@@ -245,16 +245,16 @@ const useFolderContextMenu = (
 
         return [
           {
-            label: "Filtrar por",
+            label: "Sort by",
             menu: [
               {
                 action: () => updateSorting("name", true),
-                label: "Nome",
+                label: "Name",
                 toggle: sortBy === "name",
               },
               {
                 action: () => updateSorting("size", false),
-                label: "Tamanho",
+                label: "Size",
                 toggle: sortBy === "size",
               },
               {
@@ -264,28 +264,28 @@ const useFolderContextMenu = (
               },
               {
                 action: () => updateSorting("date", false),
-                label: "Data de modoficação",
+                label: "Date modified",
                 toggle: sortBy === "date",
               },
               MENU_SEPERATOR,
               {
                 action: () => updateSorting("", true),
-                label: "Ascendente",
+                label: "Ascending",
                 toggle: isAscending,
               },
               {
                 action: () => updateSorting("", false),
-                label: "Decrescente",
+                label: "Descending",
                 toggle: !isAscending,
               },
             ],
           },
-          { action: () => updateFolder(url), label: "Atualizar" },
+          { action: () => updateFolder(url), label: "Refresh" },
           ...(isDesktop
             ? [
                 MENU_SEPERATOR,
                 {
-                  label: "Plano de Fundo",
+                  label: "Background",
                   menu: WALLPAPER_MENU.reduce<MenuItem[]>(
                     (menu, item) => [
                       ...menu,
@@ -307,7 +307,7 @@ const useFolderContextMenu = (
                           {
                             action: stopGlobalMusicVisualization,
                             checked: true,
-                            label: "Visualização da Música",
+                            label: "Music Visualization",
                           },
                           MENU_SEPERATOR,
                         ]
@@ -317,7 +317,7 @@ const useFolderContextMenu = (
                     {
                       action: () => {
                         const url = window.prompt(
-                          "Imagem de fundo — cole uma URL (http/https) ou um link proxy (/api/proxy?url=…):"
+                          "Background image — paste a URL (http/https) or a proxy link (/api/proxy?url=…):"
                         );
                         const value = url?.trim();
 
@@ -342,12 +342,12 @@ const useFolderContextMenu = (
                         }
                         setWallpaper(value);
                       },
-                      label: "Imagem da URL…",
+                      label: "Image from URL…",
                     },
                     {
                       // Background fit — adjustable any time, even before an image
                       // is defined (the fit persists and applies to the next image).
-                      label: "Ajustar fundo",
+                      label: "Background fit",
                       menu: (
                         ["fill", "fit", "stretch", "center", "tile"] as const
                       ).map((fit) => ({
@@ -363,8 +363,8 @@ const useFolderContextMenu = (
                       {
                         action: captureScreen,
                         label: currentMediaStream?.active
-                          ? "Parar captura de tela"
-                          : "Capturar a tela",
+                          ? "Stop screen capture"
+                          : "Capture screen",
                       },
                     ]
                   : []),
@@ -374,34 +374,34 @@ const useFolderContextMenu = (
           ...FS_COMMANDS,
           {
             action: () => open("Terminal", { url }),
-            label: "Abrir Terminal aqui",
+            label: "Open Terminal here",
           },
           {
             action: () => pasteToFolder(),
             disabled: Object.keys(pasteList).length === 0,
-            label: "Colar",
+            label: "Paste",
           },
           MENU_SEPERATOR,
           {
-            label: "Novo",
+            label: "New",
             menu: [
               {
                 action: () => newPath(NEW_FOLDER, undefined, "rename"),
                 icon: FOLDER_ICON,
-                label: "Pasta",
+                label: "Folder",
               },
               MENU_SEPERATOR,
               {
                 action: () =>
                   newPath(NEW_RTF_DOCUMENT, Buffer.from(""), "rename"),
                 icon: richTextDocumentIcon,
-                label: "Documento Rich Text",
+                label: "Rich Text Document",
               },
               {
                 action: () =>
                   newPath(NEW_TEXT_DOCUMENT, Buffer.from(""), "rename"),
                 icon: textDocumentIcon,
-                label: "Documento de texto",
+                label: "Text Document",
               },
             ],
           },

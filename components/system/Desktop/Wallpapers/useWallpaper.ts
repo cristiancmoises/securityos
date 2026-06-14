@@ -225,17 +225,20 @@ const useWallpaper = (
           }
         }
       }
+    } else if (wallpaperImage.includes("/api/proxy?url=")) {
+      // Already a proxied image link — whether relative (/api/proxy?url=...&nojs=1)
+      // or a full one copied from the address bar
+      // (http://localhost:8088/api/proxy?url=...). Use the SAME-ORIGIN path so the
+      // browser loads it from this origin. (Re-proxying the full URL would make the
+      // proxy fetch localhost and hit its own SSRF guard — the "doesn't load" bug.)
+      wallpaperUrl = wallpaperImage.slice(wallpaperImage.indexOf("/api/proxy"));
+      newWallpaperFit = wallpaperFit;
     } else if (/^https?:\/\//.test(wallpaperImage)) {
       // Custom image URL set by the user. CSP img-src allows https: directly;
       // http is routed through the privacy proxy to avoid mixed-content blocking.
       wallpaperUrl = wallpaperImage.startsWith("https://")
         ? wallpaperImage
         : `/api/proxy?url=${encodeURIComponent(wallpaperImage)}`;
-      newWallpaperFit = wallpaperFit;
-    } else if (wallpaperImage.startsWith("/api/proxy")) {
-      // A same-origin proxied image link (e.g. /api/proxy?url=...&nojs=1) copied
-      // from the Tor Browser — use it as-is.
-      wallpaperUrl = wallpaperImage;
       newWallpaperFit = wallpaperFit;
     } else if (await exists(wallpaperImage)) {
       wallpaperUrl = bufferToUrl(await readFile(wallpaperImage));

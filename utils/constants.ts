@@ -54,9 +54,12 @@ export const DEFAULT_THEME: ThemeName = "defaultTheme";
 
 export const DEFAULT_AI_API = "HuggingFace:"; // Engine:Key
 
-// v86 guest networking is OFF by default for privacy (no silent third-party relay
-// connection). The Tor Control app sets this to a relay URL when the user opts in.
-export const DEFAULT_EMULATOR_RELAY_URL = "";
+// Tor is ON by default: the v86 guest's network defaults to the local Tor relay
+// (ws://127.0.0.1:8081 -> SOCKS5 -> Tor; matches RELAY_PRESETS.tor). It fails
+// closed if the relay isn't running (no network rather than a clear-net leak).
+// Switch it (Tor/clearnet/off) in the Tor Control app. The in-OS Browser/Tor
+// Browser already exit through Tor via the server-side privacy proxy.
+export const DEFAULT_EMULATOR_RELAY_URL = "ws://127.0.0.1:8081/";
 
 // Fast webOS: default to a static solid background (no animated WebGL wallpaper).
 // Users can still pick MATRIX 3D / VANTA / a picture from the wallpaper menu.

@@ -15,12 +15,12 @@ const useClockContextMenu = (): ContextMenuCapture => {
         return [
           {
             action: () => setClockSource("local"),
-            label: "Horário Local",
+            label: "Local Time",
             toggle: isLocal,
           },
           {
             action: () => setClockSource("ntp"),
-            label: "Servidor",
+            label: "Server",
             toggle: !isLocal,
           },
         ];

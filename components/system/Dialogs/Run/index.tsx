@@ -33,12 +33,12 @@ const resourceAliasMap: Record<string, string> = {
   vlc: "VideoPlayer",
 };
 
-const MESSAGE = `Digite o nome de um programa, pasta, documento ou recurso da Internet e ${PACKAGE_DATA.alias} vai abrir para você.`;
+const MESSAGE = `Type the name of a program, folder, document, or Internet resource, and ${PACKAGE_DATA.alias} will open it for you.`;
 
 const notFound = (resource: string): void =>
   // eslint-disable-next-line no-alert
   alert(
-    `Não foi possível encontrar '${resource}'. Certifique-se de ter digitado o nome corretamente e tente novamente.`
+    `Couldn't find '${resource}'. Make sure you typed the name correctly, and then try again.`
   );
 
 const utilCommandMap: Record<string, () => void> = {
@@ -210,11 +210,11 @@ const Run: FC<ComponentProcessProps> = () => {
       }}
     >
       <figure>
-        <img alt="Executar" src="/System/Icons/32x32/run.webp" />
+        <img alt="Run" src="/System/Icons/32x32/run.webp" />
         <figcaption>{MESSAGE}</figcaption>
       </figure>
       <div>
-        <label htmlFor={OPEN_ID}>Abrir:</label>
+        <label htmlFor={OPEN_ID}>Open:</label>
         <div>
           <input
             ref={inputRef}

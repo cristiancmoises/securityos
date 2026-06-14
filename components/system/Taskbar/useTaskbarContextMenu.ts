@@ -22,8 +22,8 @@ const useTaskbarContextMenu = (onStartButton = false): ContextMenuCapture => {
           processArray.length > 0 &&
           !processArray.some(([, { minimized }]) => !minimized);
         const toggleLabel = allWindowsMinimized
-          ? "Mostrar Janelas Abertas"
-          : "Mostrar o Desktop";
+          ? "Show Open Windows"
+          : "Show the Desktop";
         const menuItems: MenuItem[] = [
           {
             action: () => toggleShowDesktop(processesRef.current, minimize),
@@ -44,7 +44,7 @@ const useTaskbarContextMenu = (onStartButton = false): ContextMenuCapture => {
             },
             {
               action: () => open("Run"),
-              label: "Executar",
+              label: "Run",
             },
             MENU_SEPERATOR
           );
@@ -53,8 +53,8 @@ const useTaskbarContextMenu = (onStartButton = false): ContextMenuCapture => {
             {
               action: toggleFullScreen,
               label: document.fullscreenElement
-                ? "Sair da Tela Cheia"
-                : "Entrar na Tela Cheia",
+                ? "Exit Full Screen"
+                : "Enter Full Screen",
             },
             MENU_SEPERATOR
           );

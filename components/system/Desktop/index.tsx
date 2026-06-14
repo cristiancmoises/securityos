@@ -1,4 +1,5 @@
 import StyledDesktop from "components/system/Desktop/StyledDesktop";
+import useFilePaste from "components/system/Desktop/useFilePaste";
 import useWallpaper from "components/system/Desktop/Wallpapers/useWallpaper";
 import FileManager from "components/system/Files/FileManager";
 import { useRef } from "react";
@@ -8,6 +9,8 @@ const Desktop: FC = ({ children }) => {
   const desktopRef = useRef<HTMLElement | null>(null);
 
   useWallpaper(desktopRef);
+  // Paste files/images from the OS clipboard straight onto the Desktop.
+  useFilePaste(DESKTOP_PATH);
 
   return (
     <StyledDesktop ref={desktopRef}>
