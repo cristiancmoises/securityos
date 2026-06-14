@@ -111,11 +111,13 @@ export const bookmarks: Bookmark[] = [
 
 export const HOME_PAGE = "https://securityops.co";
 
-// The Clearnet Browser's default search engine. Unlike the Tor Browser (which
-// searches a .onion over Tor), clearnet searches go to the user's own SecurityOps
-// site over the normal connection. It's first-party, so the results page loads
-// DIRECT (real origin) rather than through the rewriting proxy.
-export const CLEARNET_SEARCH_QUERY = "https://securityops.co/search?q=";
+// The Clearnet Browser's default search engine. securityops.co is the user's own
+// SearXNG metasearch ("Security Search"); its search endpoint is GET /web?s=<query>
+// (verified against the live searchbox form — the input is name="s" and the form
+// posts to /web). Unlike the Tor Browser (which searches a .onion over Tor), these
+// clearnet searches go over the normal connection; the host is first-party, so the
+// results page loads DIRECT (real origin) rather than through the rewriting proxy.
+export const CLEARNET_SEARCH_QUERY = "https://securityops.co/web?s=";
 
 // Server-side privacy proxy (pages/api/proxy.ts). Routing remote pages through it
 // (a) strips X-Frame-Options/CSP frame-ancestors so sites that block embedding
