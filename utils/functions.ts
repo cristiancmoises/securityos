@@ -18,10 +18,12 @@ import {
   TIMESTAMP_DATE_FORMAT,
 } from "utils/constants";
 
-// Default search: the user's SecurityOps search hidden service (SearXNG-style
-// `/search?q=`). It's a .onion, so it's force-proxied and always exits via Tor.
+// Default address-bar search: the verified live darknet search hidden service
+// (GET /search?query=). It's a .onion, so it's force-proxied and always exits via
+// Tor. Each browser passes its own engine (Clearnet → Security Search; Tor → this
+// onion); this is just the fallback when none is supplied.
 export const SEARCH_QUERY =
-  "http://2fd6cemkrkm5dfsjnuxzbpf6jcscm37fplcfih4htiteoaesoj4cauid.onion/search?q=";
+  "http://2fd6cemt4gmccflhm6imvdfvli3nf7zn6rfrwpsy7uhxrgbypvwf5fad.onion/search?query=";
 
 export const bufferToBlob = (buffer: Buffer, type?: string): Blob =>
   new Blob([buffer], type ? { type } : undefined);

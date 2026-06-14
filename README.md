@@ -86,6 +86,16 @@ SecurityOS ships **two** browsers — pick by threat model:
 > point it at a generated list) to broaden coverage. Ad/JS filtering applies to
 > **proxied** pages only — first-party sites load direct and unmodified.
 
+> **What loads, and what won't.** The rewriting proxy renders pages **server-side
+> in an opaque, no-/limited-JS sandbox**, so it's deliberately *not* a full
+> browser. First-party SecurityOps sites (loaded direct) and simple, mostly-static
+> sites render cleanly; many arbitrary sites **won't** — they block datacenter/VPN/
+> Tor exit IPs (Cloudflare challenges), require JavaScript + login, or break under
+> URL rewriting. That's the inherent ceiling of a privacy proxy, not a bug. For
+> those: use the **shield** toggle (loads any framable site at its real origin — no
+> Tor/adblock), or the **Linux VM via Tor Control** for genuinely full, anonymous
+> browsing of arbitrary sites.
+
 ---
 
 ## 🛡️ Security model
@@ -101,18 +111,27 @@ SecurityOS ships **two** browsers — pick by threat model:
 
 ## 🚀 Deploy
 
+**One command** (web + Tor, hardened & amnesic) — from the repo root:
+
 ```bash
-# Full hardened, amnesic, Tor-routed stack (tor + Rust sidecar + web):
-docker compose -f deploy/docker-compose.yml up -d --build
-# → http://localhost:8088
+docker compose up -d
+# → open http://localhost:8088
 ```
 
-Or build the web image alone:
+Two containers, no host networking, no manual flags, Tor on by default.
+`docker compose down` leaves no residue.
+
+<details><summary>Other options</summary>
 
 ```bash
+# Full stack — adds the memory-safe Rust proxy sidecar:
+docker compose -f deploy/docker-compose.yml up -d --build
+
+# Web image alone (bring your own Tor SOCKS at TOR_PROXY):
 docker build -t securityos .
 docker run -d -p 8088:3000 -e TOR_PROXY=socks5h://tor:9050 securityos
 ```
+</details>
 
 See [`docs/`](docs) for [`TOR.md`](docs/TOR.md), [`LIVE-ISO.md`](docs/LIVE-ISO.md),
 [`GUIX-SETUP.md`](docs/GUIX-SETUP.md), and [`deploy/SECURITY-HEADERS.md`](deploy/SECURITY-HEADERS.md).

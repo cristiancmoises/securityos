@@ -1,0 +1,70 @@
+# SecurityOS — one-command deploy.
+#
+#   docker compose up -d        # then open http://localhost:8088
+#
+# Two services: the web desktop and a Tor daemon. The web container's privacy
+# proxy (/api/proxy) routes every fetch through Tor over SOCKS5h (DNS + .onion
+# resolved AT Tor), so the in-OS Browser and Tor Browser exit over Tor by default.
+# No host networking, no manual flags. Both run read-only with RAM-only scratch
+# (amnesia: nothing persists, no logs), so `docker compose down` leaves no residue.
+#
+# For the full stack that adds the memory-safe Rust proxy sidecar, use
+# `docker compose -f deploy/docker-compose.yml up -d` instead. For a single
+# container with no compose at all, see deploy/standalone/ (docker run only).
+services:
+  tor:
+    build:
+      context: deploy
+      dockerfile: tor/Dockerfile
+    restart: unless-stopped
+    init: true
+    # No caps needed for a SOCKS client on a high port; immutable rootfs; Tor's
+    # DataDirectory is RAM-only (uid 100/gid 101), so circuits/keys never touch disk.
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /var/lib/tor:uid=100,gid=101,mode=0700
+      - /tmp
+    mem_limit: 192m
+    pids_limit: 256
+    logging: { driver: "none" }
+    networks: [securenet]
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: securityos
+    restart: unless-stopped
+    init: true
+    # Wait until Tor has actually finished bootstrapping (the image's healthcheck
+    # checks status/bootstrap-phase, not just the open port), so the first onion
+    # request can't fail on a cold start.
+    depends_on:
+      tor:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      TMPDIR: /tmp
+      # Route every fetch through Tor's SOCKS5h port. Tor is ON by default; comment
+      # this out for a non-Tor deployment (the proxy then only strips framing).
+      TOR_PROXY: socks5h://tor:9050
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /SecurityOS/.next/cache
+      - /root/.cache
+    mem_limit: 1g
+    pids_limit: 512
+    logging: { driver: "none" }
+    ports:
+      - "8088:3000"
+    networks: [securenet]
+
+networks:
+  securenet:
+    driver: bridge

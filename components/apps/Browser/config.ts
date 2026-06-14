@@ -112,7 +112,7 @@ export const bookmarks: Bookmark[] = [
 export const HOME_PAGE = "https://securityops.co";
 
 // The Clearnet Browser's default search engine. securityops.co is the user's own
-// SearXNG metasearch ("Security Search"); its search endpoint is GET /web?s=<query>
+// "Security Search" metasearch engine; its search endpoint is GET /web?s=<query>
 // (verified against the live searchbox form — the input is name="s" and the form
 // posts to /web). Unlike the Tor Browser (which searches a .onion over Tor), these
 // clearnet searches go over the normal connection; the host is first-party, so the
