@@ -4,8 +4,7 @@ import StyledBrowser from "components/apps/Browser/StyledBrowser";
 import type { ComponentProcessProps } from "components/system/Apps/RenderComponent";
 import useTitle from "components/system/Window/useTitle";
 import { useProcesses } from "contexts/process";
-import useHistory from "hooks/useHistory";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Button from "styles/common/Button";
 import {
   NOSCRIPT_IFRAME_CONFIG,
@@ -81,95 +80,283 @@ const BOOKMARKS: { name: string; url: string }[] = [
 // (the /api/proxy SOCKS5h path), rendered in an opaque-origin sandbox. JavaScript
 // is DISABLED by default ("Safest") — the proxy strips scripts + sets script-src
 // 'none', and the iframe drops allow-scripts. Toggle JS on per session if needed.
+// Tabs (in no-JS mode, the sandbox forbids scripts, so links open in the current
+// tab and new tabs come from the + button; with JS on, ctrl/middle-click + pop-ups
+// open new tabs via the in-page shim).
+const addressFromSrc = (src: string): string => {
+  try {
+    return new URL(src, window.location.origin).searchParams.get("url") || src;
+  } catch {
+    return src;
+  }
+};
+
+type Tab = {
+  key: number;
+  address: string;
+  src: string;
+  title: string;
+  history: string[];
+  position: number;
+  loading: boolean;
+};
+
+const blankTab = (key: number, address: string): Tab => ({
+  key,
+  address,
+  src: "",
+  title: "",
+  history: address ? [address] : [],
+  position: address ? 0 : -1,
+  loading: false,
+});
+
+const tabLabel = (tab: Tab): string =>
+  (tab.title || tab.address || "New tab").replace(/^https?:\/\//, "");
+
 const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
   const {
-    url: changeUrl,
     processes: { [id]: process },
   } = useProcesses();
   const { prependFileToTitle } = useTitle(id);
   const { url = "" } = process || {};
   const initialUrl = url || TOR_HOME;
-  const { canGoBack, canGoForward, history, moveHistory, position } =
-    useHistory(initialUrl, id);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [src, setSrc] = useState("");
+  const keyCounter = useRef(0);
   const [jsEnabled, setJsEnabled] = useState(false);
   const [extEnabled, setExtEnabled] = useState(false);
-  const currentUrl = useRef("");
-  const changeHistory = (step: number): void => {
-    moveHistory(step);
+  const [tabs, setTabs] = useState<Tab[]>(() => [blankTab(0, initialUrl)]);
+  const [activeKey, setActiveKey] = useState(0);
 
-    if (inputRef.current) inputRef.current.value = history[position + step];
-  };
-  const setUrl = useCallback(
-    async (addressInput: string): Promise<void> => {
-      setLoading(true);
+  const activeTab = useMemo(
+    () => tabs.find((t) => t.key === activeKey) || tabs[0],
+    [tabs, activeKey]
+  );
 
+  const patchTab = useCallback(
+    (key: number, patch: Partial<Tab>): void =>
+      setTabs((prev) =>
+        prev.map((t) => (t.key === key ? { ...t, ...patch } : t))
+      ),
+    []
+  );
+
+  const resolveSrc = useCallback(
+    async (addressInput: string): Promise<{ src: string; address: string }> => {
       const addressUrl = await getUrlOrSearch(addressInput, TOR_SEARCH_QUERY);
 
-      if (!/^https?:/.test(addressUrl)) {
-        setLoading(false);
-        return;
-      }
+      if (!/^https?:/.test(addressUrl)) return { src: "", address: addressInput };
 
-      setSrc(
-        `${PROXY_PATH}${encodeURIComponent(addressUrl)}${
+      return {
+        src: `${PROXY_PATH}${encodeURIComponent(addressUrl)}${
           jsEnabled ? "" : "&nojs=1"
-        }${extEnabled ? "&ext=1" : ""}`
-      );
-      prependFileToTitle(addressInput);
-
-      if (inputRef.current && document.activeElement !== inputRef.current) {
-        inputRef.current.value = addressInput;
-      }
+        }${extEnabled ? "&ext=1" : ""}`,
+        address: addressInput,
+      };
     },
-    [extEnabled, jsEnabled, prependFileToTitle]
+    [extEnabled, jsEnabled]
   );
-  const toggleJs = useCallback((): void => {
-    currentUrl.current = "";
-    setJsEnabled((prev) => !prev);
+
+  const navigateTab = useCallback(
+    async (key: number, addressInput: string, push = true): Promise<void> => {
+      patchTab(key, { loading: true });
+
+      const { src, address } = await resolveSrc(addressInput);
+
+      setTabs((prev) =>
+        prev.map((t) => {
+          if (t.key !== key) return t;
+
+          const history = push
+            ? [...t.history.slice(0, t.position + 1), address]
+            : t.history;
+
+          return {
+            ...t,
+            address,
+            src,
+            history,
+            position: push ? history.length - 1 : t.position,
+          };
+        })
+      );
+    },
+    [patchTab, resolveSrc]
+  );
+
+  const openTab = useCallback(
+    (addressInput: string = TOR_HOME): void => {
+      keyCounter.current += 1;
+      const key = keyCounter.current;
+
+      setTabs((prev) => [...prev, blankTab(key, "")]);
+      setActiveKey(key);
+      void navigateTab(key, addressInput, true);
+    },
+    [navigateTab]
+  );
+
+  const openProxiedTab = useCallback((proxiedSrc: string): void => {
+    keyCounter.current += 1;
+    const key = keyCounter.current;
+    const address = addressFromSrc(proxiedSrc);
+
+    setTabs((prev) => [
+      ...prev,
+      { ...blankTab(key, address), src: proxiedSrc, loading: true },
+    ]);
+    setActiveKey(key);
   }, []);
-  const toggleExt = useCallback((): void => {
-    currentUrl.current = "";
-    setExtEnabled((prev) => !prev);
-  }, []);
+
+  const closeTab = useCallback(
+    (key: number): void => {
+      setTabs((prev) => {
+        if (prev.length <= 1) return prev;
+        const index = prev.findIndex((t) => t.key === key);
+        const next = prev.filter((t) => t.key !== key);
+
+        if (key === activeKey) {
+          const fallback = next[Math.max(0, index - 1)];
+
+          if (fallback) setActiveKey(fallback.key);
+        }
+
+        return next;
+      });
+    },
+    [activeKey]
+  );
+
+  const selectTab = useCallback(
+    (key: number): void => {
+      setActiveKey(key);
+      const tab = tabs.find((t) => t.key === key);
+
+      if (tab && inputRef.current) inputRef.current.value = tab.address;
+    },
+    [tabs]
+  );
+
+  const toggleJs = useCallback((): void => setJsEnabled((prev) => !prev), []);
+  const toggleExt = useCallback((): void => setExtEnabled((prev) => !prev), []);
+
+  const didInit = useRef(false);
 
   useEffect(() => {
-    if (process && history[position] !== currentUrl.current) {
-      currentUrl.current = history[position];
-      setUrl(history[position]);
+    if (!didInit.current) {
+      didInit.current = true;
+      void navigateTab(0, initialUrl, false);
     }
-  }, [history, position, process, setUrl]);
+  }, [initialUrl, navigateTab]);
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent): void => {
+      const candidate = (event.data as { __sosNewTab?: unknown })?.__sosNewTab;
+      const prefix = `${window.location.origin}/api/proxy?`;
+
+      if (typeof candidate === "string" && candidate.startsWith(prefix)) {
+        openProxiedTab(candidate);
+      }
+    };
+
+    window.addEventListener("message", onMessage);
+
+    return () => window.removeEventListener("message", onMessage);
+  }, [openProxiedTab]);
+
+  useEffect(() => {
+    if (!activeTab) return;
+
+    prependFileToTitle(tabLabel(activeTab));
+
+    if (inputRef.current && document.activeElement !== inputRef.current) {
+      inputRef.current.value = activeTab.address;
+    }
+  }, [activeTab, prependFileToTitle]);
+
+  // Reload the active tab when a mode toggle (JS / extension) changes.
+  useEffect(() => {
+    if (activeTab?.address) void navigateTab(activeKey, activeTab.address, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jsEnabled, extEnabled]);
+
+  const canGoBack = (activeTab?.position ?? 0) > 0;
+  const canGoForward =
+    activeTab && activeTab.position < activeTab.history.length - 1;
+
+  const go = (step: number): void => {
+    if (!activeTab) return;
+    const position = activeTab.position + step;
+    const address = activeTab.history[position];
+
+    if (address === undefined) return;
+    patchTab(activeKey, { position });
+    if (inputRef.current) inputRef.current.value = address;
+    void navigateTab(activeKey, address, false);
+  };
 
   return (
     <StyledBrowser $hasSrcDoc={false}>
-      <nav>
+      <nav className="tabstrip">
+        {tabs.map((tab) => (
+          <span
+            key={tab.key}
+            className={tab.key === activeKey ? "tab active" : "tab"}
+          >
+            <button
+              className="tab-select"
+              onClick={() => selectTab(tab.key)}
+              type="button"
+              {...label(tab.address || "New tab")}
+            >
+              {tabLabel(tab)}
+            </button>
+            {tabs.length > 1 && (
+              <button
+                className="tab-close"
+                onClick={() => closeTab(tab.key)}
+                type="button"
+                {...label("Close tab")}
+              >
+                ×
+              </button>
+            )}
+          </span>
+        ))}
+        <button
+          className="tab-new"
+          onClick={() => openTab()}
+          type="button"
+          {...label("New tab")}
+        >
+          +
+        </button>
+      </nav>
+      <nav className="controls">
         <div>
           <Button
             disabled={!canGoBack}
-            onClick={() => changeHistory(-1)}
+            onClick={() => go(-1)}
             {...label("Click to go back")}
           >
             <Arrow direction="left" />
           </Button>
           <Button
             disabled={!canGoForward}
-            onClick={() => changeHistory(+1)}
+            onClick={() => go(+1)}
             {...label("Click to go forward")}
           >
             <Arrow direction="right" />
           </Button>
           <Button
-            disabled={loading}
-            onClick={() => {
-              currentUrl.current = "";
-              setUrl(history[position]);
-            }}
+            disabled={activeTab?.loading}
+            onClick={() =>
+              activeTab && navigateTab(activeKey, activeTab.address, false)
+            }
             {...label("Reload this page")}
           >
-            {loading ? <Stop /> : <Refresh />}
+            {activeTab?.loading ? <Stop /> : <Refresh />}
           </Button>
           <Button
             onClick={toggleJs}
@@ -235,7 +422,7 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
           onFocusCapture={() => inputRef.current?.select()}
           onKeyDown={({ key }) => {
             if (inputRef.current && key === "Enter") {
-              changeUrl(id, inputRef.current.value);
+              void navigateTab(activeKey, inputRef.current.value, true);
               window.getSelection()?.removeAllRanges();
               inputRef.current.blur();
             }
@@ -249,7 +436,7 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
             key={name}
             onClick={() => {
               if (inputRef.current) inputRef.current.value = bookmarkUrl;
-              changeUrl(id, bookmarkUrl);
+              void navigateTab(activeKey, bookmarkUrl, true);
             }}
             {...label(`${name}\n${bookmarkUrl}`)}
           >
@@ -257,13 +444,17 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
           </Button>
         ))}
       </nav>
-      <iframe
-        ref={iframeRef}
-        onLoad={() => setLoading(false)}
-        src={src || undefined}
-        title={id}
-        {...(jsEnabled ? SANDBOXED_IFRAME_CONFIG : NOSCRIPT_IFRAME_CONFIG)}
-      />
+      {tabs.map((tab) => (
+        <iframe
+          key={tab.key}
+          ref={tab.key === activeKey ? iframeRef : undefined}
+          onLoad={() => patchTab(tab.key, { loading: false })}
+          src={tab.src || undefined}
+          style={{ display: tab.key === activeKey ? undefined : "none" }}
+          title={`${id}-${tab.key}`}
+          {...(jsEnabled ? SANDBOXED_IFRAME_CONFIG : NOSCRIPT_IFRAME_CONFIG)}
+        />
+      ))}
     </StyledBrowser>
   );
 };

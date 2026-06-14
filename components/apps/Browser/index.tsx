@@ -13,17 +13,11 @@ import useTitle from "components/system/Window/useTitle";
 import { useFileSystem } from "contexts/fileSystem";
 import { useProcesses } from "contexts/process";
 import processDirectory from "contexts/process/directory";
-import useHistory from "hooks/useHistory";
 import { extname } from "path";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Button from "styles/common/Button";
 import Icon from "styles/common/Icon";
-import {
-  FAVICON_BASE_PATH,
-  IFRAME_CONFIG,
-  ONE_TIME_PASSIVE_EVENT,
-  SANDBOXED_IFRAME_CONFIG,
-} from "utils/constants";
+import { IFRAME_CONFIG, SANDBOXED_IFRAME_CONFIG } from "utils/constants";
 import { getUrlOrSearch, label } from "utils/functions";
 
 const isHttpUrl = (value: string): boolean =>
@@ -37,211 +31,350 @@ const isOnionUrl = (value: string): boolean => {
   }
 };
 
+// A proxied iframe src either starts with the relative proxy path (address-bar
+// navigations) or is the absolute same-origin proxy URL (links/pop-ups posted by
+// the in-page shim). Either way it must render in the opaque sandbox.
+const isProxiedSrc = (src: string): boolean =>
+  Boolean(src) && (src.startsWith(PROXY_PATH) || src.includes("/api/proxy?"));
+
+// Recover a human-readable address from a proxied src for the address bar / title.
+const addressFromSrc = (src: string): string => {
+  try {
+    const u = new URL(src, window.location.origin);
+    const target = u.searchParams.get("url");
+
+    return target || src;
+  } catch {
+    return src;
+  }
+};
+
+type Tab = {
+  key: number;
+  address: string;
+  src: string;
+  srcDoc: string;
+  title: string;
+  history: string[];
+  position: number;
+  loading: boolean;
+};
+
+const blankTab = (key: number, address: string): Tab => ({
+  key,
+  address,
+  src: "",
+  srcDoc: "",
+  title: "",
+  history: address ? [address] : [],
+  position: address ? 0 : -1,
+  loading: false,
+});
+
+const tabLabel = (tab: Tab): string =>
+  (tab.title || tab.address || "New tab").replace(/^https?:\/\//, "");
+
 const Browser: FC<ComponentProcessProps> = ({ id }) => {
   const {
     icon: setIcon,
     linkElement,
     open,
-    url: changeUrl,
     processes: { [id]: process },
   } = useProcesses();
   const { prependFileToTitle } = useTitle(id);
   const { url = "" } = process || {};
   const initialUrl = url || HOME_PAGE;
-  const { canGoBack, canGoForward, history, moveHistory, position } =
-    useHistory(initialUrl, id);
   const { exists, readFile } = useFileSystem();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [srcDoc, setSrcDoc] = useState("");
-  const [src, setSrc] = useState("");
-  // Privacy proxy: ON routes remote pages through /api/proxy (server-side fetch via
-  // Tor + strips X-Frame-Options/CSP so sites that block embedding load). OFF loads
-  // the page directly (its real origin + cookies) — for interactive/login sites.
+  const keyCounter = useRef(0);
+  // Window-level (shared by every tab, like a normal browser's settings).
   const [proxyEnabled, setProxyEnabled] = useState(PROXY_ENABLED_BY_DEFAULT);
-  // LibreJS-style filter (ON by default): the proxy keeps only first-party +
-  // trivial/free-licensed JavaScript and strips third-party/nonfree scripts
-  // (trackers, ads, fingerprinting). Toggle OFF to allow all JS on a page that
-  // needs it. Only meaningful while the privacy proxy is ON.
   const [libreJsEnabled, setLibreJsEnabled] = useState(true);
-  const currentUrl = useRef("");
-  const changeHistory = (step: number): void => {
-    moveHistory(step);
+  const [tabs, setTabs] = useState<Tab[]>(() => [blankTab(0, initialUrl)]);
+  const [activeKey, setActiveKey] = useState(0);
 
-    if (inputRef.current) inputRef.current.value = history[position + step];
-  };
-  const setUrl = useCallback(
-    async (addressInput: string): Promise<void> => {
-      setLoading(true);
+  const activeTab = useMemo(
+    () => tabs.find((t) => t.key === activeKey) || tabs[0],
+    [tabs, activeKey]
+  );
 
+  const patchTab = useCallback(
+    (key: number, patch: Partial<Tab>): void =>
+      setTabs((prev) =>
+        prev.map((t) => (t.key === key ? { ...t, ...patch } : t))
+      ),
+    []
+  );
+
+  // Resolve an address-bar entry into iframe state (the proxy/first-party/onion
+  // decision), without touching React state, so callers can apply it to any tab.
+  const resolveAddress = useCallback(
+    async (
+      addressInput: string
+    ): Promise<
+      | { handoff: true }
+      | { handoff?: false; src: string; srcDoc: string; address: string }
+    > => {
       const isHtml =
         [".htm", ".html"].includes(extname(addressInput).toLowerCase()) &&
         (await exists(addressInput));
 
-      // Resolve everything we await BEFORE touching iframe state, so the iframe
-      // transitions old -> new in a single render (no about:blank flicker that
-      // would fire a premature onLoad).
       if (isHtml) {
         const content = (await readFile(addressInput)).toString();
 
-        setSrc("");
-        setSrcDoc(content);
-        setIcon(id, processDirectory.Browser.icon);
-        return;
+        return { src: "", srcDoc: content, address: addressInput };
       }
 
-      const addressUrl = await getUrlOrSearch(
-        addressInput,
-        CLEARNET_SEARCH_QUERY
-      );
+      const addressUrl = await getUrlOrSearch(addressInput, CLEARNET_SEARCH_QUERY);
 
-      // This is the CLEARNET browser — it opens any website in the webOS. .onion
-      // sites need Tor, so hand those off to the dedicated Tor Browser.
+      // .onion needs Tor — hand off to the dedicated Tor Browser.
       if (isHttpUrl(addressUrl) && isOnionUrl(addressUrl)) {
+        return { handoff: true };
+      }
+
+      const firstParty = isHttpUrl(addressUrl) && isFirstPartyUrl(addressUrl);
+      const useProxy = isHttpUrl(addressUrl) && proxyEnabled && !firstParty;
+      const src = useProxy
+        ? `${PROXY_PATH}${encodeURIComponent(addressUrl)}&direct=1&adblock=1${
+            libreJsEnabled ? "&librejs=1" : ""
+          }`
+        : addressUrl;
+
+      return { src, srcDoc: "", address: addressInput };
+    },
+    [exists, libreJsEnabled, proxyEnabled, readFile]
+  );
+
+  // Navigate a tab. push=true records history (back/forward); replace updates in
+  // place (initial load, reload, back/forward themselves).
+  const navigateTab = useCallback(
+    async (key: number, addressInput: string, push = true): Promise<void> => {
+      patchTab(key, { loading: true });
+
+      const result = await resolveAddress(addressInput);
+
+      if (result.handoff) {
         open("TorBrowser", { url: addressInput });
-        setLoading(false);
-        if (inputRef.current) inputRef.current.value = currentUrl.current;
+        patchTab(key, { loading: false });
         return;
       }
 
-      // First-party SecurityOps sites are interactive (login, cookies, WebSockets),
-      // so load them DIRECT from their real origin. The rewriting proxy strips
-      // cookies + opaque-sandboxes the page, which breaks these apps — that's why
-      // securityops.co failed to load through the proxy before.
-      const firstParty = isHttpUrl(addressUrl) && isFirstPartyUrl(addressUrl);
+      setTabs((prev) =>
+        prev.map((t) => {
+          if (t.key !== key) return t;
 
-      // Route THIRD-party clearnet pages through the proxy with ?direct=1 (no Tor):
-      // it strips X-Frame-Options/CSP so sites that block embedding still load,
-      // blocks ads/trackers (&adblock=1), and filters JavaScript LibreJS-style.
-      // The shield toggle loads the page directly (its real origin) instead.
-      const useProxy = isHttpUrl(addressUrl) && proxyEnabled && !firstParty;
+          const history = push
+            ? [...t.history.slice(0, t.position + 1), result.address]
+            : t.history;
 
-      setSrcDoc("");
-      setSrc(
-        useProxy
-          ? `${PROXY_PATH}${encodeURIComponent(addressUrl)}&direct=1&adblock=1${
-              libreJsEnabled ? "&librejs=1" : ""
-            }`
-          : addressUrl
+          return {
+            ...t,
+            address: result.address,
+            src: result.src,
+            srcDoc: result.srcDoc,
+            history,
+            position: push ? history.length - 1 : t.position,
+          };
+        })
       );
-      setIcon(id, processDirectory.Browser.icon);
-
-      // Keep the address bar in sync (unless the user is editing it).
-      if (
-        inputRef.current &&
-        document.activeElement !== inputRef.current &&
-        !addressUrl.startsWith(CLEARNET_SEARCH_QUERY)
-      ) {
-        inputRef.current.value = addressInput;
-      }
-
-      if (addressUrl.startsWith(CLEARNET_SEARCH_QUERY)) {
-        prependFileToTitle(`${addressInput} - SecurityOps Search`);
-      } else {
-        const { name = "" } =
-          bookmarks?.find(({ url: bookmarkUrl }) => bookmarkUrl === addressInput) ||
-          {};
-
-        prependFileToTitle(name);
-      }
-
-      const { icon: bookmarkIcon } =
-        bookmarks?.find(({ url: bookmarkUrl }) => bookmarkUrl === addressInput) ||
-        {};
-
-      if (addressInput.startsWith("ipfs://")) {
-        setIcon(id, "/System/Icons/Favicons/osint.webp");
-      } else if (firstParty) {
-        // ONLY first-party (trusted SecurityOps) sites probe their real favicon.
-        // A direct probe reveals the visited host to the network, so proxied AND
-        // third-party-direct (shield-off) loads use the bookmark icon instead —
-        // never leak an arbitrary host's favicon.
-        const favicon = new Image();
-        const faviconUrl = `${new URL(addressUrl).origin}${FAVICON_BASE_PATH}`;
-
-        favicon.addEventListener(
-          "error",
-          () => {
-            if (bookmarkIcon) setIcon(id, bookmarkIcon);
-          },
-          ONE_TIME_PASSIVE_EVENT
-        );
-        favicon.addEventListener(
-          "load",
-          () => setIcon(id, faviconUrl),
-          ONE_TIME_PASSIVE_EVENT
-        );
-        favicon.src = faviconUrl;
-      } else if (bookmarkIcon) {
-        setIcon(id, bookmarkIcon);
-      }
     },
-    [
-      exists,
-      id,
-      libreJsEnabled,
-      open,
-      prependFileToTitle,
-      proxyEnabled,
-      readFile,
-      setIcon,
-    ]
+    [open, patchTab, resolveAddress]
   );
+
+  // Open a brand-new tab. addressInput omitted => the home page.
+  const openTab = useCallback(
+    (addressInput: string = HOME_PAGE): void => {
+      keyCounter.current += 1;
+      const key = keyCounter.current;
+
+      setTabs((prev) => [...prev, blankTab(key, "")]);
+      setActiveKey(key);
+      void navigateTab(key, addressInput, true);
+    },
+    [navigateTab]
+  );
+
+  // Open an already-proxied src directly in a new tab (from the in-page shim:
+  // pop-ups and ctrl/middle-clicks). No re-resolution — it is already a proxy URL.
+  const openProxiedTab = useCallback((proxiedSrc: string): void => {
+    keyCounter.current += 1;
+    const key = keyCounter.current;
+    const address = addressFromSrc(proxiedSrc);
+
+    setTabs((prev) => [
+      ...prev,
+      {
+        ...blankTab(key, address),
+        src: proxiedSrc,
+        loading: true,
+      },
+    ]);
+    setActiveKey(key);
+  }, []);
+
+  const closeTab = useCallback(
+    (key: number): void => {
+      setTabs((prev) => {
+        if (prev.length <= 1) return prev; // keep at least one tab open
+        const index = prev.findIndex((t) => t.key === key);
+        const next = prev.filter((t) => t.key !== key);
+
+        if (key === activeKey) {
+          const fallback = next[Math.max(0, index - 1)];
+
+          if (fallback) setActiveKey(fallback.key);
+        }
+
+        return next;
+      });
+    },
+    [activeKey]
+  );
+
+  const selectTab = useCallback(
+    (key: number): void => {
+      setActiveKey(key);
+      const tab = tabs.find((t) => t.key === key);
+
+      if (tab && inputRef.current) inputRef.current.value = tab.address;
+    },
+    [tabs]
+  );
+
+  // First load of the initial url (replace, don't push a duplicate history entry).
+  const didInit = useRef(false);
+
+  useEffect(() => {
+    if (!didInit.current) {
+      didInit.current = true;
+      void navigateTab(0, initialUrl, false);
+    }
+  }, [initialUrl, navigateTab]);
+
+  // The in-page shim posts { __sosNewTab } (a same-origin /api/proxy URL) for
+  // pop-ups and ctrl/middle-clicked links — open each in a new tab. Validate the
+  // URL is our own proxy endpoint so a page can't open an arbitrary/un-proxied tab.
+  useEffect(() => {
+    const onMessage = (event: MessageEvent): void => {
+      const candidate = (event.data as { __sosNewTab?: unknown })?.__sosNewTab;
+      const prefix = `${window.location.origin}/api/proxy?`;
+
+      if (typeof candidate === "string" && candidate.startsWith(prefix)) {
+        openProxiedTab(candidate);
+      }
+    };
+
+    window.addEventListener("message", onMessage);
+
+    return () => window.removeEventListener("message", onMessage);
+  }, [openProxiedTab]);
+
+  // Reflect the active tab into the window icon + title + address bar.
+  useEffect(() => {
+    if (!activeTab) return;
+
+    setIcon(id, processDirectory.Browser.icon);
+    prependFileToTitle(tabLabel(activeTab));
+
+    if (inputRef.current && document.activeElement !== inputRef.current) {
+      inputRef.current.value = activeTab.address;
+    }
+  }, [activeTab, id, prependFileToTitle, setIcon]);
+
+  useEffect(() => {
+    if (iframeRef?.current) linkElement(id, "peekElement", iframeRef.current);
+  }, [activeKey, id, linkElement]);
+
   const toggleProxy = useCallback((): void => {
-    // Force the navigation effect to reload the current page in the new mode.
-    currentUrl.current = "";
     setProxyEnabled((prev) => !prev);
   }, []);
   const toggleLibreJs = useCallback((): void => {
-    currentUrl.current = "";
     setLibreJsEnabled((prev) => !prev);
   }, []);
 
+  // Re-load the active tab when a window-level mode toggle changes.
   useEffect(() => {
-    if (process && history[position] !== currentUrl.current) {
-      currentUrl.current = history[position];
-      setUrl(history[position]);
-    }
-  }, [history, position, process, setUrl]);
+    if (activeTab?.address) void navigateTab(activeKey, activeTab.address, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proxyEnabled, libreJsEnabled]);
 
-  useEffect(() => {
-    if (iframeRef?.current) {
-      linkElement(id, "peekElement", iframeRef.current);
-    }
-  }, [id, linkElement]);
+  const canGoBack = (activeTab?.position ?? 0) > 0;
+  const canGoForward =
+    activeTab && activeTab.position < activeTab.history.length - 1;
 
-  const proxied = src.startsWith(PROXY_PATH);
-  const sandboxConfig =
-    srcDoc || proxied ? SANDBOXED_IFRAME_CONFIG : IFRAME_CONFIG;
+  const go = (step: number): void => {
+    if (!activeTab) return;
+    const position = activeTab.position + step;
+    const address = activeTab.history[position];
+
+    if (address === undefined) return;
+    patchTab(activeKey, { position });
+    if (inputRef.current) inputRef.current.value = address;
+    void navigateTab(activeKey, address, false);
+  };
 
   return (
-    <StyledBrowser $hasSrcDoc={Boolean(srcDoc)}>
-      <nav>
+    <StyledBrowser $hasSrcDoc={Boolean(activeTab?.srcDoc)}>
+      <nav className="tabstrip">
+        {tabs.map((tab) => (
+          <span
+            key={tab.key}
+            className={tab.key === activeKey ? "tab active" : "tab"}
+          >
+            <button
+              className="tab-select"
+              onClick={() => selectTab(tab.key)}
+              type="button"
+              {...label(tab.address || "New tab")}
+            >
+              {tabLabel(tab)}
+            </button>
+            {tabs.length > 1 && (
+              <button
+                className="tab-close"
+                onClick={() => closeTab(tab.key)}
+                type="button"
+                {...label("Close tab")}
+              >
+                ×
+              </button>
+            )}
+          </span>
+        ))}
+        <button
+          className="tab-new"
+          onClick={() => openTab()}
+          type="button"
+          {...label("New tab")}
+        >
+          +
+        </button>
+      </nav>
+      <nav className="controls">
         <div>
           <Button
             disabled={!canGoBack}
-            onClick={() => changeHistory(-1)}
+            onClick={() => go(-1)}
             {...label("Click to go back")}
           >
             <Arrow direction="left" />
           </Button>
           <Button
             disabled={!canGoForward}
-            onClick={() => changeHistory(+1)}
+            onClick={() => go(+1)}
             {...label("Click to go forward")}
           >
             <Arrow direction="right" />
           </Button>
           <Button
-            disabled={loading}
-            onClick={() => {
-              currentUrl.current = "";
-              setUrl(history[position]);
-            }}
+            disabled={activeTab?.loading}
+            onClick={() =>
+              activeTab && navigateTab(activeKey, activeTab.address, false)
+            }
             {...label("Reload this page")}
           >
-            {loading ? <Stop /> : <Refresh />}
+            {activeTab?.loading ? <Stop /> : <Refresh />}
           </Button>
           <Button
             onClick={toggleProxy}
@@ -296,7 +429,7 @@ const Browser: FC<ComponentProcessProps> = ({ id }) => {
           onFocusCapture={() => inputRef.current?.select()}
           onKeyDown={({ key }) => {
             if (inputRef.current && key === "Enter") {
-              changeUrl(id, inputRef.current.value);
+              void navigateTab(activeKey, inputRef.current.value, true);
               window.getSelection()?.removeAllRanges();
               inputRef.current.blur();
             }
@@ -304,16 +437,13 @@ const Browser: FC<ComponentProcessProps> = ({ id }) => {
           type="text"
         />
       </nav>
-      <nav>
+      <nav className="bookmarks">
         {bookmarks.map(({ name, icon, url: bookmarkUrl }) => (
           <Button
             key={name}
             onClick={() => {
-              if (inputRef.current) {
-                inputRef.current.value = bookmarkUrl;
-              }
-
-              changeUrl(id, bookmarkUrl);
+              if (inputRef.current) inputRef.current.value = bookmarkUrl;
+              void navigateTab(activeKey, bookmarkUrl, true);
             }}
             {...label(`${name}\n${bookmarkUrl}`)}
           >
@@ -321,14 +451,20 @@ const Browser: FC<ComponentProcessProps> = ({ id }) => {
           </Button>
         ))}
       </nav>
-      <iframe
-        ref={iframeRef}
-        onLoad={() => setLoading(false)}
-        src={src || undefined}
-        srcDoc={srcDoc || undefined}
-        title={id}
-        {...sandboxConfig}
-      />
+      {tabs.map((tab) => (
+        <iframe
+          key={tab.key}
+          ref={tab.key === activeKey ? iframeRef : undefined}
+          onLoad={() => patchTab(tab.key, { loading: false })}
+          src={tab.src || undefined}
+          srcDoc={tab.srcDoc || undefined}
+          style={{ display: tab.key === activeKey ? undefined : "none" }}
+          title={`${id}-${tab.key}`}
+          {...(tab.srcDoc || isProxiedSrc(tab.src)
+            ? SANDBOXED_IFRAME_CONFIG
+            : IFRAME_CONFIG)}
+        />
+      ))}
     </StyledBrowser>
   );
 };
