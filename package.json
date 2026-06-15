@@ -79,7 +79,7 @@
     "multiformats": "^11.0.2",
     "music-metadata": "^11.12.3",
     "next": "^16.2.9",
-    "node": "^22.0.0",
+    "node": "^26.3.0",
     "opentype.js": "^2.0.0",
     "playlist-parser": "^0.0.11",
     "prettier": "2.8.4",
