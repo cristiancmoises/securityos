@@ -18,12 +18,12 @@ import {
   TIMESTAMP_DATE_FORMAT,
 } from "utils/constants";
 
-// Default address-bar search: the verified live darknet search hidden service
+// Default address-bar search: Torch, the long-running darknet search engine
 // (GET /search?query=). It's a .onion, so it's force-proxied and always exits via
-// Tor. Each browser passes its own engine (Clearnet → Security Search; Tor → this
-// onion); this is just the fallback when none is supplied.
+// Tor. The Tor Browser passes this onion as its engine; this is just the fallback
+// when none is supplied.
 export const SEARCH_QUERY =
-  "http://2fd6cemt4gmccflhm6imvdfvli3nf7zn6rfrwpsy7uhxrgbypvwf5fad.onion/search?query=";
+  "http://torchdeedp3i2jigzjdmfpn5ttjhthh5wbmda2rr3jvqjg5p77c54dqd.onion/search?query=";
 
 export const bufferToBlob = (buffer: Buffer, type?: string): Blob =>
   new Blob([buffer], type ? { type } : undefined);
