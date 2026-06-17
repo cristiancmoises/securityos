@@ -34,7 +34,7 @@ const StyledRegex = styled.div`
 
   table {
     border-collapse: collapse;
-    font-family: "Cascadia Code", "Consolas", monospace;
+    font-family: ${({ theme }) => theme.formats.monoFont};
     font-size: 12px;
     width: 100%;
   }
@@ -149,7 +149,8 @@ const RegexTesterTool: FC = () => {
             named: match.groups ? { ...match.groups } : {},
           });
 
-          if (match.index === regex.lastIndex) advancePastEmpty(regex, testString);
+          if (match.index === regex.lastIndex)
+            advancePastEmpty(regex, testString);
           if (matches.length >= MAX_MATCHES) {
             truncated = true;
             break;
@@ -240,7 +241,10 @@ const RegexTesterTool: FC = () => {
         </div>
 
         <p className="muted">
-          Active regex: <code>/{pattern || "(empty)"}/{flagString}</code>
+          Active regex:{" "}
+          <code>
+            /{pattern || "(empty)"}/{flagString}
+          </code>
         </p>
 
         {result.kind === "error" && (

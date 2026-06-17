@@ -45,7 +45,7 @@ const StyledTool = styled.div`
     border: 1px solid #4a3a5c;
     border-radius: 5px;
     color: #e8e2ee;
-    font-family: "Cascadia Code", "Consolas", monospace;
+    font-family: ${({ theme }) => theme.formats.monoFont};
     font-size: 12px;
     padding: 7px 9px;
     width: 100%;
@@ -132,7 +132,7 @@ const StyledTool = styled.div`
     border: 1px solid #2f2740;
     border-radius: 6px;
     color: #d7c2ec;
-    font-family: "Cascadia Code", "Consolas", monospace;
+    font-family: ${({ theme }) => theme.formats.monoFont};
     font-size: 12px;
     margin: 0;
     overflow-x: auto;
@@ -163,7 +163,7 @@ const StyledTool = styled.div`
     background: #0f0b14;
     border-radius: 3px;
     color: #d7c2ec;
-    font-family: "Cascadia Code", "Consolas", monospace;
+    font-family: ${({ theme }) => theme.formats.monoFont};
     padding: 1px 5px;
   }
 

@@ -48,7 +48,7 @@ security tooling.
 - 🌐 Portfolio — <https://cristiancezarmoises.com>
 - 🐙 GitHub — <https://github.com/cristiancmoises>
 - ⑂ Forgejo (projects) — <https://git.securityops.co/cristiancmoises>
-- 💼 LinkedIn — <https://www.linkedin.com/in/cristian-cezar-mois%C3%A9s>
+- 💼 LinkedIn — <https://www.linkedin.com/in/cristiancezarmoises>
 - 📺 YouTube — <https://www.youtube.com/@securityops>
 - 🐧 Guix config — <https://codeberg.org/berkeley/guix-config>
 - 🔗 Project home — <https://os.securityops.co> · Wiki — <https://wiki.securityops.co>

@@ -9,6 +9,7 @@ type StyledWindowProps = {
 const StyledWindow = styled(motion.section)<StyledWindowProps>`
   background-color: ${({ $backgroundColor, theme }) =>
     $backgroundColor || theme.colors.window.background};
+  border-radius: ${({ theme }) => theme.sizes.window.radius};
   box-shadow: ${({ $isForeground, theme }) =>
     $isForeground
       ? theme.colors.window.shadow

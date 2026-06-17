@@ -16,15 +16,14 @@ const StyledSidebar = styled.nav`
 
   &:hover:not(&.collapsed) {
     backdrop-filter: blur(12px);
-    background-color: hsla(0, 0%, 10%, 95%);
-    box-shadow: 8px 0 5px -5px hsla(0, 0%, 10%, 50%);
+
+    /* KDE Kickoff category rail surface — token-driven so the expanded rail recolors
+       with the theme (the Undercover light palette stays light). */
+    background-color: ${({ theme }) => theme.colors.titleBar.background};
+    box-shadow: ${({ theme }) => `8px 0 5px -5px ${theme.colors.accent.glow}`};
     transition: all 300ms ease, backdrop-filter 1ms;
     transition-timing-function: cubic-bezier(0.15, 1, 0.5, 1);
     width: ${({ theme }) => theme.sizes.startMenu.sideBar.expandedWidth};
-
-    @supports ((-webkit-backdrop-filter: none) or (backdrop-filter: none)) {
-      background-color: hsla(0, 0%, 10%, 75%);
-    }
   }
 `;
 

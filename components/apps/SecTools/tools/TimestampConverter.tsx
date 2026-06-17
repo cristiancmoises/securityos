@@ -20,7 +20,7 @@ const Rows = styled.div`
   }
 
   .row .v {
-    font-family: "Cascadia Code", "Consolas", monospace;
+    font-family: ${({ theme }) => theme.formats.monoFont};
     word-break: break-all;
   }
 `;
@@ -63,16 +63,18 @@ const toMillis = (n: number, unit: EpochUnit): number => {
   }
 };
 
-const RELATIVE_DIVISIONS: { amount: number; unit: Intl.RelativeTimeFormatUnit }[] =
-  [
-    { amount: 60, unit: "second" },
-    { amount: 60, unit: "minute" },
-    { amount: 24, unit: "hour" },
-    { amount: 7, unit: "day" },
-    { amount: 4.34524, unit: "week" },
-    { amount: 12, unit: "month" },
-    { amount: Number.POSITIVE_INFINITY, unit: "year" },
-  ];
+const RELATIVE_DIVISIONS: {
+  amount: number;
+  unit: Intl.RelativeTimeFormatUnit;
+}[] = [
+  { amount: 60, unit: "second" },
+  { amount: 60, unit: "minute" },
+  { amount: 24, unit: "hour" },
+  { amount: 7, unit: "day" },
+  { amount: 4.34524, unit: "week" },
+  { amount: 12, unit: "month" },
+  { amount: Number.POSITIVE_INFINITY, unit: "year" },
+];
 
 const formatRelative = (fromMs: number, nowMs: number): string => {
   try {
@@ -170,7 +172,8 @@ const TimestampConverterTool: FC = () => {
 
     if (Number.isNaN(ms)) {
       return {
-        error: "Unparseable date. Try an ISO 8601 string (e.g. 2026-06-13T12:00:00Z).",
+        error:
+          "Unparseable date. Try an ISO 8601 string (e.g. 2026-06-13T12:00:00Z).",
       };
     }
 
@@ -299,7 +302,9 @@ const TimestampConverterTool: FC = () => {
 
       {reverseResult && !("error" in reverseResult) ? (
         <pre className="output">
-          {`Epoch seconds : ${reverseResult.seconds}\nEpoch ms      : ${reverseResult.ms}\nISO 8601 UTC  : ${new Date(reverseResult.ms).toISOString()}`}
+          {`Epoch seconds : ${reverseResult.seconds}\nEpoch ms      : ${
+            reverseResult.ms
+          }\nISO 8601 UTC  : ${new Date(reverseResult.ms).toISOString()}`}
         </pre>
       ) : null}
     </StyledTool>

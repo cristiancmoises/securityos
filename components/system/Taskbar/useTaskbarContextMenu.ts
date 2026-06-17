@@ -4,14 +4,20 @@ import type {
   MenuItem,
 } from "contexts/menu/useMenuContextState";
 import { useProcesses } from "contexts/process";
+import { useSession } from "contexts/session";
 import { useProcessesRef } from "hooks/useProcessesRef";
 import { useMemo } from "react";
-import { MENU_SEPERATOR } from "utils/constants";
+import {
+  DEFAULT_WALLPAPER,
+  MENU_SEPERATOR,
+  UNDERCOVER_WALLPAPER,
+} from "utils/constants";
 import { toggleFullScreen, toggleShowDesktop } from "utils/functions";
 
 const useTaskbarContextMenu = (onStartButton = false): ContextMenuCapture => {
   const { contextMenu } = useMenu();
   const { minimize, open } = useProcesses();
+  const { setThemeName, setWallpaper, themeName } = useSession();
   const processesRef = useProcessesRef();
 
   return useMemo(
@@ -60,9 +66,34 @@ const useTaskbarContextMenu = (onStartButton = false): ContextMenuCapture => {
           );
         }
 
+        const undercoverOn = themeName === "undercover";
+
+        menuItems.push(MENU_SEPERATOR, {
+          action: () => {
+            if (undercoverOn) {
+              setThemeName("defaultTheme");
+              setWallpaper(DEFAULT_WALLPAPER, "fill");
+            } else {
+              setThemeName("undercover");
+              setWallpaper(UNDERCOVER_WALLPAPER, "fill");
+            }
+          },
+          label: "Undercover mode (Windows 11)",
+          toggle: undercoverOn,
+        });
+
         return menuItems;
       }),
-    [contextMenu, minimize, onStartButton, open, processesRef]
+    [
+      contextMenu,
+      minimize,
+      onStartButton,
+      open,
+      processesRef,
+      setThemeName,
+      setWallpaper,
+      themeName,
+    ]
   );
 };
 

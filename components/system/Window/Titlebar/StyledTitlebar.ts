@@ -69,6 +69,12 @@ const StyledTitlebar = styled.header<StyledTitlebarProps>`
       place-items: center;
       width: ${({ theme }) => theme.sizes.titleBar.buttonWidth};
 
+      /* Win11 caption buttons read as clean, borderless cells with a softly
+         rounded hover; Undercover drops the dividing border-left and rounds the
+         hover fill (applied below). Default (Emacs) keeps its bordered cells. */
+      ${({ theme }) =>
+        theme.name === "Undercover" ? "border-left: none;" : ""}
+
       svg {
         fill: ${({ $foreground, theme }) =>
           $foreground
@@ -89,6 +95,13 @@ const StyledTitlebar = styled.header<StyledTitlebarProps>`
         background-color: ${({ theme }) =>
           theme.colors.titleBar.backgroundHover};
 
+        /* Win11 hover fill is a clean, softly rounded cell rather than a hard
+           full-height block; Undercover only. Just rounds the corners of the
+           fill — no padding/margin, so button geometry never shifts. Colors
+           stay token-driven. */
+        ${({ theme }) =>
+          theme.name === "Undercover" ? "border-radius: 5px;" : ""}
+
         svg {
           fill: ${({ theme }) => theme.colors.titleBar.text};
         }
@@ -96,21 +109,33 @@ const StyledTitlebar = styled.header<StyledTitlebarProps>`
         &.close {
           background-color: ${({ theme }) => theme.colors.titleBar.closeHover};
           transition: background-color 0.25s ease;
+
+          /* The Win11 red close hover needs white glyph for contrast. */
+          ${({ theme }) =>
+            theme.name === "Undercover"
+              ? "svg { fill: rgb(255, 255, 255); }"
+              : ""}
         }
       }
 
       &:active {
-        background-color: rgb(51, 51, 51);
+        background-color: ${({ theme }) =>
+          theme.colors.titleBar.backgroundHover};
+
+        ${({ theme }) =>
+          theme.name === "Undercover" ? "border-radius: 5px;" : ""}
 
         &.close {
-          background-color: rgb(139, 10, 20);
+          background-color: ${({ theme }) => theme.colors.titleBar.closeHover};
         }
       }
 
       &:disabled {
         svg {
-          fill: ${({ $foreground }) =>
-            $foreground ? "rgb(50, 50, 50)" : "rgb(60, 60, 60)"};
+          fill: ${({ $foreground, theme }) =>
+            $foreground
+              ? theme.colors.titleBar.buttonInactive
+              : theme.colors.titleBar.textInactive};
         }
 
         &:hover {

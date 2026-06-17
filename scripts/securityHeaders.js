@@ -23,8 +23,8 @@
  *   - worker-src / child-src need blob:: v86 spawns a blob-URL worker (libv86.js); the
  *     clock/wallpaper workers are same-origin chunks already covered by 'self'.
  *   - img/media/connect need blob: + data: for emulator FS, screenshots and canvas exports.
- *   - frame-src 'self' (jspaint/kiwiirc local iframes) + https: (in-OS Browser remote sites).
- *   - connect-src allows https:/wss: so the in-OS Browser, IRC and the *user-configurable*
+ *   - frame-src 'self' (jspaint local iframes) + https: (in-OS Browser remote sites).
+ *   - connect-src allows https:/wss: so the in-OS Browser and the *user-configurable*
  *     Tor relay all work. Operators who do NOT need user-set endpoints can tighten this to
  *     an explicit host allowlist — see deploy/SECURITY-HEADERS.md.
  *   - COEP is intentionally OMITTED: require-corp/credentialless breaks the v86 wss relay

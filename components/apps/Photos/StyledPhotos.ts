@@ -8,7 +8,7 @@ type StyledPhotosProps = {
 };
 
 const StyledPhotos = styled.div<StyledPhotosProps>`
-  background-color: #222;
+  background-color: ${({ theme }) => theme.colors.background};
   display: flex;
   height: 100%;
   padding-bottom: ${paddingSize};
@@ -29,7 +29,7 @@ const StyledPhotos = styled.div<StyledPhotosProps>`
     width: 100%;
 
     div {
-      color: rgb(167, 167, 167);
+      color: hsla(190, 100%, 62%, 50%);
       font-size: 13px;
       padding: 0 38px;
       text-align: center;

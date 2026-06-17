@@ -1,5 +1,6 @@
 import http from "http";
 import https from "https";
+import zlib from "zlib";
 import { lookup } from "dns/promises";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { SocksProxyAgent } from "socks-proxy-agent";
@@ -54,6 +55,92 @@ try {
   socksAgent = undefined;
 }
 
+// Tor STREAM ISOLATION (the exact mechanism Tor Browser uses per-site/per-tab).
+// Tor's SocksPort enables IsolateSOCKSAuth by default: two SOCKS connections that
+// present DIFFERENT username:password pairs are placed on SEPARATE circuits (and
+// thus, in general, exit through different relays / IPs). This costs nothing — it
+// only changes which circuit Tor picks; the bytes still flow over the same Tor.
+//
+// When a request carries an opaque per-tab token (&iso=<token>), we route it
+// through a SocksProxyAgent whose URL embeds <token>:<token> as the SOCKS creds,
+// so each tab/token gets its own circuit (site-correlation resistance), and the
+// "New Tor circuit" button just rotates the token to get a fresh exit IP. With no
+// token we use the shared global `socksAgent` above, unchanged.
+//
+// Per-token agents are cached (never rebuilt per request) in an LRU-ish Map capped
+// at MAX_ISO_AGENTS — inserting past the cap evicts the oldest entry, so a long
+// session with many tab rotations can't grow memory without bound.
+const MAX_ISO_AGENTS = 256;
+const isoAgents = new Map<string, SocksProxyAgent>();
+
+// Build the per-token SOCKS proxy URL from TOR_PROXY, injecting <token>:<token> as
+// userinfo so Tor isolates the stream. Returns undefined if TOR_PROXY is unset or
+// unparseable (callers then fall back to the global agent / fail-closed path).
+const torProxyUrlWithAuth = (token: string): string | undefined => {
+  try {
+    const url = new URL(TOR_PROXY);
+
+    url.username = encodeURIComponent(token);
+    url.password = encodeURIComponent(token);
+
+    return url.href;
+  } catch {
+    return undefined;
+  }
+};
+
+// Resolve the SOCKS agent for a request. An isolation token yields a cached
+// per-token agent (separate Tor circuit); no token yields the shared global agent.
+// Returns undefined only when Tor isn't configured at all — callers MUST treat that
+// as fail-closed (never a direct connection), exactly like the global agent path.
+const agentForToken = (token?: string): SocksProxyAgent | undefined => {
+  if (!token || !socksAgent) return socksAgent;
+
+  const cached = isoAgents.get(token);
+
+  if (cached) {
+    // Refresh recency so the cap evicts genuinely-cold tokens first.
+    isoAgents.delete(token);
+    isoAgents.set(token, cached);
+
+    return cached;
+  }
+
+  const proxyUrl = torProxyUrlWithAuth(token);
+
+  // If we can't build a per-token URL, fall back to the global Tor agent (still
+  // Tor, just shares the default circuit) rather than leaking via a direct path.
+  if (!proxyUrl) return socksAgent;
+
+  let agent: SocksProxyAgent;
+
+  try {
+    agent = new SocksProxyAgent(proxyUrl);
+  } catch {
+    return socksAgent;
+  }
+
+  isoAgents.set(token, agent);
+  if (isoAgents.size > MAX_ISO_AGENTS) {
+    const oldest = isoAgents.keys().next().value;
+
+    if (oldest !== undefined) isoAgents.delete(oldest);
+  }
+
+  return agent;
+};
+
+// Accept only opaque, fixed-length hex/alphanumeric tokens (the client generates
+// 128-bit hex). This keeps the value Tor sees bounded and free of anything that
+// could matter to the SOCKS layer; anything else is ignored (no isolation).
+const sanitizeIsoToken = (raw: string | string[] | undefined): string => {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+
+  return typeof value === "string" && /^[a-z0-9]{8,64}$/i.test(value)
+    ? value
+    : "";
+};
+
 // Optional memory-safe Rust sidecar (see sidecar/). When PROXY_SIDECAR_URL is set,
 // non-extension requests are delegated to it — it performs the untrusted work
 // (Tor fetch, SSRF guard, streaming HTML rewriting) in a memory-safe language.
@@ -62,17 +149,27 @@ const PROXY_SIDECAR_URL = process.env.PROXY_SIDECAR_URL || "";
 
 const BROWSER_HEADERS: Record<string, string> = {
   Accept:
-    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,video/*,audio/*,*/*;q=0.8",
+  // Ask upstream for an UNCOMPRESSED body. Node's http/https (unlike fetch) do not
+  // auto-decompress, so a gzip/br response would otherwise reach us as raw bytes —
+  // garbled HTML (blank/broken .onion pages) or mislabeled assets. We also gunzip
+  // defensively below for servers that compress regardless of this hint.
+  "Accept-Encoding": "identity",
   "Accept-Language": "en-US,en;q=0.9",
   "User-Agent":
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
 };
 
-// ALLOWLIST: only these upstream response headers are forwarded.
+// ALLOWLIST: only these upstream response headers are forwarded. content-range and
+// accept-ranges let <video>/<audio> seek (HTTP Range -> 206 Partial Content); we
+// deliberately do NOT forward content-length (we may decompress, and Node derives
+// the correct length from the buffer we actually send).
 const FORWARD_RESPONSE_HEADERS = new Set([
   "content-type",
   "content-language",
   "content-disposition",
+  "accept-ranges",
+  "content-range",
 ]);
 
 const isPrivateV4 = (a: number, b: number): boolean =>
@@ -142,7 +239,8 @@ const assertAllowedUrl = async (
   // Tor hidden services resolve/route only inside Tor and are never a LAN IP.
   // (In direct/clearnet mode an .onion can't be reached anyway — fall through so
   // the DNS lookup fails it.)
-  if (!forceCheck && u.hostname.toLowerCase().endsWith(".onion")) return undefined;
+  if (!forceCheck && u.hostname.toLowerCase().endsWith(".onion"))
+    return undefined;
 
   // In Tor mode Tor cannot reach the LAN/metadata, and a local DNS lookup would
   // leak the hostname — so skip the local resolve and let Tor handle it. BUT a
@@ -179,12 +277,20 @@ const httpGet = (
   urlStr: string,
   maxBytes: number = MAX_RESPONSE_BYTES,
   useTor = true,
-  pinnedIp?: string
+  pinnedIp?: string,
+  extraHeaders: Record<string, string> = {},
+  // The SOCKS agent to use in Tor mode. Defaults to the shared global agent; an
+  // isolation token (see agentForToken) supplies a per-token agent on a separate
+  // circuit. Fail-closed is still gated on the GLOBAL socksAgent below: if Tor
+  // isn't configured at all, we never open a direct connection.
+  torAgent: SocksProxyAgent | undefined = socksAgent
 ): Promise<ProxyResponse> =>
   new Promise((resolve, reject) => {
     // Fail CLOSED: in Tor mode, never fall back to a direct (clearnet) connection
     // just because the SOCKS agent is missing/broken — that would silently leak the
     // real IP while the user believes they are on Tor. Surface it as a Tor error.
+    // Gate on the GLOBAL socksAgent (configuration), not the per-token agent, so an
+    // isolation request still fails closed exactly like a non-isolated one.
     if (useTor && !socksAgent) {
       reject(new Error("tor-not-configured"));
       return;
@@ -196,8 +302,11 @@ const httpGet = (
       {
         // Tor by default; the Clearnet Browser passes ?direct=1 (useTor=false) to
         // fetch over the normal connection. SSRF guard still applies either way.
-        agent: useTor ? socksAgent : undefined,
-        headers: BROWSER_HEADERS,
+        // In Tor mode an isolation token routes via a per-circuit agent; otherwise
+        // the shared global agent. Either way it is ALWAYS a Tor SOCKS agent here.
+        agent: useTor ? torAgent : undefined,
+        // Per-request extras (e.g. a forwarded Range header for media seeking) win.
+        headers: { ...BROWSER_HEADERS, ...extraHeaders },
         method: "GET",
         // Pin the IP the SSRF guard already validated so DNS can't rebind to a
         // private address between the check and connect (direct mode only; Tor
@@ -229,10 +338,18 @@ const httpGet = (
       (response) => {
         const chunks: Buffer[] = [];
         let total = 0;
+        // Media (video/audio) and 206 Partial responses can dwarf the HTML cap —
+        // give them the large binary budget so playback/seeking isn't truncated.
+        const responseType = String(response.headers["content-type"] || "");
+        const cap =
+          response.statusCode === 206 ||
+          /^(?:video|audio)\//i.test(responseType)
+            ? MAX_BIN_BYTES
+            : maxBytes;
 
         response.on("data", (chunk: Buffer) => {
           total += chunk.length;
-          if (total > maxBytes) {
+          if (total > cap) {
             request.destroy(new Error("too-large"));
             return;
           }
@@ -255,6 +372,41 @@ const httpGet = (
     request.on("error", reject);
     request.end();
   });
+
+// Node's http/https never auto-decompress. We request `identity`, but some servers
+// gzip/deflate/brotli regardless — decode here so the HTML rewriter and the asset
+// passthrough see real bytes (otherwise the page is blank/garbled). A 206 partial
+// is never decoded (a sliced compressed stream can't stand alone) and any decode
+// error falls back to the raw body rather than failing the whole page.
+const decodeBody = (response: ProxyResponse): Buffer => {
+  const encodingHeader = response.headers["content-encoding"];
+  const encoding = (
+    Array.isArray(encodingHeader) ? encodingHeader[0] : encodingHeader || ""
+  )
+    .toString()
+    .trim()
+    .toLowerCase();
+
+  if (!encoding || encoding === "identity" || response.status === 206) {
+    return response.body;
+  }
+
+  try {
+    if (encoding === "gzip" || encoding === "x-gzip") {
+      return zlib.gunzipSync(response.body);
+    }
+    if (encoding === "deflate") {
+      return zlib.inflateSync(response.body);
+    }
+    if (encoding === "br") {
+      return zlib.brotliDecompressSync(response.body);
+    }
+  } catch {
+    // Corrupt/truncated stream — serve raw bytes rather than failing the page.
+  }
+
+  return response.body;
+};
 
 const PINNED_ORIGIN = (process.env.SECURITYOS_ORIGIN || "").replace(/\/+$/, "");
 
@@ -310,12 +462,17 @@ type ProxyFlags = {
   adblock: boolean;
   libreJs: boolean;
   isDirect: boolean;
+  // Per-tab Tor stream-isolation token: carried on every rewritten URL so links,
+  // sub-resources and GET-form submits stay on the SAME tab circuit. Empty -> none.
+  iso: string;
 };
 
 const flagQuery = (f: ProxyFlags): string =>
   `${f.noJs ? "&nojs=1" : ""}${f.injectExt ? "&ext=1" : ""}${
     f.adblock ? "&adblock=1" : ""
-  }${f.libreJs ? "&librejs=1" : ""}${f.isDirect ? "&direct=1" : ""}`;
+  }${f.libreJs ? "&librejs=1" : ""}${f.isDirect ? "&direct=1" : ""}${
+    f.iso ? `&iso=${f.iso}` : ""
+  }`;
 
 const proxify = (
   rawUrl: string,
@@ -361,8 +518,7 @@ const clientShim = (proxyPrefix: string, base: string): string =>
 // A site whose JS is fully free-licensed (e.g. our own *.securityops.co apps) keeps
 // working; commercial sites load but with their nonfree JS disabled. Users can opt
 // out per page with the browser's "Allow all JS" toggle (drops &librejs=1).
-const FREE_LICENSE_RE =
-  /@licstart|@license/i;
+const FREE_LICENSE_RE = /@licstart|@license/i;
 const FREE_LICENSE_NAME_RE =
   /\b(GPL|AGPL|LGPL|MIT|Expat|X11|BSD|ISC|Apache(?:[-\s]?2)?|MPL|Mozilla Public|CC0|CC[-\s]?0|Public Domain|Unlicense|WTFPL|Boost|zlib|Artistic)\b/i;
 // LibreJS only ever emits magnet links for genuinely free licenses.
@@ -457,10 +613,18 @@ const rewriteHtml = (
   injectExt: boolean,
   libreJs: boolean,
   adblock: boolean,
-  isDirect: boolean
+  isDirect: boolean,
+  iso: string
 ): string => {
   const proxyPrefix = `${origin}/api/proxy?url=`;
-  const flags: ProxyFlags = { noJs, injectExt, adblock, libreJs, isDirect };
+  const flags: ProxyFlags = {
+    noJs,
+    injectExt,
+    adblock,
+    libreJs,
+    isDirect,
+    iso,
+  };
   const px = (u: string): string => proxify(u, base, origin, flags);
   let out = html;
 
@@ -472,7 +636,10 @@ const rewriteHtml = (
   // Keep "new tab" links INSIDE the in-OS browser: force target=_blank (and any
   // other target) to _self so they navigate this iframe instead of opening a real
   // browser tab.
-  out = out.replace(/\starget\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, ' target="_self"');
+  out = out.replace(
+    /\starget\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi,
+    ' target="_self"'
+  );
 
   if (noJs) {
     // Tor-Browser-"Safest" style: remove all scripts, inline handlers and
@@ -499,6 +666,32 @@ const rewriteHtml = (
 
       // Always re-emit double-quoted (also normalizes unquoted values safely).
       return `${pre}"${px(url).replace(/"/g, "%22")}"`;
+    }
+  );
+  // srcset is comma-separated "URL [descriptor]" pairs, so the single-URL pass
+  // above can't touch it — responsive <img>/<picture><source> would then fetch
+  // direct (IP leak) or just fail. Rewrite each candidate URL, keep its descriptor.
+  out = out.replace(
+    /(\s(?:srcset|data-srcset)\s*=\s*)("([^"]*)"|'([^']*)')/gi,
+    (_m, pre: string, _q: string, dq: string, sq: string) => {
+      const value = dq ?? sq ?? "";
+      const rewritten = value
+        .split(",")
+        .map((candidate) => {
+          const seg = candidate.trim();
+
+          if (!seg) return "";
+
+          const space = seg.search(/\s/);
+          const rawUrl = space === -1 ? seg : seg.slice(0, space);
+          const descriptor = space === -1 ? "" : seg.slice(space);
+
+          return `${px(rawUrl).replace(/"/g, "%22")}${descriptor}`;
+        })
+        .filter(Boolean)
+        .join(", ");
+
+      return `${pre}"${rewritten}"`;
     }
   );
   // GET forms: a GET submit REPLACES the action's query string with the form
@@ -542,10 +735,7 @@ const rewriteHtml = (
     if (!pxTarget) return whole;
 
     const esc = (s: string): string =>
-      s
-        .replace(/&/g, "&amp;")
-        .replace(/"/g, "&quot;")
-        .replace(/</g, "&lt;");
+      s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
     const newAttrs = attrs.replace(
       /\saction\s*=\s*("[^"]*"|'[^']*')/i,
       ` action="${origin}/api/proxy"`
@@ -556,7 +746,8 @@ const rewriteHtml = (
       (injectExt ? `<input type="hidden" name="ext" value="1">` : "") +
       (libreJs ? `<input type="hidden" name="librejs" value="1">` : "") +
       (adblock ? `<input type="hidden" name="adblock" value="1">` : "") +
-      (isDirect ? `<input type="hidden" name="direct" value="1">` : "");
+      (isDirect ? `<input type="hidden" name="direct" value="1">` : "") +
+      (iso ? `<input type="hidden" name="iso" value="${esc(iso)}">` : "");
 
     return `<form${newAttrs}>${hidden}`;
   });
@@ -590,11 +781,14 @@ const rewriteHtml = (
       return `${pre}${quote}${rewritten}${quote}`;
     }
   );
-  out = out.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (m, _q: string, u: string) => {
-    const proxied = px(u);
+  out = out.replace(
+    /url\(\s*(['"]?)([^'")]+)\1\s*\)/gi,
+    (m, _q: string, u: string) => {
+      const proxied = px(u);
 
-    return proxied === u ? m : `url('${proxied.replace(/'/g, "%27")}')`;
-  });
+      return proxied === u ? m : `url('${proxied.replace(/'/g, "%27")}')`;
+    }
+  );
   out = out.replace(
     /(@import\s+)("([^"]*)"|'([^']*)')/gi,
     (_m, pre: string, _q: string, dq: string, sq: string) =>
@@ -659,14 +853,14 @@ const errorPage = (targetHost: string, kind: ErrorKind): string =>
       `<p>The <b>tor</b> service may not be running. Check <b>Tor Control</b>, or bring the Tor container up ` +
       `(<code>docker compose up -d tor</code>). Onion routing resumes automatically once Tor is back.</p>`
     : kind === "onion-down"
-      ? `<h1>🧅 This .onion looks offline</h1>` +
-        `<p><b>Tor is working</b>, but the hidden service <code>${targetHost}</code> didn't answer ` +
-        `(Tor replied <code>Host unreachable</code>). The service is most likely down, or its address changed.</p>` +
-        `<p>Try another bookmark, or make sure the hidden service is published and running on its host.</p>`
-      : `<h1>🧅 Couldn't load <code>${targetHost}</code> through the privacy proxy</h1>` +
-        `<p>The site may block proxies, require JavaScript/login, or be temporarily down.</p>` +
-        `<p>For interactive or logged-in sites, toggle the <b>shield</b> in the toolbar to load directly. ` +
-        `For serious anonymous browsing, use the Linux VM via Tor Control.</p>`) +
+    ? `<h1>🧅 This .onion looks offline</h1>` +
+      `<p><b>Tor is working</b>, but the hidden service <code>${targetHost}</code> didn't answer ` +
+      `(Tor replied <code>Host unreachable</code>). The service is most likely down, or its address changed.</p>` +
+      `<p>Try another bookmark, or make sure the hidden service is published and running on its host.</p>`
+    : `<h1>🧅 Couldn't load <code>${targetHost}</code> through the privacy proxy</h1>` +
+      `<p>The site may block proxies, require JavaScript/login, or be temporarily down.</p>` +
+      `<p>For interactive or logged-in sites, toggle the <b>shield</b> in the toolbar to load directly. ` +
+      `For serious anonymous browsing, use the Linux VM via Tor Control.</p>`) +
   `</div></body></html>`;
 
 const sendError = (
@@ -712,6 +906,14 @@ const handler = async (
   const adblock =
     req.query.adblock === "1" ||
     (Array.isArray(req.query.adblock) && req.query.adblock.includes("1"));
+  // Tor stream isolation: an opaque per-tab token (&iso=<token>) routes this fetch
+  // through its own Tor circuit (separate exit IP), so different tabs can't be
+  // correlated by a shared exit and "New Tor circuit" rotates a tab's token for a
+  // fresh exit. Empty/invalid -> the shared default circuit (no behavior change).
+  // This ONLY affects circuit selection; SSRF guard, pinning, fail-closed, header
+  // allowlist and timeouts are all unchanged.
+  const isoToken = sanitizeIsoToken(req.query.iso);
+  const torAgent = agentForToken(isoToken);
 
   // GET-form support: rewritten forms submit to /api/proxy with the real target in
   // __pxurl plus the form fields as normal query params (a GET submit drops the
@@ -734,6 +936,7 @@ const handler = async (
         "bin",
         "librejs",
         "adblock",
+        "iso",
       ]);
 
       Object.entries(req.query).forEach(([key, value]) => {
@@ -769,12 +972,18 @@ const handler = async (
     !isBin &&
     !isDirect &&
     !libreJs &&
-    !adblock
+    !adblock &&
+    // Stream-isolation requests must use the Node path so they route through the
+    // per-token Tor circuit (the sidecar has its own non-isolated circuit).
+    !isoToken &&
+    // Range requests (media seeking) need the Range-aware Node path below.
+    !req.headers.range
   ) {
     try {
-      const sidecar = `${PROXY_SIDECAR_URL.replace(/\/+$/, "")}/proxy?url=${encodeURIComponent(
-        target.href
-      )}${noJs ? "&nojs=1" : ""}`;
+      const sidecar = `${PROXY_SIDECAR_URL.replace(
+        /\/+$/,
+        ""
+      )}/proxy?url=${encodeURIComponent(target.href)}${noJs ? "&nojs=1" : ""}`;
       const upstream = await fetch(sidecar);
       const buffer = Buffer.from(await upstream.arrayBuffer());
       const contentType = upstream.headers.get("content-type");
@@ -804,12 +1013,25 @@ const handler = async (
     // multiply the per-hop cap (6 hops * 512 MB) into an OOM. Each hop is capped at
     // whatever budget remains.
     let budget = isBin ? MAX_BIN_BYTES : MAX_RESPONSE_BYTES;
+    // Forward the browser's Range header so <video>/<audio> can seek: upstream
+    // answers 206 Partial Content, which we relay through (status + content-range)
+    // unchanged. Absent a Range, media still streams as a normal 200.
+    const range = req.headers.range;
+    const extraHeaders: Record<string, string> =
+      typeof range === "string" ? { Range: range } : {};
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
       // eslint-disable-next-line no-await-in-loop
       const pinnedIp = await assertAllowedUrl(current, isDirect);
       // eslint-disable-next-line no-await-in-loop
-      response = await httpGet(current.href, budget, !isDirect, pinnedIp);
+      response = await httpGet(
+        current.href,
+        budget,
+        !isDirect,
+        pinnedIp,
+        extraHeaders,
+        torAgent
+      );
 
       budget -= response.body.length;
       if (budget <= 0 && response.status >= 300 && response.status < 400) {
@@ -833,9 +1055,15 @@ const handler = async (
     const contentType = Array.isArray(contentTypeHeader)
       ? contentTypeHeader[0]
       : contentTypeHeader || "";
+    // Decompress once (gzip/br/deflate) so HTML rewriting and asset passthrough
+    // both operate on real bytes; Node then sets a matching content-length.
+    const body = decodeBody(response);
 
     Object.entries(response.headers).forEach(([key, value]) => {
-      if (value !== undefined && FORWARD_RESPONSE_HEADERS.has(key.toLowerCase())) {
+      if (
+        value !== undefined &&
+        FORWARD_RESPONSE_HEADERS.has(key.toLowerCase())
+      ) {
         try {
           res.setHeader(key, value);
         } catch {
@@ -856,18 +1084,19 @@ const handler = async (
       res.setHeader("Content-Security-Policy", proxiedCsp(noJs));
       res.end(
         rewriteHtml(
-          response.body.toString("utf8"),
+          body.toString("utf8"),
           current.href,
           ourOrigin(req),
           noJs,
           injectExt,
           libreJs,
           adblock,
-          isDirect
+          isDirect,
+          isoToken
         )
       );
     } else {
-      res.end(response.body);
+      res.end(body);
     }
   } catch (error) {
     // Classify the failure so the message is actionable instead of always blaming
@@ -896,8 +1125,8 @@ const handler = async (
     const kind: ErrorKind = torDown
       ? "tor-down"
       : isOnion
-        ? "onion-down"
-        : "load-failed";
+      ? "onion-down"
+      : "load-failed";
 
     sendError(res, 502, target.hostname, kind);
   }

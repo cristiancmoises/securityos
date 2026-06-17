@@ -49,10 +49,6 @@ const BOOKMARKS: { name: string; url: string }[] = [
     url: "http://secopshnfap6cllndkzxf7345kjlbgqvfdkyrv6jfwkkfcwxtdfcqgid.onion/",
   },
   {
-    name: "SecChat",
-    url: "http://secops5qrrxmlsv3nezdyxc77v7cg57civtre6tqr2phk6uwvrxccjqd.onion/",
-  },
-  {
     name: "PrivateBin",
     url: "http://secopslhalclg4yet3mn6ftp25ncxsfrkrjsvkzfq4rrlxhf2zujbtyd.onion/",
   },
@@ -89,6 +85,30 @@ const addressFromSrc = (src: string): string => {
   }
 };
 
+// Pull the Tor isolation token out of a proxied src (e.g. a link the in-page shim
+// opened in a new tab) so the new tab inherits the SAME circuit as the link it came
+// from. Falls back to "" (caller then mints a fresh token).
+const isoFromSrc = (src: string): string => {
+  try {
+    return new URL(src, window.location.origin).searchParams.get("iso") || "";
+  } catch {
+    return "";
+  }
+};
+
+// An opaque 128-bit token used purely as the Tor SOCKS username:password for STREAM
+// ISOLATION (see pages/api/proxy.ts). A unique token => a separate Tor circuit =>
+// in general a different exit IP. It is NOT secret and reveals nothing about the
+// real client; it only selects which circuit Tor uses. crypto.getRandomValues is
+// fine here — this is client-side React (Math.random is avoided / may be unavailable).
+const newIsoToken = (): string => {
+  const bytes = new Uint8Array(16);
+
+  crypto.getRandomValues(bytes);
+
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+};
+
 type Tab = {
   key: number;
   address: string;
@@ -97,9 +117,13 @@ type Tab = {
   history: string[];
   position: number;
   loading: boolean;
+  // Per-tab Tor stream-isolation token: gives this tab its own circuit/exit IP so
+  // sites in different tabs can't be correlated by a shared exit. "New Tor circuit"
+  // rotates it for a fresh exit. Stable across navigations within the tab.
+  iso: string;
 };
 
-const blankTab = (key: number, address: string): Tab => ({
+const blankTab = (key: number, address: string, iso?: string): Tab => ({
   key,
   address,
   src: "",
@@ -107,6 +131,7 @@ const blankTab = (key: number, address: string): Tab => ({
   history: address ? [address] : [],
   position: address ? 0 : -1,
   loading: false,
+  iso: iso ?? newIsoToken(),
 });
 
 const tabLabel = (tab: Tab): string => {
@@ -153,6 +178,11 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const keyCounter = useRef(0);
+  // Secure-by-default, every launch: NoScript "Safest" (jsMode "off" -> all
+  // JavaScript blocked, script-src 'none', sandbox drops allow-scripts) and the
+  // Security Ops extension OFF (its scripts — incl. secops-reporter — never load,
+  // so no telemetry). The user can opt into scripts / the extension per session;
+  // it never persists, so a fresh window is always the hardened state.
   const [jsMode, setJsMode] = useState<JsMode>("off");
   const [extEnabled, setExtEnabled] = useState(false);
   const [tabs, setTabs] = useState<Tab[]>(() => [blankTab(0, initialUrl)]);
@@ -163,6 +193,13 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
     [tabs, activeKey]
   );
 
+  // Latest tabs, readable inside callbacks without making them depend on `tabs`
+  // (so navigateTab can look up a tab's isolation token without invalidating every
+  // memoized callback on each navigation).
+  const tabsRef = useRef(tabs);
+
+  tabsRef.current = tabs;
+
   const patchTab = useCallback(
     (key: number, patch: Partial<Tab>): void =>
       setTabs((prev) =>
@@ -172,19 +209,24 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
   );
 
   const resolveSrc = useCallback(
-    async (addressInput: string): Promise<{ src: string; address: string }> => {
+    async (
+      addressInput: string,
+      iso: string
+    ): Promise<{ src: string; address: string }> => {
       const addressUrl = await getUrlOrSearch(addressInput, TOR_SEARCH_QUERY);
 
-      if (!/^https?:/.test(addressUrl)) return { src: "", address: addressInput };
+      if (!/^https?:/.test(addressUrl))
+        return { src: "", address: addressInput };
 
       return {
+        // &iso=<tab token> pins this tab to its own Tor circuit (separate exit IP).
         src: `${PROXY_PATH}${encodeURIComponent(addressUrl)}${
           jsMode === "off"
             ? "&nojs=1"
             : jsMode === "noscript"
-              ? "&librejs=1"
-              : ""
-        }${extEnabled ? "&ext=1" : ""}`,
+            ? "&librejs=1"
+            : ""
+        }${extEnabled ? "&ext=1" : ""}${iso ? `&iso=${iso}` : ""}`,
         address: addressInput,
       };
     },
@@ -192,10 +234,19 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
   );
 
   const navigateTab = useCallback(
-    async (key: number, addressInput: string, push = true): Promise<void> => {
+    async (
+      key: number,
+      addressInput: string,
+      push = true,
+      // Override the tab's isolation token (used when opening a brand-new tab whose
+      // state hasn't committed yet). Otherwise the tab's current token is used.
+      isoOverride?: string
+    ): Promise<void> => {
       patchTab(key, { loading: true });
 
-      const { src, address } = await resolveSrc(addressInput);
+      const iso =
+        isoOverride ?? tabsRef.current.find((t) => t.key === key)?.iso ?? "";
+      const { src, address } = await resolveSrc(addressInput, iso);
 
       setTabs((prev) =>
         prev.map((t) => {
@@ -222,10 +273,13 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
     (addressInput: string = TOR_HOME): void => {
       keyCounter.current += 1;
       const key = keyCounter.current;
+      // Generate the new tab's isolation token here so the immediate navigateTab
+      // (before state commits) routes through the correct per-tab circuit.
+      const iso = newIsoToken();
 
-      setTabs((prev) => [...prev, blankTab(key, "")]);
+      setTabs((prev) => [...prev, blankTab(key, "", iso)]);
       setActiveKey(key);
-      void navigateTab(key, addressInput, true);
+      void navigateTab(key, addressInput, true, iso);
     },
     [navigateTab]
   );
@@ -234,10 +288,13 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
     keyCounter.current += 1;
     const key = keyCounter.current;
     const address = addressFromSrc(proxiedSrc);
+    // Inherit the circuit of the link that spawned this tab (the shim carried the
+    // parent's &iso=); mint a fresh one only if the src somehow has none.
+    const iso = isoFromSrc(proxiedSrc) || newIsoToken();
 
     setTabs((prev) => [
       ...prev,
-      { ...blankTab(key, address), src: proxiedSrc, loading: true },
+      { ...blankTab(key, address, iso), src: proxiedSrc, loading: true },
     ]);
     setActiveKey(key);
   }, []);
@@ -277,6 +334,20 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
   );
   const toggleExt = useCallback((): void => setExtEnabled((prev) => !prev), []);
 
+  // "New Tor circuit" for the active tab: rotate its isolation token (new SOCKS
+  // creds => Tor builds a fresh circuit => new exit IP) and reload the current
+  // address through it. Tor Browser's "New Tor Circuit for this Site", at no cost.
+  const newCircuit = useCallback((): void => {
+    const tab = tabsRef.current.find((t) => t.key === activeKey);
+
+    if (!tab) return;
+
+    const iso = newIsoToken();
+
+    patchTab(activeKey, { iso });
+    if (tab.address) void navigateTab(activeKey, tab.address, false, iso);
+  }, [activeKey, navigateTab, patchTab]);
+
   const didInit = useRef(false);
 
   useEffect(() => {
@@ -295,7 +366,10 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
       };
       const prefix = `${window.location.origin}/api/proxy?`;
 
-      if (typeof data?.__sosNewTab === "string" && data.__sosNewTab.startsWith(prefix)) {
+      if (
+        typeof data?.__sosNewTab === "string" &&
+        data.__sosNewTab.startsWith(prefix)
+      ) {
         openProxiedTab(data.__sosNewTab);
       } else if (
         typeof data?.__sosTitle === "string" &&
@@ -330,7 +404,8 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
 
   // Reload the active tab when a mode toggle (JS / extension) changes.
   useEffect(() => {
-    if (activeTab?.address) void navigateTab(activeKey, activeTab.address, false);
+    if (activeTab?.address)
+      void navigateTab(activeKey, activeTab.address, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jsMode, extEnabled]);
 
@@ -412,12 +487,34 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
             {activeTab?.loading ? <Stop /> : <Refresh />}
           </Button>
           <Button
-            onClick={toggleJs}
-            {...label(JS_MODE_LABEL[jsMode])}
+            onClick={newCircuit}
+            {...label("New Tor circuit for this site (fresh exit IP)")}
           >
+            <svg height="16" viewBox="0 0 24 24" width="16">
+              <path
+                d="M4.5 12a7.5 7.5 0 0 1 12.9-5.2M19.5 12a7.5 7.5 0 0 1-12.9 5.2"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.8"
+              />
+              <path
+                d="M17.4 3v3.8h-3.8M6.6 21v-3.8h3.8"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.8"
+              />
+            </svg>
+          </Button>
+          <Button onClick={toggleJs} {...label(JS_MODE_LABEL[jsMode])}>
             <svg
               height="16"
-              opacity={jsMode === "all" ? 1 : jsMode === "noscript" ? 0.7 : 0.35}
+              opacity={
+                jsMode === "all" ? 1 : jsMode === "noscript" ? 0.7 : 0.35
+              }
               viewBox="0 0 24 24"
               width="16"
             >

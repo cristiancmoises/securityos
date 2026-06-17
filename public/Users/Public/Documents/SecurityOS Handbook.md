@@ -43,7 +43,7 @@ Three things can touch the network, and you control each:
 SecurityOS ships hardened: a strict Content-Security-Policy, `no-referrer`, a
 locked-down Permissions-Policy, and **no silent third-party connections** — the
 VM's network is off until you opt in, and optional features (server clock, IPFS,
-APOD wallpaper, IRC) only connect when you enable them.
+APOD wallpaper) only connect when you enable them.
 
 ## A suggested learning path
 

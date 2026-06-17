@@ -8,7 +8,11 @@ import formats from "styles/defaultTheme/formats";
 const MILLISECONDS_IN_SECOND = 1000;
 
 const fontSize = "12px";
-const textColor = "rgba(255, 255, 255, 90%)";
+// Cooler "neon-glass" white (matches theme.colors.text) plus a soft cyan glow, so
+// the canvas-rendered clock reads as a HUD readout like the DOM StyledClock does.
+const textColor = "rgba(234, 246, 255, 92%)";
+const glowColor = "hsla(190, 100%, 60%, 55%)";
+const glowBlur = 6;
 
 let mode: ClockSource;
 let offscreenCanvas: OffscreenCanvas;
@@ -27,6 +31,8 @@ const TEXT_HEIGHT_OFFSET = 1;
 const styleClock = (): void => {
   offscreenContext.scale(global.devicePixelRatio, global.devicePixelRatio);
   offscreenContext.fillStyle = textColor;
+  offscreenContext.shadowColor = glowColor;
+  offscreenContext.shadowBlur = glowBlur;
   offscreenContext.font = `${fontSize} ${formats.systemFont}`;
   offscreenContext.textAlign = "center";
   offscreenContext.textBaseline = "middle";

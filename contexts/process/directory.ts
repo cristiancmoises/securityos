@@ -91,6 +91,17 @@ const directory: Processes = {
     singleton: true,
     title: "DevTools",
   },
+  Emacs: {
+    Component: dynamic(() => import("components/apps/Emacs")),
+    backgroundColor: "#1d1f21",
+    defaultSize: {
+      height: 520,
+      width: 720,
+    },
+    icon: "/System/Icons/emacs.webp",
+    singleton: true,
+    title: "Emacs",
+  },
   Emulator: {
     Component: dynamic(() => import("components/apps/Emulator")),
     backgroundColor: "#000",
@@ -108,17 +119,6 @@ const directory: Processes = {
     backgroundColor: "#202020",
     icon: FOLDER_ICON,
     title: "File Explorer",
-  },
-  IRC: {
-    Component: dynamic(() => import("components/apps/IRC")),
-    backgroundColor: "#FFF",
-    defaultSize: {
-      height: 512,
-      width: 704,
-    },
-    icon: "/System/Icons/kiwiirc.webp",
-    libs: ["Program Files/kiwiirc/index.html"],
-    title: "IRC",
   },
   JSDOS: {
     Component: dynamic(() => import("components/apps/JSDOS")),
@@ -149,6 +149,17 @@ const directory: Processes = {
       "/Program Files/Marked/purify.min.js",
     ],
     title: "Marked",
+  },
+  Matrix: {
+    Component: dynamic(() => import("components/apps/Matrix")),
+    backgroundColor: "#0a1420",
+    defaultSize: {
+      height: 560,
+      width: 860,
+    },
+    icon: "/System/Icons/matrix.webp",
+    singleton: true,
+    title: "Matrix",
   },
   MonacoEditor: {
     Component: dynamic(() => import("components/apps/MonacoEditor")),
@@ -261,7 +272,7 @@ const directory: Processes = {
   },
   Terminal: {
     Component: dynamic(() => import("components/apps/Terminal")),
-    backgroundColor: "rgba(12, 12, 12, 0.5)",
+    backgroundColor: "hsla(222, 47%, 6%, 0.82)",
     defaultSize: {
       height: 340,
       width: 553,
@@ -300,7 +311,7 @@ const directory: Processes = {
   },
   TorBrowser: {
     Component: dynamic(() => import("components/apps/TorBrowser")),
-    backgroundColor: "#150f1b",
+    backgroundColor: "#000",
     defaultSize: {
       height: 480,
       width: 640,
@@ -330,6 +341,18 @@ const directory: Processes = {
     },
     icon: "/System/Icons/copying.webp",
     title: "",
+  },
+  Undercover: {
+    Component: dynamic(() => import("components/apps/Undercover")),
+    allowResizing: false,
+    backgroundColor: "#1c1e22",
+    defaultSize: {
+      height: 360,
+      width: 460,
+    },
+    icon: "/System/Icons/undercover.webp",
+    singleton: true,
+    title: "Undercover",
   },
   V86: {
     Component: dynamic(() => import("components/apps/V86")),

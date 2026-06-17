@@ -14,7 +14,8 @@ const StyledVideoPlayer = styled.div`
     }
 
     .vjs-control-bar {
-      background-color: rgb(240, 240, 240);
+      background-color: hsla(222, 47%, 8%, 92%);
+      color: ${({ theme }) => theme.colors.text};
       padding: 0 1;
 
       :not(.no-interaction) {
@@ -37,7 +38,7 @@ const StyledVideoPlayer = styled.div`
     }
 
     .vjs-button {
-      color: rgb(116, 116, 116);
+      color: ${({ theme }) => theme.colors.text};
       height: 28px;
       position: relative;
       width: 28px;
@@ -59,14 +60,14 @@ const StyledVideoPlayer = styled.div`
       &:hover {
         &::after {
           background-color: rgb(229, 241, 251);
-          border-color: rgb(0, 120, 215);
+          border-color: hsla(190, 100%, 62%, 90%);
         }
       }
 
       &:active {
         &::after {
           background-color: rgb(204, 228, 247);
-          border-color: rgb(0, 84, 153);
+          border-color: hsla(190, 100%, 55%, 85%);
         }
       }
     }
@@ -88,7 +89,7 @@ const StyledVideoPlayer = styled.div`
 
     .vjs-current-time-display,
     .vjs-duration-display {
-      color: #000;
+      color: ${({ theme }) => theme.colors.text};
       font-family: Sans-Serif;
       font-size: 11px;
     }
@@ -103,8 +104,8 @@ const StyledVideoPlayer = styled.div`
       div {
         background: linear-gradient(
           180deg,
-          rgb(189, 189, 189) 0%,
-          rgb(219, 219, 219) 100%
+          hsla(222, 30%, 30%) 0%,
+          hsla(222, 40%, 40%) 100%
         );
         border-radius: 5px;
       }
@@ -133,7 +134,7 @@ const StyledVideoPlayer = styled.div`
     }
 
     .vjs-volume-control {
-      background-color: rgb(240, 240, 240);
+      background-color: hsla(222, 47%, 8%, 92%);
       border-radius: 5px 5px 0 0;
       left: -28px !important;
       position: relative;

@@ -1,7 +1,7 @@
 import styled from "styled-components";
 
 const StyledStatusBar = styled.footer`
-  background-color: rgb(25, 25, 25);
+  background-color: hsla(222, 47%, 8%, 92%);
   border-top: 1px solid rgb(19, 19, 19);
   bottom: 0;
   color: rgb(108, 103, 106);
@@ -53,7 +53,7 @@ const StyledStatusBar = styled.footer`
       }
 
       &:active {
-        background-color: rgb(34, 34, 34);
+        background-color: hsla(190, 100%, 60%, 16%);
       }
 
       &.clickable {

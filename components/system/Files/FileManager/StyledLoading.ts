@@ -6,7 +6,7 @@ const StyledLoading = styled.div`
   width: 100%;
 
   &::before {
-    color: #fff;
+    color: ${({ theme }) => theme.colors.text};
     content: "Loading at the speed of light...";
     display: flex;
     font-size: 12px;
