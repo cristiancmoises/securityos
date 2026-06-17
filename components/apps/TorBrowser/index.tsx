@@ -12,16 +12,16 @@ import {
 } from "utils/constants";
 import { getUrlOrSearch, label } from "utils/functions";
 
-// The Tor Browser start page: the verified live darknet search hidden service.
+// The Tor Browser start page: Torch, the long-running darknet search engine.
 // It needs no JavaScript, so it renders in the JS-disabled "Safest" sandbox. If it
 // ever goes down, the proxy shows a clear "this .onion looks offline" page and Tor
 // itself keeps working.
 const TOR_HOME =
-  "http://2fd6cemt4gmccflhm6imvdfvli3nf7zn6rfrwpsy7uhxrgbypvwf5fad.onion/";
+  "http://torchdeedp3i2jigzjdmfpn5ttjhthh5wbmda2rr3jvqjg5p77c54dqd.onion/";
 
-// Address-bar search → the home onion's own search (GET /search?query=).
+// Address-bar search → Torch's own search (GET /search?query=).
 const TOR_SEARCH_QUERY =
-  "http://2fd6cemt4gmccflhm6imvdfvli3nf7zn6rfrwpsy7uhxrgbypvwf5fad.onion/search?query=";
+  "http://torchdeedp3i2jigzjdmfpn5ttjhthh5wbmda2rr3jvqjg5p77c54dqd.onion/search?query=";
 
 // Bookmarks. "Search" is the home onion above; the rest are the operator's .onion
 // hidden services — they resolve only while their listeners are running (otherwise
