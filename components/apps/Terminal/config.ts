@@ -7,14 +7,17 @@ export const config: ITerminalOptions = {
   cursorBlink: true,
   cursorStyle: "underline",
   cursorWidth: 8,
-  fontFamily: "Consolas, Lucida Console, Courier New, monospace",
+  fontFamily:
+    "'JetBrains Mono', 'Cascadia Code', Consolas, 'Courier New', monospace",
   fontSize: 14,
   fontWeight: "100",
   letterSpacing: 0.5,
   rows: 20,
   theme: {
     background: processDirectory.Terminal.backgroundColor,
-    foreground: "rgb(204, 204, 204)",
+    cursor: "#7df7ff",
+    foreground: "#EAF6FF",
+    selection: "hsla(190, 100%, 60%, 35%)",
   },
 };
 

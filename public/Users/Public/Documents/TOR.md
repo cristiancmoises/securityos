@@ -23,7 +23,7 @@ network, and Tor applies to each separately:
   `Permissions-Policy`, and DNS-prefetch disabled.
 - Removed/neutered silent third-party calls (Start logo, jspaint Firebase
   collaboration & CORS proxies). Other egress (NTP "server" clock, APOD
-  wallpaper, IRC, IPFS) only fires when you enable that feature.
+  wallpaper, IPFS) only fires when you enable that feature.
 
 ---
 

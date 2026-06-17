@@ -17,12 +17,12 @@ const StyledNavigation = styled.nav`
       width: 16px;
 
       &:hover {
-        color: rgb(50, 152, 254);
+        color: hsla(190, 100%, 62%, 90%);
         transition: fill 0.5s ease;
       }
 
       &:active {
-        color: rgb(54, 116, 178);
+        color: hsla(190, 100%, 55%, 85%);
         transition: none;
       }
     }

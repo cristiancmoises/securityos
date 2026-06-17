@@ -4,7 +4,7 @@ import styled, { css } from "styled-components";
 const gradientAnimation = css`
   animation: gradient 5s ease-in-out alternate infinite;
   background: ${({ theme }) =>
-    `linear-gradient(-45deg, #fff, ${theme.colors.progressBarRgb}, #fff)`};
+    `linear-gradient(-45deg, ${theme.colors.progressBackground}, ${theme.colors.progressBarRgb}, ${theme.colors.progressBackground})`};
   background-size: 300% 300%;
   content: "";
   inset: 0;
@@ -12,6 +12,8 @@ const gradientAnimation = css`
 `;
 
 const StyledTransfer = styled.div`
+  color: ${({ theme }) => theme.colors.text};
+
   h1,
   div {
     align-items: baseline;
@@ -22,14 +24,14 @@ const StyledTransfer = styled.div`
     padding: 0 22px;
 
     progress {
-      border: 1px solid rgb(188, 188, 188);
+      border: 1px solid ${({ theme }) => theme.colors.accent.edge};
       height: 15px;
       overflow: hidden;
       position: relative;
       width: 100%;
 
       &::-webkit-progress-bar {
-        background: rgb(230, 230, 230);
+        background: ${({ theme }) => theme.colors.progressBackground};
       }
 
       &::-webkit-progress-value {
@@ -73,12 +75,9 @@ const StyledTransfer = styled.div`
   }
 
   h1 {
-    background: linear-gradient(
-      to right,
-      rgb(220, 229, 244),
-      rgb(155, 192, 227),
-      rgb(0, 43, 85)
-    );
+    background: ${({ theme }) =>
+      `linear-gradient(to right, ${theme.colors.titleBar.background}, ${theme.colors.highlight})`};
+    color: ${({ theme }) => theme.colors.text};
     display: flex;
     font-size: 15px;
     font-weight: 400;
@@ -94,8 +93,9 @@ const StyledTransfer = styled.div`
   }
 
   nav {
-    background-color: rgb(240, 240, 240);
-    border-top: 1px solid rgb(223, 223, 223);
+    background-color: ${({ theme }) =>
+      theme.colors.titleBar.backgroundInactive};
+    border-top: 1px solid ${({ theme }) => theme.colors.accent.edge};
     bottom: 0;
     box-sizing: content-box;
     display: flex;

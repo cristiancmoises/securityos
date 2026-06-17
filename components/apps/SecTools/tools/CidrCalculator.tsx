@@ -14,7 +14,7 @@ const Result = styled.div`
 
   .v {
     color: #e8e2ee;
-    font-family: "Cascadia Code", "Consolas", monospace;
+    font-family: ${({ theme }) => theme.formats.monoFont};
     word-break: break-all;
   }
 `;
@@ -89,10 +89,7 @@ const compute = (ipText: string, prefixText: string): Subnet | string => {
   }
 
   const ipInt =
-    ((octets[0] << 24) |
-      (octets[1] << 16) |
-      (octets[2] << 8) |
-      octets[3]) >>>
+    ((octets[0] << 24) | (octets[1] << 16) | (octets[2] << 8) | octets[3]) >>>
     0;
 
   // /0 has no set mask bits; shifting by 32 is undefined in JS, so special-case.

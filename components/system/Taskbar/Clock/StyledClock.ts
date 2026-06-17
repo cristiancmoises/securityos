@@ -3,7 +3,13 @@ import styled from "styled-components";
 const StyledClock = styled.div`
   color: ${({ theme }) => theme.colors.text};
   display: flex;
+
+  /* HUD readout: the theme display font, wide tracking and a faint accent glow. */
+  font-family: ${({ theme }) => theme.formats.displayFont};
   font-size: ${({ theme }) => theme.sizes.clock.fontSize};
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  text-shadow: ${({ theme }) => `0 0 6px ${theme.colors.accent.start}`};
   height: 100%;
   max-width: ${({ theme }) => `calc(${theme.sizes.clock.width} + 10px)`};
   min-width: ${({ theme }) => theme.sizes.clock.width};

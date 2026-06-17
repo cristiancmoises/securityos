@@ -26,20 +26,27 @@ const StyledStartButton = styled(Button)<StyledStartButtonProps>`
     width: auto;
   }
 
+  svg {
+    filter: ${({ theme }) =>
+      `drop-shadow(0 0 5px ${theme.colors.accent.start})`};
+  }
+
   &:hover {
     background-color: ${({ $active, theme }) =>
       $active ? undefined : theme.colors.taskbar.hover};
 
     svg {
       fill: ${({ theme }) => theme.colors.highlight};
+      filter: ${({ theme }) =>
+        `drop-shadow(0 0 8px ${theme.colors.accent.glowStrong})`};
     }
   }
 
   &:active {
-    background-color: hsla(0, 0%, 20%, 70%);
+    background-color: hsla(190, 100%, 60%, 18%);
 
     svg {
-      fill: hsla(207, 100%, 60%, 80%);
+      fill: hsla(190, 100%, 65%, 90%);
     }
   }
 `;

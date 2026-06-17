@@ -5,10 +5,10 @@ type StyledBrowserProps = {
 };
 
 const StyledBrowser = styled.div<StyledBrowserProps>`
-  background-color: rgb(0, 0, 1);
+  background-color: #000;
 
   iframe {
-    background-color: ${({ $hasSrcDoc }) => ($hasSrcDoc ? "#fff" : "initial")};
+    background-color: ${({ $hasSrcDoc }) => ($hasSrcDoc ? "#fff" : "#000")};
     border: 0;
     height: calc(100% - 32px - 40px - 33px);
     width: 100%;
@@ -16,21 +16,20 @@ const StyledBrowser = styled.div<StyledBrowserProps>`
 
   nav.tabstrip {
     align-items: flex-end;
-    background-color: rgb(18, 16, 20);
+    background-color: #000;
     display: flex;
     gap: 2px;
     height: 32px;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: auto hidden;
     padding: 4px 6px 0;
     scrollbar-width: thin;
     white-space: nowrap;
 
     .tab {
       align-items: center;
-      background-color: rgb(38, 36, 40);
+      background-color: rgb(10, 10, 10);
       border-radius: 8px 8px 0 0;
-      color: rgb(190, 188, 194);
+      color: rgb(235, 235, 235);
       display: inline-flex;
       flex: 0 1 190px;
       height: 28px;
@@ -40,15 +39,16 @@ const StyledBrowser = styled.div<StyledBrowserProps>`
       transition: background-color 0.15s ease, color 0.15s ease;
     }
     .tab:hover {
-      background-color: rgb(50, 48, 53);
-      color: rgb(235, 233, 238);
+      background-color: rgb(26, 26, 26);
+      color: #fff;
     }
     .tab.active {
-      background-color: rgb(64, 62, 65);
-      box-shadow: inset 0 2px 0 rgb(138, 180, 248);
-      color: rgb(255, 255, 255);
+      background-color: rgb(34, 34, 34);
+      box-shadow: inset 0 2px 0 hsla(190, 100%, 62%, 85%);
+      color: #fff;
     }
     .tab .tab-select {
+      background-color: transparent;
       color: inherit;
       flex: 1;
       font-size: 12px;
@@ -62,6 +62,7 @@ const StyledBrowser = styled.div<StyledBrowserProps>`
     }
     .tab .tab-close {
       align-items: center;
+      background-color: transparent;
       border-radius: 50%;
       color: inherit;
       display: inline-flex;
@@ -71,17 +72,18 @@ const StyledBrowser = styled.div<StyledBrowserProps>`
       justify-content: center;
       line-height: 1;
       margin-right: 5px;
-      opacity: 0.65;
+      opacity: 65%;
       width: 19px;
     }
     .tab .tab-close:hover {
-      background-color: rgb(96, 94, 99);
-      opacity: 1;
+      background-color: rgb(64, 64, 64);
+      opacity: 100%;
     }
     .tab-new {
       align-items: center;
+      background-color: transparent;
       border-radius: 6px;
-      color: rgb(210, 208, 214);
+      color: rgb(235, 235, 235);
       display: inline-flex;
       flex: 0 0 auto;
       font-size: 19px;
@@ -92,14 +94,14 @@ const StyledBrowser = styled.div<StyledBrowserProps>`
       width: 28px;
     }
     .tab-new:hover {
-      background-color: rgb(50, 48, 53);
+      background-color: rgb(34, 34, 34);
       color: #fff;
     }
   }
 
   nav.controls {
     align-items: center;
-    background-color: rgb(0, 0, 1);
+    background-color: #000;
     display: flex;
     gap: 2px;
     height: 40px;
@@ -127,15 +129,15 @@ const StyledBrowser = styled.div<StyledBrowserProps>`
         width: 20px;
       }
       &:hover {
-        background-color: rgb(40, 40, 44);
+        background-color: rgb(28, 28, 28);
       }
       &:active {
-        background-color: rgb(80, 80, 86);
+        background-color: rgb(48, 48, 48);
       }
       &:disabled {
         cursor: default;
         svg {
-          fill: rgb(70, 70, 74);
+          fill: rgb(80, 80, 80);
         }
         &:hover {
           background-color: transparent;
@@ -143,7 +145,7 @@ const StyledBrowser = styled.div<StyledBrowserProps>`
       }
     }
     input {
-      background-color: rgb(64, 62, 65);
+      background-color: rgb(26, 26, 26);
       border-radius: 18px;
       color: rgb(255, 255, 255);
       flex: 1;
@@ -155,16 +157,16 @@ const StyledBrowser = styled.div<StyledBrowserProps>`
       min-width: 0;
       padding: 0 14px;
       &:focus {
-        outline: 2px solid rgb(138, 180, 248);
+        outline: 2px solid hsla(190, 100%, 62%, 90%);
       }
     }
   }
 
   nav.bookmarks {
     align-items: center;
-    background-color: rgb(0, 0, 1);
-    border-bottom: 1px solid rgb(40, 38, 42);
-    border-top: 1px solid rgb(40, 38, 42);
+    background-color: #000;
+    border-bottom: 1px solid rgb(26, 26, 26);
+    border-top: 1px solid rgb(26, 26, 26);
     display: flex;
     gap: 4px;
     height: 33px;
@@ -175,7 +177,7 @@ const StyledBrowser = styled.div<StyledBrowserProps>`
     white-space: nowrap;
     button {
       border-radius: 5px;
-      color: rgb(220, 220, 222);
+      color: rgb(235, 235, 235);
       flex: 0 0 auto;
       font-size: 11px;
       font-weight: 600;
@@ -184,7 +186,7 @@ const StyledBrowser = styled.div<StyledBrowserProps>`
       width: auto;
     }
     button:hover {
-      background-color: rgb(40, 40, 44);
+      background-color: rgb(28, 28, 28);
     }
   }
 `;

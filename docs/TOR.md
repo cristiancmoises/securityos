@@ -36,7 +36,7 @@ SecurityOS ships hardened against silent third-party egress:
 - A strict CSP, `Referrer-Policy: no-referrer`, `Permissions-Policy` lockdown,
   and `X-DNS-Prefetch-Control: off` are applied — see
   [`deploy/SECURITY-HEADERS.md`](../deploy/SECURITY-HEADERS.md).
-- Other opt-in egress (NTP "server" clock, APOD wallpaper, IRC, IPFS gateways)
+- Other opt-in egress (NTP "server" clock, APOD wallpaper, IPFS gateways)
   only fires when *you* enable that feature.
 
 ### Publishing a .onion mirror

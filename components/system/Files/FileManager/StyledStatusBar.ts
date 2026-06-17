@@ -2,8 +2,8 @@ import styled from "styled-components";
 
 const StyledStatusBar = styled.footer`
   align-items: center;
-  background-color: rgb(51, 51, 51);
-  color: rgb(247, 247, 247);
+  background-color: hsla(222, 47%, 8%, 92%);
+  color: ${({ theme }) => theme.colors.text};
   display: flex;
   font-size: 12px;
   font-weight: 200;
@@ -18,7 +18,7 @@ const StyledStatusBar = styled.footer`
     padding: 0 3px 0 10px;
 
     &::after {
-      border-right: 1px solid rgb(247, 247, 247);
+      border-right: 1px solid hsla(190, 100%, 62%, 18%);
       content: "";
       height: 11px;
       margin-left: 11px;

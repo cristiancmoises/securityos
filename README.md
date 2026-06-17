@@ -136,16 +136,38 @@ See [`CHANGELOG.md`](CHANGELOG.md) for what's new, and [`docs/`](docs) for
 
 ## 🤝 Contributing & license
 
-GPL-licensed components (Vaptvupt) and MIT upstream (daedalOS) — see source headers and
-`THIRD-PARTY-NOTICES`. Issues and patches welcome.
+SecurityOS is an **independent, one-person project** — built and maintained solely
+by **Cristian Cezar Moisés** (no team, no company). Issues and patches are welcome.
+
+Licensing is **per component**:
+
+- **SecurityOS (the desktop / OS itself)** — **MIT**. It's a fork of
+  [daedalOS](https://github.com/DustinBrett/daedalOS) by Dustin Brett, also MIT, so
+  [`LICENSE`](LICENSE) carries both copyrights (Cristian Cezar Moisés for SecurityOS,
+  Dustin Brett for daedalOS).
+- **Vaptvupt** (the encryption tool, and its **`.zupt`** encrypted-file format /
+  engine) — **dual-licensed: GNU AGPL-3.0-or-later *or* a separate Commercial
+  license, at your option**. The AGPL's network-use clause (§13) means that if you
+  run a *modified* Vaptvupt as a network service, you must offer its users the
+  corresponding source; a commercial license is the alternative for proprietary or
+  closed-source use. Full terms are in
+  [`LICENSE-VAPTVUPT.md`](LICENSE-VAPTVUPT.md), with the AGPL text in
+  [`LICENSES/AGPL-3.0.txt`](LICENSES/AGPL-3.0.txt).
+
+> **Naming:** *Vaptvupt* is the tool; *`.zupt`* is **only** its encrypted-file
+> format / extension — never a name for the tool itself.
+
+Upstream and bundled third-party components keep their own licenses — see source
+headers and `THIRD-PARTY-NOTICES`. For a one-page summary, see
+[`LICENSING.md`](LICENSING.md).
 
 ---
 
 ## 👨‍💻 Author
 
-**Cristian Cezar Moisés** — Information Security
+**Cristian Cezar Moisés** — sole maintainer & developer · Information Security
 
-[💼 LinkedIn](https://www.linkedin.com/in/cristian-cezar-mois%C3%A9s) ·
+[💼 LinkedIn](https://www.linkedin.com/in/cristiancezarmoises) ·
 [🐙 GitHub](https://github.com/cristiancmoises) ·
 [📦 Codeberg](https://codeberg.org/berkeley) ·
 [📺 YouTube](https://www.youtube.com/@securityops) ·

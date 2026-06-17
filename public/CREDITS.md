@@ -76,7 +76,6 @@ Este projeto é bastante aprimorado pelo código da comunidade de código aberto
 - [Chess](https://sourceforge.net/projects/htmlchess/)
 - [jspaint](https://github.com/1j01/jspaint)
 - [Print.js](https://github.com/crabbly/print.js)
-- [Kiwi IRC](https://github.com/kiwiirc/kiwiirc)
 - [ClassiCube](https://github.com/UnknownShadow200/ClassiCube)
 - [rtf.js](https://github.com/tbluemel/rtf.js)
 - [Quake 3](https://github.com/lrusso/Quake3)

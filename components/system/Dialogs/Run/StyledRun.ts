@@ -2,8 +2,9 @@ import StyledButton from "components/system/Dialogs/Transfer/StyledButton";
 import styled from "styled-components";
 
 const StyledRun = styled.div`
-  background-color: #fff;
-  border: 1px solid rgb(240, 240, 240);
+  background-color: ${({ theme }) => theme.colors.titleBar.background};
+  border: 1px solid ${({ theme }) => theme.colors.accent.edge};
+  color: ${({ theme }) => theme.colors.text};
   font-size: 12px;
 
   figure {
@@ -38,8 +39,9 @@ const StyledRun = styled.div`
 
       input,
       select {
-        border: 1px solid rgb(122, 122, 122);
+        border: 1px solid ${({ theme }) => theme.colors.accent.edge};
         border-radius: 0;
+        color: ${({ theme }) => theme.colors.text};
         font-family: ${({ theme }) => theme.formats.systemFont};
         font-size: 12px;
         height: 23px;
@@ -51,13 +53,14 @@ const StyledRun = styled.div`
       }
 
       select {
-        background-color: #fff;
+        background-color: ${({ theme }) =>
+          theme.colors.titleBar.backgroundInactive};
         clip-path: inset(0 0 0 calc(100% - 20px));
         position: absolute;
         width: calc(100% - 21px);
 
         &:disabled {
-          border: 1px solid rgb(122, 122, 122);
+          border: 1px solid ${({ theme }) => theme.colors.accent.edge};
           opacity: 100%;
         }
       }
@@ -67,11 +70,13 @@ const StyledRun = styled.div`
         margin-right: 33px;
 
         &:focus {
-          border: 1px solid rgb(0, 120, 215);
+          border: 1px solid ${({ theme }) => theme.colors.highlight};
+          border-color: ${({ theme }) => theme.colors.highlight};
           border-right: 0;
+          box-shadow: 0 0 0 1px ${({ theme }) => theme.colors.highlight};
 
           + select {
-            border-color: rgb(0, 120, 215);
+            border-color: ${({ theme }) => theme.colors.highlight};
           }
         }
       }
@@ -79,7 +84,8 @@ const StyledRun = styled.div`
   }
 
   nav {
-    background-color: rgb(240, 240, 240);
+    background-color: ${({ theme }) =>
+      theme.colors.titleBar.backgroundInactive};
     display: flex;
     flex-direction: row;
     height: 100%;

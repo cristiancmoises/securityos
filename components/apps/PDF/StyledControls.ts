@@ -1,8 +1,9 @@
 import styled from "styled-components";
 
 const StyledControls = styled.nav`
-  background-color: rgb(50, 54, 57);
-  box-shadow: 0 0 5px hsla(0, 0%, 10%, 50%);
+  background-color: hsla(222, 47%, 8%, 92%);
+  box-shadow: 0 0 8px hsla(222, 60%, 3%, 60%),
+    0 0 12px hsla(190, 100%, 55%, 18%);
   display: flex;
   height: 40px;
   position: absolute;

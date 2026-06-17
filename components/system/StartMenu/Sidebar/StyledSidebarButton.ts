@@ -6,6 +6,11 @@ type StyledSidebarButtonProps = {
 };
 
 const StyledSidebarButton = styled.li<StyledSidebarButtonProps>`
+  /* KDE Plasma "Kickoff" category rail: flat rows, a left accent bar on the active
+     item and a highlightBackground selected/hover wash — all theme-driven so the
+     Undercover (Windows 11 light) palette recolors the rail. */
+  background-color: ${({ $active, theme }) =>
+    $active ? theme.colors.highlightBackground : "transparent"};
   border: 1px solid transparent;
   display: flex;
   height: ${({ theme }) => theme.sizes.startMenu.sideBar.height};
@@ -59,12 +64,12 @@ const StyledSidebarButton = styled.li<StyledSidebarButtonProps>`
   }
 
   &:hover {
-    background-color: hsla(0, 0%, 35%, 70%);
-    border: 1px solid hsla(0, 0%, 45%, 70%);
+    background-color: ${({ theme }) => theme.colors.highlightBackground};
+    border: ${({ theme }) => `1px solid ${theme.colors.accent.edge}`};
   }
 
   &:active {
-    background-color: hsla(0, 0%, 40%, 70%);
+    background-color: ${({ theme }) => theme.colors.taskbar.active};
   }
 `;
 

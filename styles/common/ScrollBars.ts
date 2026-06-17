@@ -8,7 +8,7 @@ const ScrollBars = (
   verticalY = 0
 ): FlattenSimpleInterpolation => css`
   overflow: auto;
-  scrollbar-color: rgb(77, 77, 77) rgb(23, 23, 23);
+  scrollbar-color: hsla(190, 100%, 60%, 45%) hsla(222, 47%, 7%, 50%);
   scrollbar-gutter: stable;
 
   &::-webkit-scrollbar {
@@ -18,17 +18,17 @@ const ScrollBars = (
 
   &::-webkit-scrollbar-corner,
   &::-webkit-scrollbar-track {
-    background-color: rgb(23, 23, 23);
+    background-color: hsla(222, 47%, 7%, 50%);
   }
 
   &::-webkit-scrollbar-thumb {
     background-clip: padding-box;
-    background-color: rgb(77, 77, 77);
+    background-color: hsla(190, 100%, 60%, 45%);
   }
 
   &::-webkit-scrollbar-thumb:vertical {
     background-clip: padding-box;
-    background-color: rgb(77, 77, 77);
+    background-color: hsla(190, 100%, 60%, 45%);
     border-left: 1px solid transparent;
     border-right: 1px solid transparent;
   }
@@ -39,29 +39,29 @@ const ScrollBars = (
   }
 
   &::-webkit-scrollbar-thumb:hover {
-    background-color: rgb(122, 122, 122);
+    background-color: hsla(190, 100%, 62%, 70%);
   }
 
   &::-webkit-scrollbar-thumb:active {
-    background-color: rgb(166, 166, 166);
+    background-color: hsla(190, 100%, 65%, 85%);
   }
 
   &::-webkit-scrollbar-button:single-button {
     background-clip: padding-box;
-    background-color: rgb(23, 23, 23);
+    background-color: hsla(222, 47%, 7%, 50%);
     background-position: center 4px;
     background-repeat: no-repeat;
     background-size: 10px;
-    border: 1px solid rgb(23, 23, 23);
+    border: 1px solid hsla(222, 47%, 7%, 50%);
     display: block;
     height: ${size ? `${size}px` : "initial"};
 
     &:hover {
-      background-color: rgb(55, 55, 55);
+      background-color: hsla(222, 40%, 10%, 60%);
     }
 
     &:active {
-      background-color: rgb(166, 166, 166);
+      background-color: hsla(190, 100%, 65%, 85%);
     }
   }
 

@@ -45,12 +45,12 @@ const StyledAddressBar = styled.div`
 
     &:hover {
       background-color: rgb(27, 41, 49);
-      border: 1px solid rgb(34, 114, 153);
+      border: 1px solid hsla(190, 100%, 62%, 70%);
     }
 
     &:active {
       background-color: rgb(28, 57, 71);
-      border: 1px solid rgb(38, 160, 218);
+      border: 1px solid hsla(190, 100%, 62%, 85%);
     }
   }
 `;

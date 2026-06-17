@@ -34,7 +34,7 @@ If you edit `securityHeaders.js`, run `yarn build:headers` to regenerate
 | `style-src` | `'self' 'unsafe-inline'` | styled-components v5 injects runtime `<style>` tags and React emits inline `style=""` attributes; v5 has no clean nonce support. |
 | `worker-src` / `child-src` | `'self' blob:` | `blob:` is for v86's blob-URL worker (`libv86.js`); the clock/wallpaper workers are same-origin chunks covered by `'self'`. |
 | `img-src` / `media-src` | `'self' data: blob: https:` | `data:` window-control button icons, `blob:` emulator framebuffer/screenshots/canvas exports, `https:` favicons & remote media. |
-| `connect-src` | `'self' data: blob: https: wss:` | In-OS Browser/IRC fetches, IPFS gateways, and the **user-configurable Tor relay** (`wss:`). |
+| `connect-src` | `'self' data: blob: https: wss:` | In-OS Browser fetches, IPFS gateways, and the **user-configurable Tor relay** (`wss:`). |
 | `frame-src` | `'self' https: blob:` | `'self'` for the local jspaint/kiwiirc app iframes; `https:` for the in-OS Browser rendering remote sites. |
 | `object-src` | `'none'` | No plugins. |
 | `base-uri` / `form-action` | `'self'` | Block `<base>` hijacking and off-site form posts. |

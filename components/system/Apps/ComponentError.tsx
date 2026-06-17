@@ -1,8 +1,8 @@
 import styled from "styled-components";
 
 const StyledComponentError = styled.div`
-  background-color: #fff;
-  color: #000;
+  background-color: ${({ theme }) => theme.colors.window.background};
+  color: ${({ theme }) => theme.colors.text};
   display: flex;
   font-size: 20px;
   height: 100%;

@@ -1,7 +1,7 @@
 const sizes = {
   clock: {
     fontSize: "12px",
-    width: "76px",
+    width: "92px",
   },
   contextMenu: {
     subMenuOffset: 3,
@@ -40,7 +40,7 @@ const sizes = {
     size: 320,
   },
   taskbar: {
-    blur: "5px",
+    blur: "16px",
     entry: {
       borderSize: "2px",
       fontSize: "12px",
@@ -63,6 +63,7 @@ const sizes = {
   window: {
     cascadeOffset: 26,
     outline: "1px",
+    radius: "0px",
   },
 };
 

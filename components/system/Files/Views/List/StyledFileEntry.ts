@@ -9,7 +9,7 @@ const StyledFileEntry = styled.li`
     place-items: center;
 
     figcaption {
-      color: #fff;
+      color: ${({ theme }) => theme.colors.fileEntry.text};
     }
 
     picture {
@@ -18,7 +18,7 @@ const StyledFileEntry = styled.li`
     }
 
     svg {
-      fill: rgb(210, 210, 210);
+      fill: ${({ theme }) => theme.colors.fileEntry.text};
       height: 8px;
       margin-left: auto;
       margin-right: 8px;
@@ -41,8 +41,8 @@ const StyledFileEntry = styled.li`
     }
 
     &:hover {
-      background-color: hsla(0, 0%, 35%, 70%);
-      border: 1px solid hsla(0, 0%, 45%, 70%);
+      background-color: ${({ theme }) => theme.colors.fileEntry.background};
+      border: 1px solid ${({ theme }) => theme.colors.fileEntry.border};
     }
   }
 `;

@@ -1,8 +1,15 @@
 import FileManager from "components/system/Files/FileManager";
 import Sidebar from "components/system/StartMenu/Sidebar";
+import { Power } from "components/system/StartMenu/Sidebar/SidebarIcons";
+import StyledKickoffBody from "components/system/StartMenu/StyledKickoffBody";
+import StyledKickoffFooter from "components/system/StartMenu/StyledKickoffFooter";
+import StyledKickoffHeader from "components/system/StartMenu/StyledKickoffHeader";
 import StyledStartMenu from "components/system/StartMenu/StyledStartMenu";
 import StyledStartMenuBackground from "components/system/StartMenu/StyledStartMenuBackground";
 import useStartMenuTransition from "components/system/StartMenu/useStartMenuTransition";
+import { useFileSystem } from "contexts/fileSystem";
+import { resetStorage } from "contexts/fileSystem/functions";
+import { useSession } from "contexts/session";
 import type { Variant } from "framer-motion";
 import { useLayoutEffect, useRef, useState } from "react";
 import {
@@ -11,6 +18,7 @@ import {
   HOME,
   PREVENT_SCROLL,
 } from "utils/constants";
+import { haltEvent } from "utils/functions";
 
 type StartMenuProps = {
   toggleStartMenu: (showMenu?: boolean) => void;
@@ -22,7 +30,13 @@ type StyleVariant = Variant & {
 
 const StartMenu: FC<StartMenuProps> = ({ toggleStartMenu }) => {
   const menuRef = useRef<HTMLElement | null>(null);
+  const { rootFs } = useFileSystem();
+  const { setHaltSession } = useSession();
   const [showScrolling, setShowScrolling] = useState(false);
+  const restartSession = (): void => {
+    setHaltSession(true);
+    resetStorage(rootFs).finally(() => window.location.reload());
+  };
   const revealScrolling: React.MouseEventHandler = ({ clientX = 0 }) => {
     const { width = 0 } = menuRef.current?.getBoundingClientRect() || {};
 
@@ -63,19 +77,40 @@ const StartMenu: FC<StartMenuProps> = ({ toggleStartMenu }) => {
       {...FOCUSABLE_ELEMENT}
     >
       <StyledStartMenuBackground $height={height} />
-      <Sidebar height={height} />
-      <FileManager
-        url={`${HOME}/Start Menu`}
-        view="list"
-        hideLoading
-        hideShortcutIcons
-        loadIconsImmediately
-        preloadShortcuts
-        readOnly
-        skipFsWatcher
-        skipSorting
-        useNewFolderIcon
-      />
+      <StyledKickoffHeader onContextMenu={haltEvent}>
+        <div className="search">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 5 1.49-1.5-5-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z" />
+          </svg>
+          <span className="placeholder">Search…</span>
+        </div>
+      </StyledKickoffHeader>
+      <StyledKickoffBody>
+        <Sidebar />
+        <FileManager
+          url={`${HOME}/Start Menu`}
+          view="list"
+          hideLoading
+          hideShortcutIcons
+          loadIconsImmediately
+          preloadShortcuts
+          readOnly
+          skipFsWatcher
+          skipSorting
+          useNewFolderIcon
+        />
+      </StyledKickoffBody>
+      <StyledKickoffFooter onContextMenu={haltEvent}>
+        <button
+          aria-label="Restart session"
+          title="Clears the session and restarts."
+          type="button"
+          onClick={restartSession}
+        >
+          <Power />
+          <span>Leave</span>
+        </button>
+      </StyledKickoffFooter>
     </StyledStartMenu>
   );
 };

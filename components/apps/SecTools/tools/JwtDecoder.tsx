@@ -96,7 +96,7 @@ const Layout = styled.div`
   }
 
   table.claims td.mono {
-    font-family: "Cascadia Code", "Consolas", monospace;
+    font-family: ${({ theme }) => theme.formats.monoFont};
   }
 
   @media (max-width: 560px) {
@@ -184,9 +184,7 @@ const formatRelative = (deltaSeconds: number): string => {
 
     return rtf.format(value, unit);
   } catch {
-    return deltaSeconds >= 0
-      ? `in ${abs}s`
-      : `${abs}s ago`;
+    return deltaSeconds >= 0 ? `in ${abs}s` : `${abs}s ago`;
   }
 };
 
@@ -424,7 +422,13 @@ const JwtDecoderTool: FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [decoded.error, decoded.signature, decoded.signingInput, headerAlg, secret]);
+  }, [
+    decoded.error,
+    decoded.signature,
+    decoded.signingInput,
+    headerAlg,
+    secret,
+  ]);
 
   const hasToken = token.trim().length > 0;
 
@@ -448,9 +452,7 @@ const JwtDecoderTool: FC = () => {
           />
         </div>
 
-        {decoded.error ? (
-          <p className="error">{decoded.error}</p>
-        ) : undefined}
+        {decoded.error ? <p className="error">{decoded.error}</p> : undefined}
 
         {hasToken && !decoded.error ? (
           <>

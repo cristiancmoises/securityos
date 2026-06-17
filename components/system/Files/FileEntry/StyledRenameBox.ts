@@ -8,7 +8,7 @@ const StyledRenameBox = styled.textarea.attrs({
   rows: 1,
   spellCheck: false,
 })`
-  border: 1px solid rgb(100, 100, 100);
+  border: 1px solid ${({ theme }) => theme.colors.fileEntry.border};
   font-family: inherit;
   font-size: 11.5px;
   margin-bottom: 2px;
@@ -24,6 +24,13 @@ const StyledRenameBox = styled.textarea.attrs({
   user-select: text;
   white-space: break-spaces;
   z-index: 1;
+
+  &:focus {
+    border-color: hsla(190, 100%, 62%, 90%);
+    box-shadow: 0 0 0 1px hsla(190, 100%, 62%, 50%),
+      0 0 8px hsla(190, 100%, 55%, 35%);
+    outline: none;
+  }
 `;
 
 export default StyledRenameBox;

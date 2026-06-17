@@ -17,7 +17,8 @@ const StyledPDF = styled.div`
   }
 
   canvas {
-    box-shadow: 0 0 5px hsla(0, 0%, 10%, 50%);
+    box-shadow: 0 0 8px hsla(222, 60%, 3%, 60%),
+      0 0 12px hsla(190, 100%, 55%, 18%);
     margin: 4px 4px 0;
   }
 `;
