@@ -79,16 +79,16 @@ const directory: Processes = {
     lockAspectRatio: true,
     title: "DX-Ball",
   },
-  DevStudio: {
-    Component: dynamic(() => import("components/apps/DevStudio")),
-    backgroundColor: "#1E1E1E",
+  VSCodium: {
+    Component: dynamic(() => import("components/apps/VSCodium")),
+    backgroundColor: "#1e1e1e",
     defaultSize: {
-      height: 540,
-      width: 860,
+      height: 660,
+      width: 1000,
     },
     icon: "/System/Icons/monaco.webp",
     singleton: true,
-    title: "DevStudio",
+    title: "VSCodium",
   },
   DevTools: {
     Component: dynamic(() => import("components/apps/DevTools")),

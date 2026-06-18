@@ -97,6 +97,15 @@ const StyledScreenCapture = styled.div`
     border-color: ${({ theme }) => theme.colors.titleBar.closeHover};
   }
 
+  button.recording.paused {
+    animation: none;
+  }
+
+  button.pause {
+    background: ${({ theme }) => theme.colors.highlightBackground};
+    border-color: ${({ theme }) => theme.colors.highlight};
+  }
+
   @keyframes rec-pulse {
     50% {
       opacity: 65%;
@@ -125,6 +134,19 @@ const StyledScreenCapture = styled.div`
   .rec-indicator .timer {
     color: ${({ theme }) => theme.colors.text};
     font-variant-numeric: tabular-nums;
+  }
+
+  .rec-indicator.paused {
+    color: ${({ theme }) => theme.colors.titleBar.textInactive};
+  }
+
+  .rec-indicator.paused .dot {
+    animation: none;
+    background: ${({ theme }) => theme.colors.titleBar.textInactive};
+  }
+
+  .rec-indicator .paused-tag {
+    letter-spacing: normal;
   }
 
   .countdown {

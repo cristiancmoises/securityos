@@ -65,6 +65,32 @@ services:
       - "8088:3000"
     networks: [securenet]
 
+  # VSCodium — the full VS Code (Code-OSS) IDE via code-server, embedded by the
+  # in-OS VSCodium app. Bound to LOOPBACK only (127.0.0.1) so `--auth none` is
+  # safe (the editor isn't reachable from the LAN). The workspace persists to
+  # ~/vscodium-workspace on the host (uid 1000 == the image's `coder` user).
+  vscode:
+    image: codercom/code-server:latest
+    container_name: securityos-vscode
+    restart: unless-stopped
+    init: true
+    user: "1000:1000"
+    command:
+      - "--auth"
+      - "none"
+      - "--bind-addr"
+      - "0.0.0.0:8443"
+      - "--disable-telemetry"
+      - "--disable-update-check"
+      - "/home/coder/workspace"
+    volumes:
+      - ${HOME}/vscodium-workspace:/home/coder/workspace
+    mem_limit: 2g
+    pids_limit: 1024
+    ports:
+      - "127.0.0.1:8443:8443"
+    networks: [securenet]
+
 networks:
   securenet:
     driver: bridge
