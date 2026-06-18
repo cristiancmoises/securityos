@@ -1,24 +1,29 @@
-import { PROXY_PATH } from "components/apps/Browser/config";
 import type { ComponentProcessProps } from "components/system/Apps/RenderComponent";
 import { useState } from "react";
 import styled from "styled-components";
-import { SANDBOXED_IFRAME_CONFIG } from "utils/constants";
+import { IFRAME_CONFIG } from "utils/constants";
 
-// Vaptvupt — the SecurityOps "zupt" file/folder encryption tool, served from its
-// Tor hidden service. It works like the Tor Browser (every byte fetched
-// server-side through Tor's SOCKS5h proxy, rendered in an opaque-origin sandbox
-// that can never touch the SecurityOS origin) but with NO browser chrome: a single
-// fixed window that only ever shows the Vaptvupt tool.
+// Vaptvupt — the SecurityOps "zupt" file/folder share. Loaded DIRECTLY at its real
+// https origin (share.securityops.co), NOT via the Tor HTML-rewriting proxy.
 //
-// Unlike the Tor Browser's "Safest" default, JavaScript stays ON here (no &nojs):
-// the encryption tool needs it to run in the page. There is no &direct=1 — an
-// .onion is only reachable over Tor, so the proxy routes it through Tor (and fails
-// closed if the Tor relay is down, showing a clear "this .onion looks offline"
-// page rather than leaking a clear-net request).
-const VAPTVUPT_URL =
-  "http://secopsuwwht2unomwt3jofl33kfqsfd2z6cwip6rbqlapi7s4pys5vyd.onion/";
-const VAPTVUPT_SRC = `${PROXY_PATH}${encodeURIComponent(VAPTVUPT_URL)}`;
-const VAPTVUPT_ALLOW = "clipboard-read; clipboard-write; fullscreen";
+// TRADEOFF: the old embed routed the Vaptvupt .onion through the privacy proxy in
+// an opaque-origin sandbox. That gave anonymity but BROKE the two things this app
+// exists for: the sandbox had no `allow-downloads` (so file downloads were blocked),
+// and the proxy is GET-only (httpGet in pages/api/proxy.ts never forwards a request
+// body), so multipart file UPLOAD could not work either. To make download + upload
+// fully functional we embed the clearnet share directly with IFRAME_CONFIG — exactly
+// like SecChat (which goes direct because WebRTC needs a real browser context).
+// IFRAME_CONFIG already carries `allow-downloads allow-forms ... allow-same-origin
+// allow-scripts`, so native browser download AND multipart upload work, and the page
+// keeps its own real origin/storage. `https:` is already in the page CSP `frame-src`
+// (scripts/securityHeaders.js), so no header change is needed; downloads need no
+// Permissions-Policy entry.
+//
+// NOTE: like SecChat, share.securityops.co must allow being framed by the SecurityOS
+// origin (CSP `frame-ancestors`, no blocking X-Frame-Options) or the embed goes blank.
+const VAPTVUPT_URL = "https://share.securityops.co/";
+const VAPTVUPT_ALLOW =
+  "clipboard-read; clipboard-write; fullscreen";
 
 const StyledVaptvupt = styled.div`
   background: #150f1b;
@@ -71,14 +76,14 @@ const Vaptvupt: FC<ComponentProcessProps> = ({ id }) => {
       <iframe
         allow={VAPTVUPT_ALLOW}
         onLoad={() => setLoading(false)}
-        src={VAPTVUPT_SRC}
+        src={VAPTVUPT_URL}
         title={id}
-        {...SANDBOXED_IFRAME_CONFIG}
+        {...IFRAME_CONFIG}
       />
       {loading && (
         <div className="loading">
           <span className="spinner" />
-          Connecting to Vaptvupt over Tor…
+          Connecting to Vaptvupt…
         </div>
       )}
     </StyledVaptvupt>

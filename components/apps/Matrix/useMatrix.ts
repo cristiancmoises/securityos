@@ -187,6 +187,10 @@ const useMatrix = (): UseMatrix => {
   const mediaCacheRef = useRef<Map<string, string>>(new Map());
   const mountedRef = useRef(true);
   const rebuildTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  // Whether the first /sync ever completed. Before it does, a transient sync
+  // failure over Tor must stay "connecting" (the SDK retries) instead of a hard
+  // "Connection error" that drops the user back to the login screen.
+  const preparedRef = useRef(false);
 
   const [session, setSession] = useState<Session>();
   const [rooms, setRooms] = useState<MatrixRoom[]>([]);
@@ -256,6 +260,7 @@ const useMatrix = (): UseMatrix => {
       setLoggingIn(true);
       setError("");
       setConn("connecting");
+      preparedRef.current = false;
 
       try {
         const { accessToken, client, cryptoReady: ready, userId } =
@@ -274,18 +279,31 @@ const useMatrix = (): UseMatrix => {
 
         const sdk = await import("matrix-js-sdk");
 
-        client.on(sdk.ClientEvent.Sync, (state: string) => {
-          if (!mountedRef.current) return;
-          if (state === "PREPARED" || state === "SYNCING") {
-            setConn("online");
-            setError("");
-          } else if (state === "ERROR") {
-            setConn("error");
-          } else if (state === "RECONNECTING") {
-            setConn("connecting");
+        client.on(
+          sdk.ClientEvent.Sync,
+          (state: string, _prev: unknown, data?: { error?: { message?: string } }) => {
+            if (!mountedRef.current) return;
+            if (state === "PREPARED" || state === "SYNCING") {
+              preparedRef.current = true;
+              setConn("online");
+              setError("");
+            } else if (state === "ERROR") {
+              // The SDK auto-retries failed syncs. A transient Tor hiccup during
+              // the initial sync should NOT become a hard "Connection error" that
+              // bounces back to login — stay "connecting" (session is kept) and
+              // surface the reason. Once we've synced, keep showing "online".
+              setConn(preparedRef.current ? "online" : "connecting");
+              const reason = data?.error?.message;
+
+              if (!preparedRef.current && reason) {
+                setError(`Still connecting over Tor… ${reason}`);
+              }
+            } else if (state === "RECONNECTING" || state === "CATCHUP") {
+              setConn(preparedRef.current ? "online" : "connecting");
+            }
+            scheduleRebuild();
           }
-          scheduleRebuild();
-        });
+        );
         client.on(sdk.RoomEvent.Timeline, scheduleRebuild);
         client.on(sdk.RoomEvent.Name, scheduleRebuild);
         client.on(sdk.RoomEvent.MyMembership, scheduleRebuild);
@@ -628,6 +646,7 @@ const useMatrix = (): UseMatrix => {
     setConn("offline");
     setCryptoReady(true);
     setError("");
+    preparedRef.current = false;
   }, []);
 
   useEffect(() => {

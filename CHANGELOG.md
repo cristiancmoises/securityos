@@ -4,6 +4,34 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.8.0] — 2026-06-18
+
+### Cloudmacs — full Emacs in the browser (replaces Emacs + VSCodium)
+- Removed the simulated **Emacs** app and the **VSCodium** app; added
+  **Cloudmacs** ([karlicoss/cloudmacs](https://github.com/karlicoss/cloudmacs)) —
+  real Emacs served to the browser via **Gotty** (`emacsclient --tty`, session
+  persists across reloads).
+- Integrated into the all-in-one deploy: a loopback-only `cloudmacs` service in
+  `docker-compose.yml` (`karlicoss/cloudmacs:latest`, `127.0.0.1:8090`, runs as
+  uid 1000; config persists to `~/.cloudmacs.d`, files to `~/cloudmacs-data`).
+  Build context vendored in `deploy/cloudmacs/`. CSP allows the cloudmacs origin.
+
+### Matrix — fix "Connection Error" on connect
+- A transient Tor hiccup during the **initial sync** no longer becomes a hard
+  "Connection error" that bounces back to the login screen. The session is kept
+  and the SDK auto-retries — the status stays "Connecting over Tor…" until the
+  first sync completes. (The login path itself was verified working.)
+
+### Vaptvupt — full file functionality
+- The file-share app now embeds `share.securityops.co` **directly** (like
+  SecChat) instead of the Tor-proxied onion, so native **download and upload**
+  work (the HTML-rewriting proxy is GET-only and couldn't forward uploads).
+
+### Screen recording — performance/quality + webcam choice
+- Recording **quality presets** (Performance ~720p/2.5 Mbps · Balanced
+  ~1080p/6 Mbps · High native/12 Mbps), **codec auto-select** (VP9→VP8→WebM→MP4),
+  and a **webcam device picker** for the picture-in-picture overlay.
+
 ## [2.7.0] — 2026-06-18
 
 ### VSCodium — a real, full VS Code IDE (replaces DevStudio)

@@ -23,7 +23,7 @@ const UNDERCOVER_DISPLAY_NAMES: Readonly<Record<string, string>> = {
   Videos: "Videos",
 
   // Apps — mapped to generic, non-Microsoft Win11-ish equivalents.
-  Emacs: "Notepad",
+  Cloudmacs: "Notepad",
   Vim: "Notepad",
   "Tor Browser": "Web",
   "Screen Capture": "Snipping Tool",

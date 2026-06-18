@@ -63,6 +63,18 @@ const StyledScreenCapture = styled.div`
     margin: 0;
   }
 
+  .options .codec-badge {
+    align-items: center;
+    background: ${({ theme }) => theme.colors.highlightBackground};
+    border: 1px solid ${({ theme }) => theme.colors.highlight};
+    border-radius: 4px;
+    color: ${({ theme }) => theme.colors.titleBar.textInactive};
+    display: inline-flex;
+    font-size: 10px;
+    letter-spacing: 0.3px;
+    padding: 2px 6px;
+  }
+
   .actions {
     display: flex;
     flex-wrap: wrap;

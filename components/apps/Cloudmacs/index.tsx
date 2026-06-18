@@ -3,31 +3,27 @@ import { useCallback, useEffect, useState } from "react";
 import styled from "styled-components";
 import { IFRAME_CONFIG } from "utils/constants";
 
-// VSCodium — the FULL VS Code (Code-OSS) IDE, served by a self-hosted
-// code-server and embedded here, like the other first-party SecurityOps apps
-// (SecChat/Vaptvupt): loaded DIRECTLY, not through the Tor HTML-rewriting proxy
-// (a live editor needs real workers/websockets the proxy can't provide).
-//
-// Local testing uses the loopback code-server on :8443 — http is fine because
-// loopback is a "potentially trustworthy" origin (not mixed-content/upgraded). A
-// server deployment uses https://code.securityops.co (covered by the `https:`
-// CSP). Both origins are allowlisted in frame-src/connect-src (securityHeaders).
+// Cloudmacs — FULL Emacs in the browser (github.com/karlicoss/cloudmacs): Gotty
+// serves `emacsclient --tty` as a web TTY, so the session persists across reloads.
+// Embedded in-OS like the other first-party services. It's the local Emacs
+// backend (the `cloudmacs` docker-compose service), so it's loaded directly, not
+// through the Tor proxy. Local testing uses the loopback Gotty on :8090 (http on
+// loopback is a trustworthy origin); a server deployment uses an https origin.
 
-const LOCAL_VSCODE_URL = "http://localhost:8443/";
-const REMOTE_VSCODE_URL = "https://code.securityops.co/";
-
-const VSCODE_ALLOW = "clipboard-read; clipboard-write; fullscreen";
+const LOCAL_URL = "http://localhost:8090/";
+const REMOTE_URL = "https://emacs.securityops.co/";
+const CLOUDMACS_ALLOW = "clipboard-read; clipboard-write; fullscreen";
 
 const isLoopback = (host: string): boolean =>
   host === "localhost" || host === "127.0.0.1" || host === "[::1]";
 
-const vscodeUrl = (): string =>
+const cloudmacsUrl = (): string =>
   typeof window !== "undefined" && !isLoopback(window.location.hostname)
-    ? REMOTE_VSCODE_URL
-    : LOCAL_VSCODE_URL;
+    ? REMOTE_URL
+    : LOCAL_URL;
 
-const StyledVSCodium = styled.div`
-  background: #1e1e1e;
+const StyledCloudmacs = styled.div`
+  background: #1d1f21;
   color: ${({ theme }) => theme.colors.text};
   height: 100%;
   width: 100%;
@@ -61,7 +57,7 @@ const StyledVSCodium = styled.div`
     color: ${({ theme }) => theme.colors.titleBar.textInactive};
     font-size: 12px;
     margin: 0;
-    max-width: 420px;
+    max-width: 440px;
   }
 
   .panel pre {
@@ -88,16 +84,14 @@ const StyledVSCodium = styled.div`
   }
 `;
 
-const VSCodium: FC<ComponentProcessProps> = ({ id }) => {
-  const url = vscodeUrl();
+const Cloudmacs: FC<ComponentProcessProps> = ({ id }) => {
+  const url = cloudmacsUrl();
   const [status, setStatus] = useState<"checking" | "offline" | "online">(
     "checking"
   );
 
   const check = useCallback(() => {
     setStatus("checking");
-    // A no-cors probe can't read the response, but it resolves when the server
-    // is reachable and rejects (network error) when it isn't.
     fetch(url, { cache: "no-store", mode: "no-cors" })
       .then(() => setStatus("online"))
       .catch(() => setStatus("offline"));
@@ -117,33 +111,38 @@ const VSCodium: FC<ComponentProcessProps> = ({ id }) => {
 
   if (status === "online") {
     return (
-      <StyledVSCodium>
-        <iframe allow={VSCODE_ALLOW} src={url} title={id} {...IFRAME_CONFIG} />
-      </StyledVSCodium>
+      <StyledCloudmacs>
+        <iframe
+          allow={CLOUDMACS_ALLOW}
+          src={url}
+          title={id}
+          {...IFRAME_CONFIG}
+        />
+      </StyledCloudmacs>
     );
   }
 
   return (
-    <StyledVSCodium>
+    <StyledCloudmacs>
       <div className="panel">
-        <h1>VSCodium</h1>
+        <h1>Cloudmacs</h1>
         {status === "checking" ? (
-          <p>Connecting to the VSCodium server…</p>
+          <p>Connecting to Cloudmacs…</p>
         ) : (
           <>
             <p>
-              The VSCodium server isn&apos;t reachable at <b>{url}</b>. It runs as
-              a local container (Code-OSS / code-server). Start it with:
+              The Cloudmacs server isn&apos;t reachable at <b>{url}</b>. It runs
+              as a local container (Emacs + Gotty). Start it with:
             </p>
-            <pre>docker compose up -d vscode</pre>
+            <pre>docker compose up -d cloudmacs</pre>
             <button onClick={check} type="button">
               Retry
             </button>
           </>
         )}
       </div>
-    </StyledVSCodium>
+    </StyledCloudmacs>
   );
 };
 
-export default VSCodium;
+export default Cloudmacs;
