@@ -4,6 +4,29 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.7.0] — 2026-06-18
+
+### VSCodium — a real, full VS Code IDE (replaces DevStudio)
+- The Monaco-based **DevStudio** is replaced by **VSCodium**: the full VS Code
+  (Code-OSS) experience — extensions, integrated terminal, real
+  build/test/debug — via a self-hosted **code-server** embedded in-OS (same
+  first-party-embed pattern as SecChat/Vaptvupt).
+- Added a loopback-only `vscode` service to `docker-compose.yml`
+  (`127.0.0.1:8443`, `--auth none`, workspace at `~/vscodium-workspace`); the app
+  embeds `http://localhost:8443` locally / `https://code.securityops.co` on a
+  server, both allowlisted in CSP `frame-src`/`connect-src`. Shows a "start the
+  server" panel with a Retry if it isn't running yet.
+
+### Matrix — fixes the "Failed to construct URL" login error
+- The SDK requires an **absolute** base URL; the relative `"/api/matrix"` threw
+  *Failed to construct URL*. Now uses `window.location.origin + /api/matrix`
+  (still the same-origin Tor proxy) so login/sync work.
+
+### Screen Capture — even more
+- **Pause/Resume** recording (timer pauses too), **PNG/JPEG** screenshot format,
+  **24/30/60 fps** selector, **auto-open** the result (Photos/VideoPlayer), and a
+  **webcam picture-in-picture** overlay for recordings.
+
 ## [2.6.0] — 2026-06-18
 
 ### DevStudio — a real in-browser IDE

@@ -17,7 +17,14 @@
 
 import type { MatrixClient } from "matrix-js-sdk";
 
-export const MATRIX_BASE_URL = "/api/matrix";
+// matrix-js-sdk validates/uses baseUrl with `new URL(...)`, which throws
+// "Failed to construct URL" on a RELATIVE path. So we build an ABSOLUTE,
+// same-origin URL at call time: e.g. https://os.securityops.co/api/matrix. It
+// still points at our own /api/matrix Tor proxy (same origin) — only now the SDK
+// can parse it.
+export const MATRIX_API_PATH = "/api/matrix";
+export const matrixBaseUrl = (): string =>
+  `${typeof window === "undefined" ? "" : window.location.origin}${MATRIX_API_PATH}`;
 export const HOMESERVER_LABEL = "matrix.securityops.co";
 
 export type CreatedSession = {
@@ -36,8 +43,9 @@ export const createMatrixSession = async (
   password: string
 ): Promise<CreatedSession> => {
   const sdk = await import("matrix-js-sdk");
+  const baseUrl = matrixBaseUrl();
 
-  const bootstrap = sdk.createClient({ baseUrl: MATRIX_BASE_URL });
+  const bootstrap = sdk.createClient({ baseUrl });
   const login = await bootstrap.loginRequest({
     identifier: { type: "m.id.user", user: username },
     initial_device_display_name: "SecurityOS (Tor)",
@@ -51,7 +59,7 @@ export const createMatrixSession = async (
 
   const client = sdk.createClient({
     accessToken,
-    baseUrl: MATRIX_BASE_URL,
+    baseUrl,
     deviceId,
     store: new sdk.MemoryStore(),
     userId,
