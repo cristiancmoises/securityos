@@ -66,6 +66,7 @@ type UseMatrix = {
   activeRoom?: MatrixRoom;
   busy: boolean;
   conn: ConnState;
+  cryptoReady: boolean;
   error: string;
   invites: Invite[];
   joinRoom: (idOrAlias: string) => Promise<void>;
@@ -195,6 +196,7 @@ const useMatrix = (): UseMatrix => {
   const [error, setError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [cryptoReady, setCryptoReady] = useState(true);
   const [userResults, setUserResults] = useState<UserResult[]>([]);
   const [publicRooms, setPublicRooms] = useState<PublicRoom[]>([]);
 
@@ -256,10 +258,8 @@ const useMatrix = (): UseMatrix => {
       setConn("connecting");
 
       try {
-        const { accessToken, client, userId } = await createMatrixSession(
-          username.trim(),
-          password
-        );
+        const { accessToken, client, cryptoReady: ready, userId } =
+          await createMatrixSession(username.trim(), password);
 
         if (!mountedRef.current) {
           client.stopClient();
@@ -269,6 +269,7 @@ const useMatrix = (): UseMatrix => {
 
         clientRef.current = client;
         tokenRef.current = accessToken;
+        setCryptoReady(ready);
         setSession({ userId });
 
         const sdk = await import("matrix-js-sdk");
@@ -291,7 +292,13 @@ const useMatrix = (): UseMatrix => {
         client.on(sdk.MatrixEventEvent.Decrypted, scheduleRebuild);
 
         setConn("syncing");
-        await client.startClient({ initialSyncLimit: 40 });
+        // lazyLoadMembers keeps the initial /sync small + fast over Tor (members
+        // are fetched on demand) — the big win for connecting an established
+        // account on a slow circuit.
+        await client.startClient({
+          initialSyncLimit: 30,
+          lazyLoadMembers: true,
+        });
       } catch (caught) {
         if (!mountedRef.current) return;
         setConn("error");
@@ -619,6 +626,7 @@ const useMatrix = (): UseMatrix => {
     setUserResults([]);
     setPublicRooms([]);
     setConn("offline");
+    setCryptoReady(true);
     setError("");
   }, []);
 
@@ -648,6 +656,7 @@ const useMatrix = (): UseMatrix => {
     activeRoom,
     busy,
     conn,
+    cryptoReady,
     error,
     invites,
     joinRoom,

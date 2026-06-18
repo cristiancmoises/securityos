@@ -59,6 +59,7 @@ const Matrix: FC<ComponentProcessProps> = () => {
     activeRoom,
     busy,
     conn,
+    cryptoReady,
     error,
     invites,
     joinRoom,
@@ -123,6 +124,13 @@ const Matrix: FC<ComponentProcessProps> = () => {
           </button>
         )}
       </div>
+
+      {session && !cryptoReady && (
+        <div className="notice">
+          🔓 End-to-end encryption couldn&apos;t start this session — encrypted
+          messages may not be readable. Try reopening the app.
+        </div>
+      )}
 
       {session ? (
         <div className="panes">

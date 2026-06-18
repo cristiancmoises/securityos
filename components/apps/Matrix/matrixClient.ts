@@ -23,6 +23,7 @@ export const HOMESERVER_LABEL = "matrix.securityops.co";
 export type CreatedSession = {
   accessToken: string;
   client: MatrixClient;
+  cryptoReady: boolean;
   deviceId: string;
   userId: string;
 };
@@ -57,15 +58,27 @@ export const createMatrixSession = async (
   });
 
   // Rust crypto (Olm/Megolm via WASM). In-memory store → no keys on disk.
-  await client.initRustCrypto({ useIndexedDB: false });
+  // NON-FATAL: if E2EE fails to initialise (e.g. the WASM is blocked), still
+  // connect so the user isn't locked out entirely — unencrypted rooms work and
+  // encrypted ones show as locked. Without this, one crypto hiccup = "can't
+  // connect at all".
+  let cryptoReady = false;
 
-  // Still send to / receive from devices we have not verified — without this the
-  // client would refuse to encrypt to unverified devices and silently drop them.
-  const crypto = client.getCrypto();
+  try {
+    await client.initRustCrypto({ useIndexedDB: false });
 
-  if (crypto) crypto.globalBlacklistUnverifiedDevices = false;
+    // Still send to / receive from devices we have not verified — without this
+    // the client would refuse to encrypt to unverified devices and drop them.
+    const crypto = client.getCrypto();
 
-  return { accessToken, client, deviceId, userId };
+    if (crypto) crypto.globalBlacklistUnverifiedDevices = false;
+    cryptoReady = true;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error("SecurityOS Matrix: end-to-end encryption failed to initialise", error);
+  }
+
+  return { accessToken, client, cryptoReady, deviceId, userId };
 };
 
 // --- Encrypted-attachment decryption (AES-CTR-256), per the Matrix spec --------

@@ -124,6 +124,10 @@ export const WALLPAPER_MENU: WallpaperMenuItem[] = [
     name: "Nature",
   },
   {
+    id: "/Users/Public/Pictures/Wallpapers/Security/securityos-logo.webp",
+    name: "SecurityOps Logo",
+  },
+  {
     id: "/Users/Public/Pictures/Wallpapers/Security/securityos-brand.webp",
     name: "Security",
   },
