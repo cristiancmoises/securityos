@@ -161,6 +161,15 @@ const StyledMatrix = styled.div`
     padding: 6px 8px;
   }
 
+  .notice {
+    background: ${({ theme }) => theme.colors.taskbar.background};
+    border-bottom: 1px solid ${({ theme }) => theme.colors.highlight};
+    color: ${({ theme }) => theme.colors.text};
+    flex: 0 0 auto;
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+
   /* Logged-in 2-pane layout */
   .panes {
     display: flex;

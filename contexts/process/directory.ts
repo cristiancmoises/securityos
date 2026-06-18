@@ -79,6 +79,17 @@ const directory: Processes = {
     lockAspectRatio: true,
     title: "DX-Ball",
   },
+  DevStudio: {
+    Component: dynamic(() => import("components/apps/DevStudio")),
+    backgroundColor: "#1E1E1E",
+    defaultSize: {
+      height: 540,
+      width: 860,
+    },
+    icon: "/System/Icons/monaco.webp",
+    singleton: true,
+    title: "DevStudio",
+  },
   DevTools: {
     Component: dynamic(() => import("components/apps/DevTools")),
     backgroundColor: "#242424",

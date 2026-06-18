@@ -39,9 +39,10 @@ export const config = {
 
 const HOMESERVER = "https://matrix.securityops.co";
 
-// /sync long-polls up to ~30s; give it a comfortable 60s ceiling so a healthy
-// long-poll is never killed mid-flight.
-const REQUEST_TIMEOUT_MS = 60_000;
+// /sync long-polls up to ~30s; give it a comfortable ceiling so a healthy
+// long-poll (or a slow initial sync / key upload over Tor) is never killed
+// mid-flight.
+const REQUEST_TIMEOUT_MS = 90_000;
 // Sized for chat media: the E2EE client uploads (POST _matrix/media/v3/upload)
 // and downloads (GET _matrix/client/v1/media/download) attachments through here.
 const MAX_RESPONSE_BYTES = 50 * 1024 * 1024;

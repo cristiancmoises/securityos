@@ -11,6 +11,7 @@ import type { FileManagerViewNames } from "components/system/Files/Views";
 import { FileManagerViews } from "components/system/Files/Views";
 import { useFileSystem } from "contexts/fileSystem";
 import { requestPermission } from "contexts/fileSystem/functions";
+import { useSession } from "contexts/session";
 import dynamic from "next/dynamic";
 import { basename, extname, join } from "path";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -81,6 +82,7 @@ const FileManager: FC<FileManagerProps> = ({
       skipSorting,
     });
   const { mountFs, rootFs, stat } = useFileSystem();
+  const { sessionLoaded } = useSession();
   const { StyledFileEntry, StyledFileManager } = FileManagerViews[view];
   const { isSelecting, selectionRect, selectionStyling, selectionEvents } =
     useSelection(fileManagerRef);
@@ -200,7 +202,11 @@ const FileManager: FC<FileManagerProps> = ({
             <StyledFileEntry
               key={file}
               $selecting={isSelecting}
-              $visible={!isLoading}
+              // On the desktop, icons get absolute grid positions from the
+              // session's saved iconPositions, which load asynchronously. Hold
+              // them hidden until the session is loaded so they paint already in
+              // place instead of auto-flowing and then jumping/overlapping.
+              $visible={!isLoading && (!isDesktop || sessionLoaded)}
               {...(!readOnly && draggableEntry(url, file, renaming === file))}
               {...(renaming === "" && { onKeyDown: keyShortcuts(file) })}
               {...focusableEntry(file)}

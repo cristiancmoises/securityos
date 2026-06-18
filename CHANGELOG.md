@@ -4,6 +4,38 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.6.0] — 2026-06-18
+
+### DevStudio — a real in-browser IDE
+- New **DevStudio** app: file-tree explorer over the virtual FS, **Monaco** editor
+  with tabs (dirty indicator, Ctrl+S save), and a bottom **Output** console.
+- **Run / test / debug** that is CSP-clean (no CDN, nothing leaves Tor):
+  JavaScript runs in a **sandboxed Web Worker** (blob URL); **TypeScript/JSX**
+  is transpiled with the bundled compiler then run; a `test()/assert()` harness
+  reports pass/fail; full stack traces stream to the console (step-debug via
+  browser devtools). Compiled languages (C/C++/Go/…) hand off to the bundled
+  **Linux VM (V86)** / **Terminal**. Ctrl+Enter / F5 to run.
+
+### Matrix — connection hardening
+- **Encryption init is now non-fatal**: if E2EE/WASM can't start, you still
+  connect (unencrypted rooms work; encrypted show as locked) instead of being
+  blocked entirely — with a clear in-app notice.
+- **lazyLoadMembers** on initial sync (much smaller/faster first sync over Tor),
+  bumped the Matrix proxy timeout to 90s for slow circuits, and surface the
+  exact homeserver error text on failure.
+
+### Screen Capture — improvements
+- Screenshot **countdown** (Now/3s/5s), **copy to clipboard**, **microphone
+  audio** toggle for recordings, a live **recording timer**, and a **last-capture
+  preview** thumbnail.
+
+### Desktop fixes
+- **Default wallpaper** is now the **SecurityOps logo** (also added to the
+  Background menu).
+- **Fixed desktop icon overlap on load**: icons stay hidden until the session's
+  saved positions are loaded, so they paint already in place instead of
+  auto-flowing and then jumping over each other.
+
 ## [2.5.0] — 2026-06-17
 
 ### Matrix — a full, end-to-end-encrypted client
