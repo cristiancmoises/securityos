@@ -73,7 +73,9 @@ services:
   # ~/cloudmacs-data. The build context is vendored in deploy/cloudmacs/ — swap
   # `image:` for `build: { context: deploy/cloudmacs }` to build from source.
   cloudmacs:
-    image: karlicoss/cloudmacs:latest
+    build:
+      context: deploy/cloudmacs
+      dockerfile: Dockerfile
     container_name: securityos-cloudmacs
     restart: unless-stopped
     init: true

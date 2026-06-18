@@ -1,61 +1,20 @@
-FROM silex/emacs:master-alpine AS emacs
-# TODO 218 Mb. hmm wonder if building without GUI would help?
+# SecurityOS Cloudmacs image.
+#
+# Builds on the official karlicoss/cloudmacs image and fixes the one thing that
+# breaks its non-root (asEnvUser / su-exec) startup path: `gotty` is installed to
+# /root/go/bin, which is NOT on PATH and lives under /root (not traversable by the
+# unprivileged `emacs` user), so the container's `su-exec emacs gotty …` dies with
+# "gotty: No such file or directory" and crash-loops. We copy gotty onto a
+# world-accessible PATH directory so it runs as the emacs user.
+#
+# (The full from-source build — Emacs + Gotty + su-exec + asEnvUser — lives in the
+# upstream repo; this thin layer keeps the deploy fast and reliable. Upstream:
+# https://github.com/karlicoss/cloudmacs — see ./LICENSE.)
+FROM karlicoss/cloudmacs:latest
 
-### configure locales for proper unicode display
-# Borrowed from https://gist.github.com/Herz3h/0ffc2198cb63949a20ef61c1d2086cc0
-# TODO add other locales..
-ENV MUSL_LOCPATH=/usr/local/share/i18n/locales/musl
+USER root
+RUN cp /root/go/bin/gotty /usr/local/bin/gotty \
+ && chmod 0755 /usr/local/bin/gotty \
+ && gotty --version
 
-RUN apk --no-cache add git cmake make musl-dev gcc gettext-dev libintl \
- && git clone https://github.com/rilian-la-te/musl-locales.git /tmp/musl-locales \
- && cd /tmp/musl-locales \
- && cmake . && make && make install \
- && rm -rf /tmp/musl-locales \
- && apk del git cmake make musl-dev gcc gettext-dev libintl
- ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en' LC_ALL='en_US.UTF-8'
-### 
-
-
-### configure gotty
-# TODO extract in a separate image?
-# based on https://github.com/dit4c/dockerfile-gotty
-# Unfortunately, it's got fixed alpine version and missing dependency so easiest was just to copy it
-RUN apk add --no-cache go git build-base && \
-  go install github.com/sorenisanerd/gotty@v1.5.0 && \
-  apk del go git build-base
-# binary takes about 14 Mb
-### 
-
-
-### configure asEnvUser, tool to run emacs in docker with user's permissions rather than root
-# borrowed from https://github.com/JAremko/docker-emacs/blob/master/Dockerfile.alpine
-COPY asEnvUser /usr/local/sbin/
-
-# only allow root to run it
-RUN chown root /usr/local/sbin/asEnvUser \
- && chmod 700  /usr/local/sbin/asEnvUser
-
-# su-exec
-RUN apk --no-cache add git build-base bash \
-    && git clone https://github.com/ncopa/su-exec.git /tmp/su-exec \
-    && cd /tmp/su-exec \
-    && make \
-    && chmod 770 su-exec \
-    && mv ./su-exec /usr/local/sbin/ \
-    && apk del git build-base
-
-### 
-
-
-ENV WORKSPACE="/mnt/workspace" \
-    SHELL="/bin/bash"
-
-# gotty default
-EXPOSE 8080
-
-WORKDIR "${WORKSPACE}"
-
-ENTRYPOINT ["asEnvUser"]
-# -a options connects to existing emacs session or starts a new one if there is no Emacs running
-# see https://www.gnu.org/software/emacs/manual/html_node/emacs/emacsclient-Options.html
-CMD ["gotty", "--permit-write", "--reconnect", "emacsclient", "--tty", "-a", "emacs"]
+# ENTRYPOINT (asEnvUser) and CMD (gotty … emacsclient --tty) are inherited.
