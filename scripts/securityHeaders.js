@@ -54,18 +54,18 @@ const CSP_DIRECTIVES = {
   "img-src": ["'self'", "data:", "blob:", "https:"],
   "font-src": ["'self'", "data:"],
   "media-src": ["'self'", "data:", "blob:", "https:"],
-  // http://localhost:8443 + 127.0.0.1:8443 = the local self-hosted VSCodium
-  // (code-server) the VSCodium app embeds for local testing; loopback is a
-  // trustworthy origin (not upgraded/blocked). On a server it lives at
-  // https://code.securityops.co, already covered by `https:`.
+  // http://localhost:8090 + 127.0.0.1:8090 = the local self-hosted Cloudmacs
+  // (Gotty + Emacs) the Cloudmacs app embeds for local testing; loopback is a
+  // trustworthy origin (not upgraded/blocked). On a server it lives at an https
+  // origin (e.g. https://emacs.securityops.co), already covered by `https:`.
   "connect-src": [
     "'self'",
     "data:",
     "blob:",
     "https:",
     "wss:",
-    "http://localhost:8443",
-    "http://127.0.0.1:8443",
+    "http://localhost:8090",
+    "http://127.0.0.1:8090",
   ],
   "worker-src": ["'self'", "blob:"],
   "child-src": ["'self'", "blob:"],
@@ -73,8 +73,8 @@ const CSP_DIRECTIVES = {
     "'self'",
     "https:",
     "blob:",
-    "http://localhost:8443",
-    "http://127.0.0.1:8443",
+    "http://localhost:8090",
+    "http://127.0.0.1:8090",
   ],
   "manifest-src": ["'self'"],
   "upgrade-insecure-requests": [],

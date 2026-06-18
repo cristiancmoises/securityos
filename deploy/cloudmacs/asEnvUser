@@ -1,0 +1,63 @@
+#!/bin/bash
+set -eux
+
+# borrowed from https://github.com/JAremko/docker-emacs
+
+## Create(if needed) this user and run command as the user:
+# ENV UNAME="emacser" \
+#     GNAME="emacs" \
+#     UHOME="/home/emacs" \
+#     UID="1000" \
+#     GID="1000" \
+#     WORKSPACE="/mnt/workspace" \
+#     SHELL="/bin/bash"
+## NOTE: ^^^^ Those are default values only in docker-emacs
+## NOTE: The user will have "no password" sudo privilege
+
+## Create user if it doesn't exists
+if ! id "${UNAME}" >/dev/null 2>&1; then
+	## Prepend the user to /etc/passwd to ensure that it will
+	## override already existing users with the same IDs
+	echo -e "${UNAME}:x:${EMACS_UID}:${EMACS_GID}:${UNAME},,,:${UHOME}:${SHELL}\\n$(cat /etc/passwd)" > /etc/passwd
+	echo "${UNAME}::17032:0:99999:7:::" >> /etc/shadow
+fi
+
+## Make sure that user is sudoer (if sudo is present)
+if [[ -d "/etc/sudoers.d" ]] && [[ ! -f "/etc/sudoers.d/${UNAME}" ]]; then
+	echo "${UNAME} ALL=(ALL) NOPASSWD: ALL" > "/etc/sudoers.d/${UNAME}"
+	chmod 0440 "/etc/sudoers.d/${UNAME}"
+fi
+
+## Create user's group if it doesn't exists
+set +e
+u_group=$(grep -E -i "^${GNAME}" /etc/group)
+if [ $? -ne 0 ]; then
+	echo "${GNAME}:x:${EMACS_GID}:${UNAME}" >> /etc/group
+elif [[ ${u_group} != *"${UNAME}"* ]]; then
+	sed -i -e "s/${u_group}/${u_group},${UNAME}/g" /etc/group
+fi
+set -e
+
+
+# no harm in doing it every time? should be idempotent and shouldn't mess permissions because it's special emacs home dir
+mkdir -p "${UHOME}"
+chown "${EMACS_UID}":"${EMACS_GID}" "${UHOME}"
+
+
+function check_permissions {
+    find "$UHOME" -not -user "$EMACS_UID" -or -not -group "$EMACS_GID"
+}
+
+count=$(check_permissions | wc -l)
+
+if [ "$count" -ne 0 ]; then
+   echo "WARNING: some files have wrong permissions"
+   check_permissions
+fi
+
+
+mkdir -p "${WORKSPACE}"
+chown "${EMACS_UID}":"${EMACS_GID}" "${WORKSPACE}"
+cd "${WORKSPACE}"
+
+su-exec "${UNAME}" "$@"

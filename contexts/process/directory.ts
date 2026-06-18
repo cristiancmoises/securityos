@@ -79,16 +79,16 @@ const directory: Processes = {
     lockAspectRatio: true,
     title: "DX-Ball",
   },
-  VSCodium: {
-    Component: dynamic(() => import("components/apps/VSCodium")),
-    backgroundColor: "#1e1e1e",
+  Cloudmacs: {
+    Component: dynamic(() => import("components/apps/Cloudmacs")),
+    backgroundColor: "#1d1f21",
     defaultSize: {
-      height: 660,
-      width: 1000,
+      height: 640,
+      width: 940,
     },
-    icon: "/System/Icons/monaco.webp",
+    icon: "/System/Icons/emacs.webp",
     singleton: true,
-    title: "VSCodium",
+    title: "Cloudmacs",
   },
   DevTools: {
     Component: dynamic(() => import("components/apps/DevTools")),
@@ -101,17 +101,6 @@ const directory: Processes = {
     libs: ["/Program Files/Eruda/eruda.js"],
     singleton: true,
     title: "DevTools",
-  },
-  Emacs: {
-    Component: dynamic(() => import("components/apps/Emacs")),
-    backgroundColor: "#1d1f21",
-    defaultSize: {
-      height: 520,
-      width: 720,
-    },
-    icon: "/System/Icons/emacs.webp",
-    singleton: true,
-    title: "Emacs",
   },
   Emulator: {
     Component: dynamic(() => import("components/apps/Emulator")),

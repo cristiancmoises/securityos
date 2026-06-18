@@ -65,30 +65,34 @@ services:
       - "8088:3000"
     networks: [securenet]
 
-  # VSCodium — the full VS Code (Code-OSS) IDE via code-server, embedded by the
-  # in-OS VSCodium app. Bound to LOOPBACK only (127.0.0.1) so `--auth none` is
-  # safe (the editor isn't reachable from the LAN). The workspace persists to
-  # ~/vscodium-workspace on the host (uid 1000 == the image's `coder` user).
-  vscode:
-    image: codercom/code-server:latest
-    container_name: securityos-vscode
+  # Cloudmacs — full Emacs in the browser (karlicoss/cloudmacs): Gotty serves
+  # `emacsclient --tty` as a web TTY, so the session persists across reloads.
+  # Embedded by the in-OS Cloudmacs app. Bound to LOOPBACK only (127.0.0.1:8090).
+  # asEnvUser runs Emacs as uid/gid 1000 so the mounted host dirs (owned by the
+  # host user, uid 1000) are writable. Config persists to ~/.cloudmacs.d, files to
+  # ~/cloudmacs-data. The build context is vendored in deploy/cloudmacs/ — swap
+  # `image:` for `build: { context: deploy/cloudmacs }` to build from source.
+  cloudmacs:
+    image: karlicoss/cloudmacs:latest
+    container_name: securityos-cloudmacs
     restart: unless-stopped
     init: true
-    user: "1000:1000"
-    command:
-      - "--auth"
-      - "none"
-      - "--bind-addr"
-      - "0.0.0.0:8443"
-      - "--disable-telemetry"
-      - "--disable-update-check"
-      - "/home/coder/workspace"
+    stdin_open: true
+    tty: true
+    environment:
+      UNAME: emacs
+      GNAME: emacs
+      EMACS_UID: "1000"
+      EMACS_GID: "1000"
+      UHOME: /home/emacs
+      TERM: xterm-256color
     volumes:
-      - ${HOME}/vscodium-workspace:/home/coder/workspace
-    mem_limit: 2g
-    pids_limit: 1024
+      - ${HOME}/.cloudmacs.d:/home/emacs/.emacs.d
+      - ${HOME}/cloudmacs-data:/home/emacs/data
+    mem_limit: 1g
+    pids_limit: 512
     ports:
-      - "127.0.0.1:8443:8443"
+      - "127.0.0.1:8090:8080"
     networks: [securenet]
 
 networks:

@@ -12,9 +12,78 @@ import { bufferToBlob, isFirefox, isSafari } from "utils/functions";
 const CAPTURE_FPS = 30;
 const MIME_VIDEO_WEBM = "video/webm";
 const MIME_VIDEO_MP4 = "video/mp4";
+const MIME_VIDEO_WEBM_VP9 = "video/webm;codecs=vp9";
+const MIME_VIDEO_WEBM_VP8 = "video/webm;codecs=vp8";
 const MIME_IMAGE_PNG = "image/png";
 const MIME_IMAGE_JPEG = "image/jpeg";
 const JPEG_QUALITY = 0.92;
+
+// Recording quality / performance presets. Each preset drives both the
+// getDisplayMedia video constraints (ideal width/height) and the MediaRecorder
+// videoBitsPerSecond, so weaker machines can record smoothly while strong ones
+// keep native fidelity. `maxHeight === undefined` means "native resolution"
+// (no downscale constraint). `preferVp8` records VP8 for broadest playback at
+// lower CPU cost; the others prefer VP9 for better quality-per-size.
+export type QualityPreset = "performance" | "balanced" | "high";
+
+type QualityPresetConfig = {
+  bitsPerSecond: number;
+  maxHeight?: number;
+  maxWidth?: number;
+  preferVp8: boolean;
+};
+
+const QUALITY_PRESETS: Record<QualityPreset, QualityPresetConfig> = {
+  // Smooth on weak machines: downscale to ~720p, low bitrate, prefer VP8.
+  performance: {
+    bitsPerSecond: 2_500_000,
+    maxHeight: 720,
+    maxWidth: 1280,
+    preferVp8: true,
+  },
+  // Default: ~1080p, medium bitrate, VP9 when available.
+  balanced: {
+    bitsPerSecond: 6_000_000,
+    maxHeight: 1080,
+    maxWidth: 1920,
+    preferVp8: false,
+  },
+  // Native resolution, high bitrate, VP9 when available.
+  high: {
+    bitsPerSecond: 12_000_000,
+    preferVp8: false,
+  },
+};
+
+const DEFAULT_QUALITY: QualityPreset = "balanced";
+
+// Best-supported recording mimeType, preferring quality-per-size codecs. VP9 →
+// VP8 → generic WebM → MP4. For the Performance preset VP8 is preferred first to
+// save CPU on weak machines. Returns undefined if none can be probed (the
+// MediaRecorder then falls back to the platform default).
+const pickRecordingMimeType = (preferVp8: boolean): string | undefined => {
+  const isSupported = (type: string): boolean =>
+    typeof MediaRecorder !== "undefined" &&
+    typeof MediaRecorder.isTypeSupported === "function" &&
+    MediaRecorder.isTypeSupported(type);
+
+  const order = preferVp8
+    ? [
+        MIME_VIDEO_WEBM_VP8,
+        MIME_VIDEO_WEBM_VP9,
+        MIME_VIDEO_WEBM,
+        MIME_VIDEO_MP4,
+      ]
+    : [
+        MIME_VIDEO_WEBM_VP9,
+        MIME_VIDEO_WEBM_VP8,
+        MIME_VIDEO_WEBM,
+        MIME_VIDEO_MP4,
+      ];
+
+  return order.find((type) => isSupported(type));
+};
+
 // Inset (px) of the webcam picture-in-picture from the screen edges and the
 // fraction of the screen width it occupies.
 const PIP_MARGIN = 24;
@@ -38,9 +107,19 @@ const timeStamp = (): string =>
     .replace(/[/:]/g, "-")
     .replace(",", "");
 
-const displayOptions = (frameRate: number): DisplayMediaStreamOptions =>
-  ({
-    video: { frameRate },
+const displayOptions = (
+  frameRate: number,
+  preset?: QualityPresetConfig
+): DisplayMediaStreamOptions => {
+  // `ideal` width/height let the browser downscale toward the preset target
+  // without hard-failing if the display is smaller (or no constraint exists).
+  const video: MediaTrackConstraints = { frameRate };
+
+  if (preset?.maxWidth) video.width = { ideal: preset.maxWidth };
+  if (preset?.maxHeight) video.height = { ideal: preset.maxHeight };
+
+  return {
+    video,
     ...(!isFirefox() &&
       !isSafari() && {
         preferCurrentTab: false,
@@ -48,7 +127,8 @@ const displayOptions = (frameRate: number): DisplayMediaStreamOptions =>
         surfaceSwitching: "include",
         systemAudio: "include",
       }),
-  }) as DisplayMediaStreamOptions;
+  } as DisplayMediaStreamOptions;
+};
 
 export type ScreenshotOptions = {
   copyToClipboard?: boolean;
@@ -59,7 +139,21 @@ export type ScreenshotOptions = {
 export type RecordOptions = {
   frameRate?: RecordFrameRate;
   microphone?: boolean;
+  // Override the auto-selected best codec mimeType (auto-best is the default).
+  mimeType?: string;
+  // Recording quality / performance preset (defaults to "balanced").
+  quality?: QualityPreset;
   webcam?: boolean;
+  // deviceId of the camera to use for the webcam PiP overlay. Omitted/empty →
+  // the system default camera.
+  webcamDeviceId?: string;
+};
+
+// A selectable camera, as surfaced to the UI. `label` may be empty until the
+// user has granted camera permission at least once.
+export type CameraDevice = {
+  deviceId: string;
+  label: string;
 };
 
 export type LastCapture = {
@@ -72,6 +166,12 @@ export type LastCapture = {
 };
 
 type UseScreenCapture = {
+  // The available video-input (camera) devices for the webcam PiP overlay.
+  cameras: CameraDevice[];
+  // The mimeType that would be used to record at the given quality preset, e.g.
+  // "video/webm;codecs=vp9" — for a small codec indicator in the UI. undefined
+  // when nothing can be probed (platform default would be used).
+  bestRecordingMimeType: (quality?: QualityPreset) => string | undefined;
   canRecord: boolean;
   canScreenshot: boolean;
   canWebcam: boolean;
@@ -84,6 +184,9 @@ type UseScreenCapture = {
   // Resolves with the saved capture when a recording is STOPPED (so callers can
   // auto-open it); resolves undefined when a recording is merely started.
   recordScreen: (options?: RecordOptions) => Promise<LastCapture | undefined>;
+  // Enumerate camera devices, optionally requesting permission first so labels
+  // are populated. Safe to call repeatedly; updates `cameras`.
+  refreshCameras: (requestPermission?: boolean) => Promise<CameraDevice[]>;
   // Resolves with the saved capture so callers can auto-open it.
   takeScreenshot: (options?: ScreenshotOptions) => Promise<LastCapture | undefined>;
 };
@@ -101,6 +204,7 @@ const useScreenCapture = (): UseScreenCapture => {
   const [countdown, setCountdown] = useState(0);
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [lastCapture, setLastCapture] = useState<LastCapture>();
+  const [cameras, setCameras] = useState<CameraDevice[]>([]);
   const streamRef = useRef<MediaStream>();
   const recorderRef = useRef<MediaRecorder>();
   // Resolves the promise returned by recordScreen() when a STOP completes, so
@@ -154,6 +258,64 @@ const useScreenCapture = (): UseScreenCapture => {
   const canWebcam =
     canRecord && typeof navigator?.mediaDevices?.getUserMedia === "function";
 
+  // The codec that would be chosen for a given preset (for a UI indicator).
+  const bestRecordingMimeType = useCallback(
+    (quality: QualityPreset = DEFAULT_QUALITY): string | undefined =>
+      pickRecordingMimeType(QUALITY_PRESETS[quality].preferVp8),
+    []
+  );
+
+  // List the available camera (videoinput) devices for the webcam PiP picker.
+  // Browsers hide device labels until camera permission has been granted at
+  // least once; pass requestPermission to briefly open the camera so labels can
+  // be populated, then re-enumerate. Always fails soft — returns [] and never
+  // throws, so it can never break the core recording flow.
+  const refreshCameras = useCallback(
+    async (requestPermission = false): Promise<CameraDevice[]> => {
+      if (
+        !canWebcam ||
+        typeof navigator?.mediaDevices?.enumerateDevices !== "function"
+      ) {
+        setCameras([]);
+
+        return [];
+      }
+
+      if (requestPermission) {
+        try {
+          const probe = await navigator.mediaDevices.getUserMedia({
+            video: true,
+          });
+
+          // Release immediately; we only needed permission for labels.
+          probe.getTracks().forEach((track) => track.stop());
+        } catch {
+          // Permission denied/unavailable — enumerate anyway (labels may be
+          // empty), so the user can still pick by position.
+        }
+      }
+
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const found = devices
+          .filter((device) => device.kind === "videoinput")
+          .map((device, index) => ({
+            deviceId: device.deviceId,
+            label: device.label || `Camera ${index + 1}`,
+          }));
+
+        setCameras(found);
+
+        return found;
+      } catch {
+        setCameras([]);
+
+        return [];
+      }
+    },
+    [canWebcam]
+  );
+
   const recordScreen = useCallback(
     async (options?: RecordOptions) => {
       // Second invocation stops an in-progress recording (flushes the file).
@@ -177,8 +339,10 @@ const useScreenCapture = (): UseScreenCapture => {
       }
 
       const frameRate: RecordFrameRate = options?.frameRate ?? CAPTURE_FPS;
+      const presetKey: QualityPreset = options?.quality ?? DEFAULT_QUALITY;
+      const preset = QUALITY_PRESETS[presetKey];
       const stream = await navigator.mediaDevices.getDisplayMedia(
-        displayOptions(frameRate)
+        displayOptions(frameRate, preset)
       );
 
       // Optionally mix in the microphone. Never fail the recording if the mic is
@@ -207,11 +371,18 @@ const useScreenCapture = (): UseScreenCapture => {
       // the webcam is denied/unavailable — fall back to the plain screen stream.
       if (options?.webcam && canWebcam) {
         try {
+          // Use the chosen camera when provided; fall back to the system
+          // default if no/empty deviceId. `exact` so we honor the user's pick.
+          const deviceId = options.webcamDeviceId;
           const webcamStream = await navigator.mediaDevices.getUserMedia({
-            video: true,
+            video: deviceId ? { deviceId: { exact: deviceId } } : true,
           });
 
           auxStreamsRef.current.push(webcamStream);
+
+          // Now that permission is granted, re-enumerate so labels populate for
+          // next time (fire-and-forget; never blocks the recording).
+          refreshCameras().catch(() => undefined);
 
           const screenVideo = document.createElement("video");
           const webcamVideo = document.createElement("video");
@@ -272,12 +443,16 @@ const useScreenCapture = (): UseScreenCapture => {
       setIsPaused(false);
       setRecordSeconds(0);
 
-      const { height, width } = videoTrack.getSettings();
+      // Pick the best-supported codec (honoring an explicit override), and use
+      // the preset's fixed video bitrate for predictable quality-per-size
+      // instead of the old h*w*fps heuristic.
+      const mimeType =
+        options?.mimeType && MediaRecorder.isTypeSupported(options.mimeType)
+          ? options.mimeType
+          : pickRecordingMimeType(preset.preferVp8);
       const recorder = new MediaRecorder(recordStream, {
-        bitsPerSecond: height && width ? height * width * frameRate : undefined,
-        mimeType: MediaRecorder.isTypeSupported(MIME_VIDEO_WEBM)
-          ? MIME_VIDEO_WEBM
-          : MIME_VIDEO_MP4,
+        videoBitsPerSecond: preset.bitsPerSecond,
+        ...(mimeType ? { mimeType } : {}),
       });
 
       recorderRef.current = recorder;
@@ -346,7 +521,15 @@ const useScreenCapture = (): UseScreenCapture => {
       // Started (not stopped): the caller gets no capture yet.
       return undefined;
     },
-    [canWebcam, readFile, setCapture, stopAllStreams, updateFolder, writeFile]
+    [
+      canWebcam,
+      readFile,
+      refreshCameras,
+      setCapture,
+      stopAllStreams,
+      updateFolder,
+      writeFile,
+    ]
   );
 
   // Pause / resume an in-progress recording. The live timer is gated on
@@ -485,6 +668,8 @@ const useScreenCapture = (): UseScreenCapture => {
   );
 
   return {
+    bestRecordingMimeType,
+    cameras,
     canRecord,
     canScreenshot,
     canWebcam,
@@ -493,8 +678,9 @@ const useScreenCapture = (): UseScreenCapture => {
     isRecording,
     lastCapture,
     pauseResumeRecording,
-    recordSeconds,
     recordScreen,
+    recordSeconds,
+    refreshCameras,
     takeScreenshot,
   };
 };

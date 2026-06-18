@@ -3,10 +3,11 @@ import type { ComponentProcessProps } from "components/system/Apps/RenderCompone
 import { useProcesses } from "contexts/process";
 import useScreenCapture, {
   type LastCapture,
+  type QualityPreset,
   type RecordFrameRate,
   type ScreenshotFormat,
 } from "hooks/useScreenCapture";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // Screen Capture — a small first-party tool that screenshots (PNG/JPEG → Pictures)
 // or records (WEBM → Desktop) the screen via getDisplayMedia. Captures everything
@@ -23,8 +24,21 @@ const formatElapsed = (totalSeconds: number): string => {
   )}`;
 };
 
+// A short, human-friendly label for a recording mimeType (codec indicator).
+const codecLabel = (mimeType?: string): string => {
+  if (!mimeType) return "Auto";
+  if (mimeType.includes("vp9")) return "VP9";
+  if (mimeType.includes("vp8")) return "VP8";
+  if (mimeType.includes("mp4")) return "MP4";
+  if (mimeType.includes("webm")) return "WebM";
+
+  return "Auto";
+};
+
 const ScreenCapture: FC<ComponentProcessProps> = () => {
   const {
+    bestRecordingMimeType,
+    cameras,
     canRecord,
     canScreenshot,
     canWebcam,
@@ -35,6 +49,7 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
     pauseResumeRecording,
     recordScreen,
     recordSeconds,
+    refreshCameras,
     takeScreenshot,
   } = useScreenCapture();
   const { open } = useProcesses();
@@ -44,9 +59,30 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
   const [copyToClipboard, setCopyToClipboard] = useState(false);
   const [microphone, setMicrophone] = useState(false);
   const [webcam, setWebcam] = useState(false);
+  const [webcamDeviceId, setWebcamDeviceId] = useState("");
   const [frameRate, setFrameRate] = useState<RecordFrameRate>(30);
+  const [quality, setQuality] = useState<QualityPreset>("balanced");
   const [openAfter, setOpenAfter] = useState(true);
   const counting = countdown > 0;
+  const codec = codecLabel(bestRecordingMimeType(quality));
+
+  // Populate the camera list when the webcam overlay is first enabled. Request
+  // permission so device labels are available; falls back gracefully if denied.
+  useEffect(() => {
+    if (webcam && canWebcam && cameras.length === 0) {
+      refreshCameras(true).catch(() => undefined);
+    }
+  }, [cameras.length, canWebcam, refreshCameras, webcam]);
+
+  // Keep the chosen camera valid: default to the first available, and reset if
+  // the selected device disappears (e.g. unplugged).
+  useEffect(() => {
+    if (cameras.length === 0) {
+      if (webcamDeviceId) setWebcamDeviceId("");
+    } else if (!cameras.some((camera) => camera.deviceId === webcamDeviceId)) {
+      setWebcamDeviceId(cameras[0].deviceId);
+    }
+  }, [cameras, webcamDeviceId]);
 
   // Open the freshly saved capture in its viewer (Photos / VideoPlayer). Never
   // let a failed open break the core save flow.
@@ -90,7 +126,13 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
     const wasRecording = isRecording;
 
     try {
-      const capture = await recordScreen({ frameRate, microphone, webcam });
+      const capture = await recordScreen({
+        frameRate,
+        microphone,
+        quality,
+        webcam,
+        webcamDeviceId,
+      });
 
       setStatus(
         wasRecording
@@ -137,6 +179,20 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
           </select>
         </label>
         <label>
+          Quality
+          <select
+            disabled={!canRecord || isRecording || counting}
+            onChange={(event) =>
+              setQuality(event.target.value as QualityPreset)
+            }
+            value={quality}
+          >
+            <option value="performance">Performance (720p)</option>
+            <option value="balanced">Balanced (1080p)</option>
+            <option value="high">High quality (native)</option>
+          </select>
+        </label>
+        <label>
           FPS
           <select
             disabled={!canRecord || isRecording || counting}
@@ -150,6 +206,11 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
             <option value={60}>60</option>
           </select>
         </label>
+        {canRecord && (
+          <span className="codec-badge" title={`Recording codec: ${codec}`}>
+            Codec: {codec}
+          </span>
+        )}
         <label>
           <input
             checked={copyToClipboard}
@@ -177,6 +238,26 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
               type="checkbox"
             />
             Webcam overlay
+          </label>
+        )}
+        {canWebcam && webcam && (
+          <label>
+            Camera
+            <select
+              disabled={!canRecord || isRecording || counting}
+              onChange={(event) => setWebcamDeviceId(event.target.value)}
+              value={webcamDeviceId}
+            >
+              {cameras.length === 0 ? (
+                <option value="">Default camera</option>
+              ) : (
+                cameras.map((camera) => (
+                  <option key={camera.deviceId} value={camera.deviceId}>
+                    {camera.label}
+                  </option>
+                ))
+              )}
+            </select>
           </label>
         )}
         <label>
