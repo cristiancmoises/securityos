@@ -310,13 +310,35 @@ const useMatrix = (): UseMatrix => {
         client.on(sdk.MatrixEventEvent.Decrypted, scheduleRebuild);
 
         setConn("syncing");
-        // lazyLoadMembers keeps the initial /sync small + fast over Tor (members
-        // are fetched on demand) — the big win for connecting an established
-        // account on a slow circuit.
-        await client.startClient({
-          initialSyncLimit: 30,
-          lazyLoadMembers: true,
+        // Keep the initial /sync as SMALL as possible so it finishes fast over Tor
+        // — a big account on a slow circuit could otherwise never complete the
+        // first sync and get stuck on "Connecting over Tor…". The filter lazy-loads
+        // room members, caps the timeline to a handful of recent messages, and
+        // drops presence + ephemeral (typing/receipts) entirely.
+        const syncFilter = new sdk.Filter(client.getUserId() ?? "");
+
+        syncFilter.setDefinition({
+          presence: { types: [] },
+          room: {
+            ephemeral: { types: [] },
+            state: { lazy_load_members: true },
+            timeline: { lazy_load_members: true, limit: 10 },
+          },
         });
+        await client.startClient({
+          disablePresence: true,
+          filter: syncFilter,
+        });
+
+        // If the first sync is still not done after a while, say so (don't leave a
+        // silent spinner) — it keeps trying in the background.
+        window.setTimeout(() => {
+          if (mountedRef.current && !preparedRef.current) {
+            setError(
+              "Still syncing over Tor — a large account can take a minute on a slow circuit. Rooms appear as it finishes."
+            );
+          }
+        }, 45_000);
       } catch (caught) {
         if (!mountedRef.current) return;
         setConn("error");

@@ -1,29 +1,30 @@
+import { PROXY_PATH } from "components/apps/Browser/config";
 import type { ComponentProcessProps } from "components/system/Apps/RenderComponent";
 import { useState } from "react";
 import styled from "styled-components";
-import { IFRAME_CONFIG } from "utils/constants";
+import { SANDBOXED_IFRAME_CONFIG } from "utils/constants";
 
-// Vaptvupt — the SecurityOps "zupt" file/folder share. Loaded DIRECTLY at its real
-// https origin (share.securityops.co), NOT via the Tor HTML-rewriting proxy.
+// Vaptvupt — the SecurityOps "zupt" file/folder share, served from its Tor hidden
+// service and loaded through the same-origin Tor proxy (like the Tor Browser):
+// every byte is fetched server-side over Tor and rendered in an opaque-origin
+// sandbox.
 //
-// TRADEOFF: the old embed routed the Vaptvupt .onion through the privacy proxy in
-// an opaque-origin sandbox. That gave anonymity but BROKE the two things this app
-// exists for: the sandbox had no `allow-downloads` (so file downloads were blocked),
-// and the proxy is GET-only (httpGet in pages/api/proxy.ts never forwards a request
-// body), so multipart file UPLOAD could not work either. To make download + upload
-// fully functional we embed the clearnet share directly with IFRAME_CONFIG — exactly
-// like SecChat (which goes direct because WebRTC needs a real browser context).
-// IFRAME_CONFIG already carries `allow-downloads allow-forms ... allow-same-origin
-// allow-scripts`, so native browser download AND multipart upload work, and the page
-// keeps its own real origin/storage. `https:` is already in the page CSP `frame-src`
-// (scripts/securityHeaders.js), so no header change is needed; downloads need no
-// Permissions-Policy entry.
+// WHY THE PROXY (not a direct embed): share.securityops.co sends
+// `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'`, so a DIRECT iframe is
+// refused by the browser and the app shows blank. The proxy strips those framing
+// headers and serves the page in the sandbox, so it loads reliably.
 //
-// NOTE: like SecChat, share.securityops.co must allow being framed by the SecurityOS
-// origin (CSP `frame-ancestors`, no blocking X-Frame-Options) or the embed goes blank.
-const VAPTVUPT_URL = "https://share.securityops.co/";
-const VAPTVUPT_ALLOW =
-  "clipboard-read; clipboard-write; fullscreen";
+// DOWNLOADS work: SANDBOXED_IFRAME_CONFIG already grants `allow-downloads`.
+// UPLOADS: the HTML-rewriting proxy is GET-only (it can't forward a multipart
+// body), so in-page file UPLOAD is the one thing the proxy path can't do. To get
+// native upload too, allow framing on share.securityops.co — set CSP
+// `frame-ancestors` to the SecurityOS origin (and drop `X-Frame-Options: DENY`),
+// same as chat.securityops.co does for SecChat — then this can switch to a direct
+// embed (which supports native download + upload).
+const VAPTVUPT_URL =
+  "http://secopsuwwht2unomwt3jofl33kfqsfd2z6cwip6rbqlapi7s4pys5vyd.onion/";
+const VAPTVUPT_SRC = `${PROXY_PATH}${encodeURIComponent(VAPTVUPT_URL)}`;
+const VAPTVUPT_ALLOW = "clipboard-read; clipboard-write; fullscreen";
 
 const StyledVaptvupt = styled.div`
   background: #150f1b;
@@ -76,14 +77,14 @@ const Vaptvupt: FC<ComponentProcessProps> = ({ id }) => {
       <iframe
         allow={VAPTVUPT_ALLOW}
         onLoad={() => setLoading(false)}
-        src={VAPTVUPT_URL}
+        src={VAPTVUPT_SRC}
         title={id}
-        {...IFRAME_CONFIG}
+        {...SANDBOXED_IFRAME_CONFIG}
       />
       {loading && (
         <div className="loading">
           <span className="spinner" />
-          Connecting to Vaptvupt…
+          Connecting to Vaptvupt over Tor…
         </div>
       )}
     </StyledVaptvupt>
