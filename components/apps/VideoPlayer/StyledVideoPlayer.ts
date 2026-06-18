@@ -38,7 +38,10 @@ const StyledVideoPlayer = styled.div`
     }
 
     .vjs-button {
-      color: ${({ theme }) => theme.colors.text};
+      /* The button chrome (::after) is a fixed LIGHT box, so the icon glyph must
+         be DARK for contrast — using theme.colors.text made the icons light (and
+         invisible) on the dark theme. Fixed dark icon regardless of theme. */
+      color: rgb(38, 40, 46);
       height: 28px;
       position: relative;
       width: 28px;

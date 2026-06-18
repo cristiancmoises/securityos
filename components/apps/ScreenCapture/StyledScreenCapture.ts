@@ -63,6 +63,19 @@ const StyledScreenCapture = styled.div`
     margin: 0;
   }
 
+  /* Visually dim any option whose control is disabled (e.g. System audio on
+     browsers that can't capture it, or all recording options while busy). */
+  .options label:has(select:disabled),
+  .options label:has(input:disabled) {
+    cursor: default;
+    opacity: 60%;
+  }
+
+  .options select:disabled,
+  .options input:disabled {
+    cursor: default;
+  }
+
   .options .codec-badge {
     align-items: center;
     background: ${({ theme }) => theme.colors.highlightBackground};

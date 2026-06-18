@@ -3,6 +3,8 @@ import type { ComponentProcessProps } from "components/system/Apps/RenderCompone
 import { useProcesses } from "contexts/process";
 import useScreenCapture, {
   type LastCapture,
+  type PipPosition,
+  type PipSize,
   type QualityPreset,
   type RecordFrameRate,
   type ScreenshotFormat,
@@ -41,6 +43,7 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
     cameras,
     canRecord,
     canScreenshot,
+    canSystemAudio,
     canWebcam,
     countdown,
     isPaused,
@@ -58,13 +61,40 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
   const [format, setFormat] = useState<ScreenshotFormat>("png");
   const [copyToClipboard, setCopyToClipboard] = useState(false);
   const [microphone, setMicrophone] = useState(false);
+  const [systemAudio, setSystemAudio] = useState(true);
   const [webcam, setWebcam] = useState(false);
   const [webcamDeviceId, setWebcamDeviceId] = useState("");
+  const [webcamPosition, setWebcamPosition] =
+    useState<PipPosition>("bottom-right");
+  const [webcamSize, setWebcamSize] = useState<PipSize>("medium");
   const [frameRate, setFrameRate] = useState<RecordFrameRate>(30);
   const [quality, setQuality] = useState<QualityPreset>("balanced");
+  // Pre-recording countdown (seconds) before the recorder starts.
+  const [recordDelaySeconds, setRecordDelaySeconds] = useState(0);
+  // Optional auto-stop after this many seconds (0 = off).
+  const [maxDurationSeconds, setMaxDurationSeconds] = useState(0);
   const [openAfter, setOpenAfter] = useState(true);
+  // Which action a visible countdown belongs to, so the right button shows the
+  // right label (and the recording one stays clickable to cancel).
+  const [countdownKind, setCountdownKind] = useState<"screenshot" | "record">(
+    "screenshot"
+  );
   const counting = countdown > 0;
+  const recordCounting = counting && countdownKind === "record";
+  const screenshotCounting = counting && countdownKind === "screenshot";
   const codec = codecLabel(bestRecordingMimeType(quality));
+
+  // Record/Stop button label: cancellable during a pre-recording countdown.
+  let recordButtonLabel = "⏺ Record screen";
+
+  if (isRecording) recordButtonLabel = "⏹ Stop recording";
+  else if (recordCounting) recordButtonLabel = `✕ Cancel (${countdown}s)`;
+
+  // System/tab audio can't be captured on every browser (e.g. Firefox). Keep
+  // the toggle off + disabled there so the user isn't misled.
+  useEffect(() => {
+    if (!canSystemAudio && systemAudio) setSystemAudio(false);
+  }, [canSystemAudio, systemAudio]);
 
   // Populate the camera list when the webcam overlay is first enabled. Request
   // permission so device labels are available; falls back gracefully if denied.
@@ -99,6 +129,7 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
   };
 
   const onScreenshot = async (): Promise<void> => {
+    setCountdownKind("screenshot");
     setStatus(
       delaySeconds > 0
         ? `Capturing in ${delaySeconds}s…`
@@ -124,20 +155,45 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
 
   const onRecord = async (): Promise<void> => {
     const wasRecording = isRecording;
+    const wasCounting = counting;
+
+    if (!wasRecording && !wasCounting && recordDelaySeconds > 0) {
+      setCountdownKind("record");
+      setStatus(`Recording in ${recordDelaySeconds}s…`);
+    }
 
     try {
       const capture = await recordScreen({
+        delaySeconds: wasRecording ? 0 : recordDelaySeconds,
         frameRate,
+        maxDurationSeconds: wasRecording ? 0 : maxDurationSeconds,
         microphone,
         quality,
+        systemAudio,
         webcam,
         webcamDeviceId,
+        webcamPosition,
+        webcamSize,
       });
 
+      // A second click during the pre-recording countdown cancels it: nothing
+      // was recording, nothing came back, and the live recording never started.
+      if (wasCounting && !isRecording) {
+        setStatus("Recording cancelled.");
+
+        return;
+      }
+
+      let startedStatus = "Recording… click Stop (or end sharing) to finish.";
+
+      if (maxDurationSeconds > 0) {
+        startedStatus = `Recording… auto-stops after ${Math.round(
+          maxDurationSeconds / 60
+        )} min (or click Stop).`;
+      }
+
       setStatus(
-        wasRecording
-          ? "🎬 Recording saved to the Desktop."
-          : "Recording… click Stop (or end sharing) to finish."
+        wasRecording ? "🎬 Recording saved to the Desktop." : startedStatus
       );
       if (wasRecording && capture) openCapture(capture);
     } catch {
@@ -206,6 +262,35 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
             <option value={60}>60</option>
           </select>
         </label>
+        <label>
+          Record delay
+          <select
+            disabled={!canRecord || isRecording || counting}
+            onChange={(event) =>
+              setRecordDelaySeconds(Number(event.target.value))
+            }
+            value={recordDelaySeconds}
+          >
+            <option value={0}>Now</option>
+            <option value={3}>3s</option>
+            <option value={5}>5s</option>
+          </select>
+        </label>
+        <label>
+          Stop after
+          <select
+            disabled={!canRecord || isRecording || counting}
+            onChange={(event) =>
+              setMaxDurationSeconds(Number(event.target.value))
+            }
+            value={maxDurationSeconds}
+          >
+            <option value={0}>Off</option>
+            <option value={60}>1 min</option>
+            <option value={300}>5 min</option>
+            <option value={600}>10 min</option>
+          </select>
+        </label>
         {canRecord && (
           <span className="codec-badge" title={`Recording codec: ${codec}`}>
             Codec: {codec}
@@ -228,6 +313,21 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
             type="checkbox"
           />
           Microphone audio
+        </label>
+        <label
+          title={
+            canSystemAudio
+              ? "Capture system / tab audio in the recording"
+              : "System audio capture isn't supported in this browser"
+          }
+        >
+          <input
+            checked={systemAudio}
+            disabled={!canRecord || !canSystemAudio || isRecording || counting}
+            onChange={(event) => setSystemAudio(event.target.checked)}
+            type="checkbox"
+          />
+          System audio
         </label>
         {canWebcam && (
           <label>
@@ -260,6 +360,37 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
             </select>
           </label>
         )}
+        {canWebcam && webcam && (
+          <label>
+            Webcam position
+            <select
+              disabled={!canRecord || isRecording || counting}
+              onChange={(event) =>
+                setWebcamPosition(event.target.value as PipPosition)
+              }
+              value={webcamPosition}
+            >
+              <option value="bottom-right">Bottom-right</option>
+              <option value="bottom-left">Bottom-left</option>
+              <option value="top-right">Top-right</option>
+              <option value="top-left">Top-left</option>
+            </select>
+          </label>
+        )}
+        {canWebcam && webcam && (
+          <label>
+            Webcam size
+            <select
+              disabled={!canRecord || isRecording || counting}
+              onChange={(event) => setWebcamSize(event.target.value as PipSize)}
+              value={webcamSize}
+            >
+              <option value="small">Small</option>
+              <option value="medium">Medium</option>
+              <option value="large">Large</option>
+            </select>
+          </label>
+        )}
         <label>
           <input
             checked={openAfter}
@@ -276,15 +407,19 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
           onClick={onScreenshot}
           type="button"
         >
-          {counting ? `📷 Capturing in ${countdown}s` : "📷 Screenshot"}
+          {screenshotCounting
+            ? `📷 Capturing in ${countdown}s`
+            : "📷 Screenshot"}
         </button>
         <button
           className={isRecording ? `recording${isPaused ? " paused" : ""}` : ""}
-          disabled={!canRecord || counting}
+          // Disabled only during a screenshot countdown; a recording countdown
+          // keeps this clickable so the user can cancel it.
+          disabled={!canRecord || screenshotCounting}
           onClick={onRecord}
           type="button"
         >
-          {isRecording ? "⏹ Stop recording" : "⏺ Record screen"}
+          {recordButtonLabel}
         </button>
         {isRecording && (
           <button className="pause" onClick={pauseResumeRecording} type="button">

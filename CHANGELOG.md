@@ -4,6 +4,34 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.9.0] — 2026-06-18
+
+### Cloudmacs — Spacemacs + productivity tools
+- Cloudmacs now boots **Spacemacs** with productivity layers (org, git/**magit**,
+  helm, treemacs, auto-completion, markdown, shell, syntax-checking,
+  version-control, multiple-cursors) plus **EWW**, **Org-mode**, **Telega**
+  (Telegram; package installed — a live connection also needs `telega-server`
+  from TDLib), and **whatsappel** (the user's WhatsApp-in-Emacs package, mounted
+  from `~/whatsappel` and put on the load-path; live use needs the wuzapi backend).
+- Config persists on the host: Spacemacs in `~/.cloudmacs.d`, dotfile in
+  `~/.spacemacs.d/init.el`. Packages install from MELPA on first open.
+
+### Fixes
+- **Video/VLC player bar icons** — the control-bar icons sat on a fixed light
+  button and used the theme text color (light on light → invisible). Now a fixed
+  dark icon, visible in every theme.
+- **Matrix stuck on "Connecting over Tor…"** — the initial /sync now uses a tight
+  filter (lazy-loaded members, capped timeline, no presence/ephemeral) so it
+  finishes fast on a slow circuit, plus a watchdog note if it's still syncing.
+- **Vaptvupt not loading** — reverted to the Tor-proxy embed (share.securityops.co
+  sends `X-Frame-Options: DENY` / `frame-ancestors 'none'`, so a direct embed is
+  refused). Loads reliably; downloads work (sandbox allows them). Native upload
+  needs share.securityops.co to permit framing (then it can go direct).
+
+### Screen recording
+- Recording countdown, system-audio toggle, webcam PiP position + size, and an
+  optional max-duration auto-stop.
+
 ## [2.8.0] — 2026-06-18
 
 ### Cloudmacs — full Emacs in the browser (replaces Emacs + VSCodium)

@@ -85,9 +85,27 @@ const pickRecordingMimeType = (preferVp8: boolean): string | undefined => {
 };
 
 // Inset (px) of the webcam picture-in-picture from the screen edges and the
-// fraction of the screen width it occupies.
+// default fraction of the screen width it occupies.
 const PIP_MARGIN = 24;
 const PIP_WIDTH_RATIO = 0.22;
+
+// Webcam picture-in-picture placement + size. The corner the overlay is pinned
+// to, and the fraction of the screen width it occupies for each size step.
+export type PipPosition =
+  | "bottom-right"
+  | "bottom-left"
+  | "top-right"
+  | "top-left";
+export type PipSize = "small" | "medium" | "large";
+
+const PIP_SIZE_RATIOS: Record<PipSize, number> = {
+  small: 0.15,
+  medium: 0.22,
+  large: 0.3,
+};
+
+const DEFAULT_PIP_POSITION: PipPosition = "bottom-right";
+const DEFAULT_PIP_SIZE: PipSize = "medium";
 const TIME_DATE_FORMAT: Intl.DateTimeFormatOptions = {
   day: "2-digit",
   hour: "2-digit",
@@ -107,9 +125,22 @@ const timeStamp = (): string =>
     .replace(/[/:]/g, "-")
     .replace(",", "");
 
+// Whether this browser can plausibly capture system/tab audio via
+// getDisplayMedia. Firefox historically ignores the audio/systemAudio
+// constraints for display capture; Safari doesn't support recording at all.
+export const canCaptureSystemAudio = (): boolean =>
+  typeof navigator !== "undefined" &&
+  typeof navigator.mediaDevices?.getDisplayMedia === "function" &&
+  !isFirefox() &&
+  !isSafari();
+
 const displayOptions = (
   frameRate: number,
-  preset?: QualityPresetConfig
+  preset?: QualityPresetConfig,
+  // When defined, explicitly request (true) or suppress (false) system/tab
+  // audio capture. Undefined preserves the historical default (request it on
+  // browsers that support it). Screenshots never need audio.
+  systemAudio?: boolean
 ): DisplayMediaStreamOptions => {
   // `ideal` width/height let the browser downscale toward the preset target
   // without hard-failing if the display is smaller (or no constraint exists).
@@ -118,14 +149,20 @@ const displayOptions = (
   if (preset?.maxWidth) video.width = { ideal: preset.maxWidth };
   if (preset?.maxHeight) video.height = { ideal: preset.maxHeight };
 
+  // Resolve whether to ask for system audio. Default ON for supported browsers
+  // (preserves prior behavior); honor an explicit false to opt out.
+  const wantSystemAudio =
+    systemAudio === undefined ? canCaptureSystemAudio() : systemAudio;
+
   return {
     video,
+    ...(wantSystemAudio && { audio: true }),
     ...(!isFirefox() &&
       !isSafari() && {
         preferCurrentTab: false,
         selfBrowserSurface: "include",
         surfaceSwitching: "include",
-        systemAudio: "include",
+        systemAudio: wantSystemAudio ? "include" : "exclude",
       }),
   } as DisplayMediaStreamOptions;
 };
@@ -137,16 +174,30 @@ export type ScreenshotOptions = {
 };
 
 export type RecordOptions = {
+  // Optional 3-2-1 style countdown (seconds) before the MediaRecorder starts.
+  // 0/undefined starts immediately.
+  delaySeconds?: number;
   frameRate?: RecordFrameRate;
+  // Optionally auto-stop the recording after this many seconds. 0/undefined =
+  // no automatic stop (record until manually stopped).
+  maxDurationSeconds?: number;
   microphone?: boolean;
   // Override the auto-selected best codec mimeType (auto-best is the default).
   mimeType?: string;
   // Recording quality / performance preset (defaults to "balanced").
   quality?: QualityPreset;
+  // Explicitly capture system/tab audio. Defaults to ON for browsers that
+  // support it (preserving prior behavior); set false to opt out. Independent
+  // of `microphone`.
+  systemAudio?: boolean;
   webcam?: boolean;
   // deviceId of the camera to use for the webcam PiP overlay. Omitted/empty →
   // the system default camera.
   webcamDeviceId?: string;
+  // Corner the webcam PiP overlay is pinned to (defaults to bottom-right).
+  webcamPosition?: PipPosition;
+  // Size of the webcam PiP overlay as a width fraction (defaults to medium).
+  webcamSize?: PipSize;
 };
 
 // A selectable camera, as surfaced to the UI. `label` may be empty until the
@@ -172,6 +223,8 @@ type UseScreenCapture = {
   // "video/webm;codecs=vp9" — for a small codec indicator in the UI. undefined
   // when nothing can be probed (platform default would be used).
   bestRecordingMimeType: (quality?: QualityPreset) => string | undefined;
+  // Whether system/tab audio capture is plausibly supported (for a UI toggle).
+  canSystemAudio: boolean;
   canRecord: boolean;
   canScreenshot: boolean;
   canWebcam: boolean;
@@ -215,6 +268,11 @@ const useScreenCapture = (): UseScreenCapture => {
   const auxStreamsRef = useRef<MediaStream[]>([]);
   const pipRafRef = useRef<number>();
   const lastThumbnailRef = useRef<string>();
+  // Auto-stop timer (max recording duration). Cleared on manual stop/unmount.
+  const maxDurationTimerRef = useRef<number>();
+  // True while a pre-recording countdown is running so a second click can
+  // cancel it instead of being ignored.
+  const recordCountdownRef = useRef(false);
 
   const setCapture = useCallback((capture: LastCapture) => {
     if (lastThumbnailRef.current) URL.revokeObjectURL(lastThumbnailRef.current);
@@ -225,6 +283,10 @@ const useScreenCapture = (): UseScreenCapture => {
   // Tear down every track and the picture-in-picture compositing loop. Safe to
   // call multiple times — failures of any optional resource never throw.
   const stopAllStreams = useCallback(() => {
+    if (maxDurationTimerRef.current !== undefined) {
+      window.clearTimeout(maxDurationTimerRef.current);
+      maxDurationTimerRef.current = undefined;
+    }
     if (pipRafRef.current !== undefined) {
       cancelAnimationFrame(pipRafRef.current);
       pipRafRef.current = undefined;
@@ -237,11 +299,16 @@ const useScreenCapture = (): UseScreenCapture => {
     auxStreamsRef.current = [];
   }, []);
 
-  // Revoke any outstanding thumbnail object URL on unmount.
+  // Revoke any outstanding thumbnail object URL and clear the auto-stop timer
+  // on unmount.
   useEffect(
     () => () => {
       if (lastThumbnailRef.current) {
         URL.revokeObjectURL(lastThumbnailRef.current);
+      }
+      if (maxDurationTimerRef.current !== undefined) {
+        window.clearTimeout(maxDurationTimerRef.current);
+        maxDurationTimerRef.current = undefined;
       }
     },
     []
@@ -257,6 +324,7 @@ const useScreenCapture = (): UseScreenCapture => {
     !isSafari();
   const canWebcam =
     canRecord && typeof navigator?.mediaDevices?.getUserMedia === "function";
+  const canSystemAudio = canRecord && canCaptureSystemAudio();
 
   // The codec that would be chosen for a given preset (for a UI indicator).
   const bestRecordingMimeType = useCallback(
@@ -318,6 +386,15 @@ const useScreenCapture = (): UseScreenCapture => {
 
   const recordScreen = useCallback(
     async (options?: RecordOptions) => {
+      // A click during the pre-recording countdown cancels it (nothing has
+      // started yet). The countdown loop below sees this flag and bails out.
+      if (recordCountdownRef.current) {
+        recordCountdownRef.current = false;
+        setCountdown(0);
+
+        return undefined;
+      }
+
       // Second invocation stops an in-progress recording (flushes the file).
       // Resolve with the finalized capture once the recorder flushes its data.
       if (streamRef.current) {
@@ -341,8 +418,37 @@ const useScreenCapture = (): UseScreenCapture => {
       const frameRate: RecordFrameRate = options?.frameRate ?? CAPTURE_FPS;
       const presetKey: QualityPreset = options?.quality ?? DEFAULT_QUALITY;
       const preset = QUALITY_PRESETS[presetKey];
+
+      // Optional 3-2-1 countdown before recording starts. Show the picker only
+      // after it elapses so the user can frame the recording. Cancellable via a
+      // second click (recordCountdownRef cleared by the cancel branch above).
+      const recordDelay = Math.max(
+        0,
+        Math.trunc(options?.delaySeconds ?? 0)
+      );
+
+      if (recordDelay > 0) {
+        recordCountdownRef.current = true;
+        try {
+          for (let remaining = recordDelay; remaining > 0; remaining -= 1) {
+            if (!recordCountdownRef.current) break;
+            setCountdown(remaining);
+            // eslint-disable-next-line no-await-in-loop
+            await new Promise((resolve) => {
+              window.setTimeout(resolve, 1000);
+            });
+          }
+        } finally {
+          setCountdown(0);
+        }
+
+        // Cancelled during the countdown — abort before opening the picker.
+        if (!recordCountdownRef.current) return undefined;
+        recordCountdownRef.current = false;
+      }
+
       const stream = await navigator.mediaDevices.getDisplayMedia(
-        displayOptions(frameRate, preset)
+        displayOptions(frameRate, preset, options?.systemAudio)
       );
 
       // Optionally mix in the microphone. Never fail the recording if the mic is
@@ -402,15 +508,27 @@ const useScreenCapture = (): UseScreenCapture => {
           const context = canvas.getContext("2d");
 
           if (context) {
+            // Resolve the chosen PiP corner + size (fall back to defaults).
+            const pipPosition = options.webcamPosition ?? DEFAULT_PIP_POSITION;
+            const pipRatio =
+              PIP_SIZE_RATIOS[options.webcamSize ?? DEFAULT_PIP_SIZE] ??
+              PIP_WIDTH_RATIO;
+            const isLeft = pipPosition.endsWith("-left");
+            const isTop = pipPosition.startsWith("top-");
+
             const drawFrame = (): void => {
               context.drawImage(screenVideo, 0, 0, width, height);
 
-              const pipWidth = Math.round(width * PIP_WIDTH_RATIO);
+              const pipWidth = Math.round(width * pipRatio);
               const camWidth = webcamVideo.videoWidth || 1;
               const camHeight = webcamVideo.videoHeight || 1;
               const pipHeight = Math.round(pipWidth * (camHeight / camWidth));
-              const pipX = width - pipWidth - PIP_MARGIN;
-              const pipY = height - pipHeight - PIP_MARGIN;
+              const pipX = isLeft
+                ? PIP_MARGIN
+                : width - pipWidth - PIP_MARGIN;
+              const pipY = isTop
+                ? PIP_MARGIN
+                : height - pipHeight - PIP_MARGIN;
 
               context.drawImage(
                 webcamVideo,
@@ -518,6 +636,28 @@ const useScreenCapture = (): UseScreenCapture => {
 
       recorder.start();
 
+      // Optional max-duration auto-stop. When the timer fires, stop the
+      // recorder (its inactive `dataavailable` handler flushes + finalizes the
+      // file) and tear down the streams. Cleared on manual stop / unmount via
+      // stopAllStreams(). Fail-soft: a bad timer can never break recording.
+      const maxDuration = Math.max(
+        0,
+        Math.trunc(options?.maxDurationSeconds ?? 0)
+      );
+
+      if (maxDuration > 0) {
+        maxDurationTimerRef.current = window.setTimeout(() => {
+          maxDurationTimerRef.current = undefined;
+          try {
+            if (recorder.state !== "inactive") recorder.stop();
+          } catch {
+            // Recorder already gone — nothing to stop.
+          }
+          recorderRef.current = undefined;
+          stopAllStreams();
+        }, maxDuration * 1000);
+      }
+
       // Started (not stopped): the caller gets no capture yet.
       return undefined;
     },
@@ -587,7 +727,8 @@ const useScreenCapture = (): UseScreenCapture => {
       const mimeType = isJpeg ? MIME_IMAGE_JPEG : MIME_IMAGE_PNG;
       const extension = isJpeg ? "jpg" : "png";
       const stream = await navigator.mediaDevices.getDisplayMedia(
-        displayOptions(1)
+        // Screenshots never need audio — opt out so no audio is captured.
+        displayOptions(1, undefined, false)
       );
 
       try {
@@ -672,6 +813,7 @@ const useScreenCapture = (): UseScreenCapture => {
     cameras,
     canRecord,
     canScreenshot,
+    canSystemAudio,
     canWebcam,
     countdown,
     isPaused,

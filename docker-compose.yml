@@ -89,10 +89,15 @@ services:
       UHOME: /home/emacs
       TERM: xterm-256color
     volumes:
+      # .emacs.d = the Spacemacs checkout; .spacemacs.d/init.el = the dotfile that
+      # enables the layers + telega/whatsappel/org/eww; whatsappel = the user's
+      # whatsapp-in-emacs package (loaded onto load-path, read-only).
       - ${HOME}/.cloudmacs.d:/home/emacs/.emacs.d
+      - ${HOME}/.spacemacs.d:/home/emacs/.spacemacs.d
+      - ${HOME}/whatsappel:/home/emacs/whatsappel:ro
       - ${HOME}/cloudmacs-data:/home/emacs/data
-    mem_limit: 1g
-    pids_limit: 512
+    mem_limit: 2g
+    pids_limit: 1024
     ports:
       - "127.0.0.1:8090:8080"
     networks: [securenet]
