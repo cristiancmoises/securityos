@@ -3,6 +3,9 @@ const sizes = {
     fontSize: "12px",
     width: "92px",
   },
+  volume: {
+    width: "36px",
+  },
   contextMenu: {
     subMenuOffset: 3,
   },

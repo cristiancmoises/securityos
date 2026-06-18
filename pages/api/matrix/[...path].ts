@@ -42,8 +42,10 @@ const HOMESERVER = "https://matrix.securityops.co";
 // /sync long-polls up to ~30s; give it a comfortable 60s ceiling so a healthy
 // long-poll is never killed mid-flight.
 const REQUEST_TIMEOUT_MS = 60_000;
-const MAX_RESPONSE_BYTES = 25 * 1024 * 1024;
-const MAX_BODY_BYTES = 4 * 1024 * 1024;
+// Sized for chat media: the E2EE client uploads (POST _matrix/media/v3/upload)
+// and downloads (GET _matrix/client/v1/media/download) attachments through here.
+const MAX_RESPONSE_BYTES = 50 * 1024 * 1024;
+const MAX_BODY_BYTES = 50 * 1024 * 1024;
 
 const TOR_PROXY = process.env.TOR_PROXY || "";
 // Never let a malformed TOR_PROXY value take down the route at module load. A

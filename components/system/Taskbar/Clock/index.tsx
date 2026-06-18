@@ -11,6 +11,7 @@ import {
   TASKBAR_HEIGHT,
 } from "utils/constants";
 import { createOffscreenCanvas } from "utils/functions";
+import { useTheme } from "styled-components";
 
 type ClockWorkerResponse = LocaleTimeDate | "source";
 
@@ -67,6 +68,11 @@ const Clock: FC = () => {
   );
   const { date, time } = now;
   const { clockSource } = useSession();
+  // Windows 11 stacks the time over the date in the bottom-right of the taskbar.
+  // Under Undercover we render the clock as DOM text (so we can stack two lines)
+  // instead of the single-line OffscreenCanvas readout used by the default theme.
+  const { name: themeDisplayName } = useTheme();
+  const undercover = themeDisplayName === "Undercover";
   const clockWorkerInit = useCallback(
     () =>
       new Worker(
@@ -83,6 +89,8 @@ const Clock: FC = () => {
     () => typeof window !== "undefined" && "OffscreenCanvas" in window,
     []
   );
+  // Undercover renders a stacked DOM clock, so it must opt out of the canvas path.
+  const useCanvasClock = supportsOffscreenCanvas && !undercover;
   const updateTime = useCallback(
     ({ data, target: clockWorker }: MessageEvent<ClockWorkerResponse>) => {
       if (data === "source") {
@@ -102,14 +110,21 @@ const Clock: FC = () => {
     clockWorkerInit,
     updateTime
   );
+  const clockContainerRef = useRef<HTMLDivElement | null>(null);
   const clockCallbackRef = useCallback(
     (clockContainer: HTMLDivElement | null) => {
+      clockContainerRef.current = clockContainer;
+
       if (
+        !undercover &&
+        supportsOffscreenCanvas &&
         !offScreenClockCanvas.current &&
         currentWorker.current &&
         clockContainer instanceof HTMLDivElement
       ) {
-        [...clockContainer.children].forEach((element) => element.remove());
+        [...clockContainer.children]
+          .filter((element) => element instanceof HTMLCanvasElement)
+          .forEach((element) => element.remove());
 
         offScreenClockCanvas.current = createOffscreenCanvas(
           clockContainer,
@@ -128,12 +143,24 @@ const Clock: FC = () => {
     },
     // NOTE: Need `now` in the dependency array to ensure the clock is updated
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [currentWorker, now]
+    [currentWorker, now, supportsOffscreenCanvas, undercover]
   );
 
+  // When entering Undercover, drop the imperatively-appended <canvas> so it doesn't
+  // sit beside the React-rendered stacked DOM clock (and clean up on theme switch).
   useEffect(() => {
+    if (undercover && clockContainerRef.current) {
+      [...clockContainerRef.current.children]
+        .filter((element) => element instanceof HTMLCanvasElement)
+        .forEach((element) => element.remove());
+    }
+  }, [undercover]);
+
+  useEffect(() => {
+    // Reset the offscreen canvas when the source changes OR when Undercover toggles
+    // (so switching back to the default theme re-initialises the canvas clock).
     offScreenClockCanvas.current = undefined;
-  }, [clockSource]);
+  }, [clockSource, undercover]);
 
   useEffect(() => {
     if (supportsOffscreenCanvas) {
@@ -161,15 +188,23 @@ const Clock: FC = () => {
 
   return (
     <StyledClock
-      ref={supportsOffscreenCanvas ? clockCallbackRef : undefined}
+      ref={clockCallbackRef}
       aria-label="Clock"
+      className={undercover ? "undercover" : undefined}
       onClick={easterEggOnClick}
       role="timer"
       title={date}
       suppressHydrationWarning
       {...clockContextMenu}
     >
-      {supportsOffscreenCanvas ? undefined : time}
+      {undercover ? (
+        <>
+          <span className="time">{time}</span>
+          <span className="date">{date?.split("\n")[0]}</span>
+        </>
+      ) : useCanvasClock ? undefined : (
+        time
+      )}
     </StyledClock>
   );
 };

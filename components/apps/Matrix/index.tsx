@@ -1,46 +1,99 @@
+import { HOMESERVER_LABEL } from "components/apps/Matrix/matrixClient";
 import StyledMatrix from "components/apps/Matrix/StyledMatrix";
-import useMatrix, { type ConnState } from "components/apps/Matrix/useMatrix";
+import useMatrix, {
+  type ConnState,
+  type MatrixMessage,
+} from "components/apps/Matrix/useMatrix";
 import type { ComponentProcessProps } from "components/system/Apps/RenderComponent";
 import { useEffect, useRef, useState } from "react";
 
-// Matrix — first-party, FUNCTIONAL Matrix chat client for the SecurityOS desktop.
-// Every network call goes to the SAME-ORIGIN /api/matrix endpoint, which forwards
-// to the one fixed homeserver (matrix.securityops.co) over Tor. The access token
-// lives in memory only (amnesic): closing the window forgets it, so each session
-// re-authenticates — the privacy-correct default.
+// Matrix — first-party, FULLY FUNCTIONAL Matrix client for the SecurityOS desktop
+// (matrix-js-sdk + Rust crypto/E2EE). Every network call goes to the SAME-ORIGIN
+// /api/matrix endpoint, forwarded to matrix.securityops.co over Tor. Decrypts
+// encrypted rooms, searches people, browses + joins federated rooms, handles
+// invites, and renders images. The session is in-memory/amnesic.
 
 const CONN_LABEL: Record<ConnState, string> = {
   connecting: "Connecting over Tor…",
   error: "Connection error",
   offline: "Not connected",
   online: "Connected over Tor",
+  syncing: "Syncing over Tor…",
+};
+
+type Tab = "chats" | "discover" | "people";
+
+// Lazily fetch + decrypt an image attachment, then render it from a blob URL.
+const MediaImage: FC<{
+  message: MatrixMessage;
+  resolve: (message: MatrixMessage) => Promise<string>;
+}> = ({ message, resolve }) => {
+  const [url, setUrl] = useState("");
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    resolve(message)
+      .then((resolved) => active && setUrl(resolved))
+      .catch(() => active && setFailed(true));
+
+    return () => {
+      active = false;
+    };
+  }, [message, resolve]);
+
+  if (failed) return <div className="media-fail">🖼️ {message.fileName}</div>;
+  if (!url) return <div className="media-loading">Loading image…</div>;
+
+  return (
+    <a href={url} rel="noreferrer" target="_blank">
+      <img alt={message.fileName || "image"} className="media-img" src={url} />
+    </a>
+  );
 };
 
 const Matrix: FC<ComponentProcessProps> = () => {
   const {
+    acceptInvite,
     activeRoom,
+    busy,
     conn,
     error,
-    login,
+    invites,
+    joinRoom,
+    listPublicRooms,
     loggingIn,
+    login,
     logout,
+    publicRooms,
+    rejectInvite,
+    resolveMedia,
     rooms,
+    searchUsers,
     selectRoom,
     selectedRoomId,
     sendMessage,
     session,
+    startDm,
+    uploadImage,
+    userResults,
   } = useMatrix();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [draft, setDraft] = useState("");
+  const [tab, setTab] = useState<Tab>("chats");
+  const [peopleTerm, setPeopleTerm] = useState("");
+  const [roomTerm, setRoomTerm] = useState("");
+  const [joinTarget, setJoinTarget] = useState("");
   const messagesRef = useRef<HTMLDivElement | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
-  // Keep the message list pinned to the newest message.
   useEffect(() => {
     const element = messagesRef.current;
 
     if (element) element.scrollTop = element.scrollHeight;
-  }, [activeRoom?.messages]);
+  }, [activeRoom?.messages, selectedRoomId]);
 
   const dotClass =
     conn === "error" ? "dot error" : conn === "online" ? "dot" : "dot busy";
@@ -51,12 +104,18 @@ const Matrix: FC<ComponentProcessProps> = () => {
     setDraft("");
   };
 
+  const onSelect = (roomId: string): void => {
+    selectRoom(roomId);
+    setTab("chats");
+  };
+
   return (
     <StyledMatrix>
       <div className="tor-bar">
         <span className="status">
           <span className={dotClass} />
           {CONN_LABEL[conn]}
+          {busy && <span className="spinner"> · working…</span>}
         </span>
         {session && (
           <button className="ghost-btn" onClick={logout} type="button">
@@ -71,26 +130,190 @@ const Matrix: FC<ComponentProcessProps> = () => {
             <div className="me" title={session.userId}>
               {session.userId}
             </div>
-            {rooms.length === 0 ? (
-              <div className="empty">
-                {conn === "online" ? "No joined rooms." : "Loading rooms…"}
+
+            <div className="tabs">
+              <button
+                className={tab === "chats" ? "tab active" : "tab"}
+                onClick={() => setTab("chats")}
+                type="button"
+              >
+                Chats
+              </button>
+              <button
+                className={tab === "people" ? "tab active" : "tab"}
+                onClick={() => setTab("people")}
+                type="button"
+              >
+                People
+              </button>
+              <button
+                className={tab === "discover" ? "tab active" : "tab"}
+                onClick={() => {
+                  setTab("discover");
+                  if (publicRooms.length === 0) void listPublicRooms();
+                }}
+                type="button"
+              >
+                Discover
+              </button>
+            </div>
+
+            {tab === "chats" && (
+              <div className="list">
+                {invites.length > 0 && (
+                  <div className="invites">
+                    <div className="section-label">Invites</div>
+                    {invites.map((invite) => (
+                      <div key={invite.id} className="invite">
+                        <div className="invite-name" title={invite.inviter}>
+                          {invite.name}
+                        </div>
+                        <div className="invite-actions">
+                          <button
+                            className="mini-btn accept"
+                            onClick={() => void acceptInvite(invite.id)}
+                            type="button"
+                          >
+                            Accept
+                          </button>
+                          <button
+                            className="mini-btn"
+                            onClick={() => void rejectInvite(invite.id)}
+                            type="button"
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {rooms.length === 0 ? (
+                  <div className="empty">
+                    {conn === "online" ? "No joined rooms yet." : "Loading…"}
+                  </div>
+                ) : (
+                  rooms.map((room) => (
+                    <button
+                      key={room.id}
+                      className={
+                        room.id === selectedRoomId
+                          ? "room-item active"
+                          : "room-item"
+                      }
+                      onClick={() => onSelect(room.id)}
+                      title={room.name}
+                      type="button"
+                    >
+                      <span className="room-name">
+                        {room.encrypted ? "🔒 " : ""}
+                        {room.name}
+                      </span>
+                      {room.unread > 0 && (
+                        <span className="badge">{room.unread}</span>
+                      )}
+                    </button>
+                  ))
+                )}
               </div>
-            ) : (
-              rooms.map((room) => (
-                <button
-                  key={room.id}
-                  className={
-                    room.id === selectedRoomId
-                      ? "room-item active"
-                      : "room-item"
-                  }
-                  onClick={() => selectRoom(room.id)}
-                  title={room.name}
-                  type="button"
+            )}
+
+            {tab === "people" && (
+              <div className="list">
+                <form
+                  className="finder"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void searchUsers(peopleTerm);
+                  }}
                 >
-                  {room.name}
-                </button>
-              ))
+                  <input
+                    onChange={(event) => setPeopleTerm(event.target.value)}
+                    placeholder="Search people…"
+                    value={peopleTerm}
+                  />
+                  <button className="mini-btn" type="submit">
+                    Find
+                  </button>
+                </form>
+                {userResults.length === 0 ? (
+                  <div className="empty">
+                    Search the directory to start a chat.
+                  </div>
+                ) : (
+                  userResults.map((user) => (
+                    <div key={user.userId} className="result">
+                      <div className="result-main" title={user.userId}>
+                        <div className="result-name">{user.displayName}</div>
+                        <div className="result-sub">{user.userId}</div>
+                      </div>
+                      <button
+                        className="mini-btn accept"
+                        onClick={() => void startDm(user.userId)}
+                        type="button"
+                      >
+                        Message
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {tab === "discover" && (
+              <div className="list">
+                <form
+                  className="finder"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void listPublicRooms(roomTerm);
+                  }}
+                >
+                  <input
+                    onChange={(event) => setRoomTerm(event.target.value)}
+                    placeholder="Search rooms…"
+                    value={roomTerm}
+                  />
+                  <button className="mini-btn" type="submit">
+                    Search
+                  </button>
+                </form>
+                <form
+                  className="finder"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void joinRoom(joinTarget);
+                    setJoinTarget("");
+                  }}
+                >
+                  <input
+                    onChange={(event) => setJoinTarget(event.target.value)}
+                    placeholder="Join #room:server or !id…"
+                    value={joinTarget}
+                  />
+                  <button className="mini-btn accept" type="submit">
+                    Join
+                  </button>
+                </form>
+                {publicRooms.map((room) => (
+                  <div key={room.id} className="result">
+                    <div className="result-main" title={room.topic}>
+                      <div className="result-name">{room.name}</div>
+                      <div className="result-sub">
+                        {room.memberCount} members
+                        {room.alias ? ` · ${room.alias}` : ""}
+                      </div>
+                    </div>
+                    <button
+                      className="mini-btn accept"
+                      onClick={() => void joinRoom(room.alias || room.id)}
+                      type="button"
+                    >
+                      Join
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
@@ -98,7 +321,14 @@ const Matrix: FC<ComponentProcessProps> = () => {
             {activeRoom ? (
               <>
                 <div className="chat-header" title={activeRoom.name}>
-                  {activeRoom.name}
+                  <span className="chat-title">
+                    {activeRoom.encrypted ? "🔒 " : ""}
+                    {activeRoom.name}
+                  </span>
+                  <span className="chat-sub">
+                    {activeRoom.memberCount} members
+                    {activeRoom.encrypted ? " · end-to-end encrypted" : ""}
+                  </span>
                 </div>
                 <div ref={messagesRef} className="messages">
                   {activeRoom.messages.length === 0 ? (
@@ -109,16 +339,57 @@ const Matrix: FC<ComponentProcessProps> = () => {
                         key={message.eventId}
                         className={`msg${message.mine ? " mine" : ""}${
                           message.pending ? " pending" : ""
-                        }`}
+                        }${message.kind === "encrypted" ? " locked" : ""}`}
                       >
-                        <div className="sender">{message.sender}</div>
-                        <div className="body">{message.body}</div>
+                        {!message.mine && (
+                          <div className="sender">{message.senderName}</div>
+                        )}
+                        {message.kind === "image" ? (
+                          <MediaImage
+                            message={message}
+                            resolve={resolveMedia}
+                          />
+                        ) : message.kind === "file" ? (
+                          <button
+                            className="file-link"
+                            onClick={() =>
+                              void resolveMedia(message).then((url) => {
+                                if (url) window.open(url, "_blank");
+                              })
+                            }
+                            type="button"
+                          >
+                            📎 {message.fileName || "Download file"}
+                          </button>
+                        ) : (
+                          <div className="body">{message.body}</div>
+                        )}
                       </div>
                     ))
                   )}
                 </div>
                 {error && <div className="error">{error}</div>}
                 <div className="composer">
+                  <input
+                    ref={fileRef}
+                    accept="image/*"
+                    hidden
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+
+                      if (file) void uploadImage(file);
+                      event.target.value = "";
+                    }}
+                    type="file"
+                  />
+                  <button
+                    className="attach-btn"
+                    onClick={() => fileRef.current?.click()}
+                    title="Send an image"
+                    type="button"
+                  >
+                    📎
+                  </button>
                   <input
                     onChange={(event) => setDraft(event.target.value)}
                     onKeyDown={(event) => {
@@ -141,7 +412,7 @@ const Matrix: FC<ComponentProcessProps> = () => {
                 </div>
               </>
             ) : (
-              <div className="empty">Select a room to start chatting.</div>
+              <div className="empty">Select a chat, or find people to message.</div>
             )}
           </div>
         </div>
@@ -155,7 +426,7 @@ const Matrix: FC<ComponentProcessProps> = () => {
             }}
           >
             <h1>Matrix</h1>
-            <p className="sub">matrix.securityops.co · routed over Tor</p>
+            <p className="sub">{HOMESERVER_LABEL} · end-to-end encrypted · over Tor</p>
             <label>
               Username
               <input
@@ -179,6 +450,10 @@ const Matrix: FC<ComponentProcessProps> = () => {
             <button className="primary-btn" disabled={loggingIn} type="submit">
               {loggingIn ? "Signing in…" : "Sign in"}
             </button>
+            <p className="hint">
+              Encryption keys live in memory only — closing this window forgets
+              them.
+            </p>
           </form>
         </div>
       )}

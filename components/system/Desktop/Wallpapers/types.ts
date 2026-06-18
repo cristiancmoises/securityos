@@ -1,3 +1,5 @@
+import type MatrixConfig from "components/system/Desktop/Wallpapers/Matrix/config";
+import type { VantaWavesConfig } from "components/system/Desktop/Wallpapers/vantaWaves/types";
 import type { Size } from "components/system/Window/RndWindow/useResizable";
 
 export type WallpaperConfig = Partial<typeof MatrixConfig> | VantaWavesConfig;

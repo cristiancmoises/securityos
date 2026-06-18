@@ -16,7 +16,9 @@ import {
   DEFAULT_ASCENDING,
   DEFAULT_CLOCK_SOURCE,
   DEFAULT_EMULATOR_RELAY_URL,
+  DEFAULT_MUTED,
   DEFAULT_THEME,
+  DEFAULT_VOLUME,
   DEFAULT_WALLPAPER,
   DEFAULT_WALLPAPER_FIT,
   SESSION_FILE,
@@ -46,6 +48,8 @@ const useSessionContextState = (): SessionContextState => {
   );
   const [wallpaperFit, setWallpaperFit] = useState(DEFAULT_WALLPAPER_FIT);
   const [wallpaperImage, setWallpaperImage] = useState(DEFAULT_WALLPAPER);
+  const [volume, setVolume] = useState(DEFAULT_VOLUME);
+  const [muted, setMuted] = useState(DEFAULT_MUTED);
   const [runHistory, setRunHistory] = useState<string[]>([]);
   const prependToStack = useCallback(
     (id: string) =>
@@ -107,9 +111,11 @@ const useSessionContextState = (): SessionContextState => {
             clockSource,
             emulatorRelayUrl,
             iconPositions,
+            muted,
             runHistory,
             sortOrders,
             themeName,
+            volume,
             wallpaperFit,
             wallpaperImage,
             windowStates,
@@ -133,10 +139,12 @@ const useSessionContextState = (): SessionContextState => {
     emulatorRelayUrl,
     haltSession,
     iconPositions,
+    muted,
     runHistory,
     sessionLoaded,
     sortOrders,
     themeName,
+    volume,
     wallpaperFit,
     wallpaperImage,
     windowStates,
@@ -164,6 +172,8 @@ const useSessionContextState = (): SessionContextState => {
 
           if (session.aiApi) setAiApi(session.aiApi);
           if (session.clockSource) setClockSource(session.clockSource);
+          if (typeof session.volume === "number") setVolume(session.volume);
+          if (typeof session.muted === "boolean") setMuted(session.muted);
           if (typeof session.emulatorRelayUrl === "string") {
             setEmulatorRelayUrl(session.emulatorRelayUrl);
           }
@@ -211,6 +221,7 @@ const useSessionContextState = (): SessionContextState => {
     emulatorRelayUrl,
     foregroundId,
     iconPositions,
+    muted,
     prependToStack,
     removeFromStack,
     runHistory,
@@ -220,14 +231,17 @@ const useSessionContextState = (): SessionContextState => {
     setForegroundId,
     setHaltSession,
     setIconPositions,
+    setMuted,
     setRunHistory,
     setSortOrder,
     setThemeName,
+    setVolume,
     setWallpaper,
     setWindowStates,
     sortOrders,
     stackOrder,
     themeName,
+    volume,
     wallpaperFit,
     wallpaperImage,
     windowStates,

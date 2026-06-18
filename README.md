@@ -134,6 +134,26 @@ See [`CHANGELOG.md`](CHANGELOG.md) for what's new, and [`docs/`](docs) for
 
 ---
 
+## ⚠️ Disclaimer & liability
+
+SecurityOS is built by **one person**, Cristian Cezar Moisés, to **improve
+privacy worldwide** and help people be **safer online** — and for the author's own
+use. It is **for lawful, authorized use only**.
+
+- **Use it ethically and legally.** The bundled tools (Tor Browser, Matrix chat,
+  Vaptvupt encryption, network utilities) are for securing your *own* systems,
+  **authorized** research/testing with explicit permission, lawful privacy, and
+  CTF/labs.
+- **You are solely responsible** for what you do with it. **The project and its
+  sole maintainer are NOT responsible or liable for any misuse, illegal,
+  unauthorized, or harmful use.**
+- **No warranty.** Provided *"as is"*, without warranty of any kind; to the
+  maximum extent permitted by law the author is **not liable** for any damages
+  arising from its use. Tor reduces but does not eliminate deanonymization risk.
+
+Full terms: [`docs/TERMS.md`](docs/TERMS.md) (also on the SecurityOS desktop as
+`terms.md`), and [`LICENSE`](LICENSE).
+
 ## 🤝 Contributing & license
 
 SecurityOS is an **independent, one-person project** — built and maintained solely

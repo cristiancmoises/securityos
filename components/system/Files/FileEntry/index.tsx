@@ -19,6 +19,7 @@ import type { FileManagerViewNames } from "components/system/Files/Views";
 import { FileEntryIconSize } from "components/system/Files/Views";
 import { useFileSystem } from "contexts/fileSystem";
 import { useProcesses } from "contexts/process";
+import { useSession } from "contexts/session";
 import { m as motion } from "framer-motion";
 import useDoubleClick from "hooks/useDoubleClick";
 import dynamic from "next/dynamic";
@@ -59,6 +60,7 @@ import {
   isYouTubeUrl,
 } from "utils/functions";
 import { spotlightEffect } from "utils/spotlightEffect";
+import { getUndercoverName } from "utils/undercoverNames";
 
 const Down = dynamic(() =>
   import("components/apps/FileExplorer/NavigationIcons").then((mod) => mod.Down)
@@ -155,6 +157,20 @@ const FileEntry: FC<FileEntryProps> = ({
   } = useFileSystem();
   const [showInFileManager, setShowInFileManager] = useState(false);
   const { formats, sizes } = useTheme();
+  const { themeName } = useSession();
+  // Undercover (Windows 11 disguise) is a pure presentation overlay: swap the
+  // VISIBLE label for a generic Win11-ish name without renaming the file on disk.
+  // Gated on the live themeName so the default theme always shows real names and
+  // toggling Undercover off restores them with no leftovers.
+  const displayName = useMemo(() => {
+    if (themeName !== "undercover") return name;
+
+    const withoutExt = name.replace(/\.[^.]+$/, "");
+
+    return getUndercoverName(name) !== name
+      ? getUndercoverName(name)
+      : getUndercoverName(withoutExt);
+  }, [name, themeName]);
   const listView = view === "list";
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const figureRef = useRef<HTMLElement | null>(null);
@@ -190,14 +206,14 @@ const FileEntry: FC<FileEntryProps> = ({
   const truncatedName = useMemo(
     () =>
       truncateName(
-        name,
+        displayName,
         sizes.fileEntry.fontSize,
         formats.systemFont,
         sizes.fileEntry[
           listView ? "maxListTextDisplayWidth" : "maxIconTextDisplayWidth"
         ]
       ),
-    [formats.systemFont, listView, name, sizes.fileEntry]
+    [displayName, formats.systemFont, listView, sizes.fileEntry]
   );
   const iconRef = useRef<HTMLImageElement | null>(null);
   const isIconCached = useRef(false);
@@ -507,7 +523,7 @@ const FileEntry: FC<FileEntryProps> = ({
     <>
       <Button
         ref={buttonRef}
-        aria-label={name}
+        aria-label={displayName}
         onMouseOver={() => createTooltip().then(setTooltip)}
         title={tooltip}
         {...(listView && { ...LIST_VIEW_ANIMATION, as: motion.button })}
@@ -534,13 +550,13 @@ const FileEntry: FC<FileEntryProps> = ({
             ref={iconRef}
             $eager={loadIconImmediately}
             $moving={pasteList[path] === "move"}
-            alt={name}
+            alt={displayName}
             src={icon}
             {...FileEntryIconSize[view]}
           />
           <SubIcons
             icon={icon}
-            name={name}
+            name={displayName}
             showShortcutIcon={Boolean(hideShortcutIcon || stats.systemShortcut)}
             subIcons={subIcons}
             view={view}
@@ -556,9 +572,9 @@ const FileEntry: FC<FileEntryProps> = ({
             />
           ) : (
             <figcaption>
-              {!isOnlyFocusedEntry || name.length === truncatedName.length
+              {!isOnlyFocusedEntry || displayName.length === truncatedName.length
                 ? truncatedName
-                : name}
+                : displayName}
             </figcaption>
           )}
           {listView && openInFileExplorer && <Down flip={showInFileManager} />}

@@ -19,11 +19,22 @@ WORKDIR SecurityOS
 COPY package.json yarn.lock ./
 RUN yarn
 
-# socks-proxy-agent (Tor SOCKS5h for the privacy proxy) is side-installed via npm,
-# NOT added to package.json: yarn-classic re-resolves the short-hash git deps
+# Side-installed (via npm, NOT package.json) deps, ALL IN ONE npm install:
+#   - socks-proxy-agent: Tor SOCKS5h for the privacy + Matrix proxies.
+#   - matrix-js-sdk + its Rust crypto WASM: the E2EE Matrix chat app (decrypts
+#     encrypted rooms, search/join/invites/media).
+# Why npm + --no-save: yarn-classic re-resolves the short-hash git deps
 # (browserfs/utif) and dies with "Commit hash required" whenever package.json
-# changes. npm adds it without touching the yarn lockfile (keeps `yarn` cached).
-RUN npm install --no-save --no-package-lock --no-audit --no-fund socks-proxy-agent@^8.0.4
+# changes; npm adds these without touching the yarn lockfile (keeps `yarn` cached).
+# Why ONE command: `npm install` prunes packages it considers extraneous (those
+# not in package.json and not requested in THIS invocation), so installing matrix
+# in a SEPARATE step would prune socks-proxy-agent. Keep them together.
+# NODE_OPTIONS=--openssl-legacy-provider (set above) lets the git deps' webpack-4
+# install step run under node's OpenSSL 3.
+RUN npm install --no-save --no-package-lock --no-audit --no-fund \
+    socks-proxy-agent@^8.0.4 \
+    matrix-js-sdk@41.7.0 \
+    @matrix-org/matrix-sdk-crypto-wasm@18.3.1
 
 # Privacy: no Next.js telemetry, ever (build or runtime). Placed after the cached
 # dependency layer so toggling it doesn't trigger a full reinstall.

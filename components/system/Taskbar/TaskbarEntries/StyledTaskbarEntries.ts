@@ -13,7 +13,8 @@ const StyledTaskbarEntries = styled.ol`
   margin: 0 3px;
   overflow: hidden;
   position: absolute;
-  right: ${({ theme }) => theme.sizes.clock.width};
+  right: ${({ theme }) =>
+    `calc(${theme.sizes.clock.width} + ${theme.sizes.volume.width})`};
 
   /* Win11 gives each taskbar button a softly rounded hover/active pill. The
      per-entry highlight is a ::before on the child <li> (StyledTaskbarEntry);

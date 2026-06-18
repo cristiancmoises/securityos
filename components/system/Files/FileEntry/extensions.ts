@@ -8,7 +8,7 @@ type Extension = {
   type?: string;
 };
 
-export const TEXT_EDITORS = ["MonacoEditor", "Vim"];
+export const TEXT_EDITORS = ["MonacoEditor", "Vim", "Emacs"];
 
 const types = {
   Application: {
@@ -25,6 +25,11 @@ const types = {
     icon: "image",
     process: ["V86"],
     type: "Disc Image File",
+  },
+  EmacsDocument: {
+    icon: "emacs",
+    process: ["Emacs", "MonacoEditor", "Vim"],
+    type: "Emacs / Org Document",
   },
   Emulator: {
     icon: "emulator",
@@ -112,6 +117,7 @@ const types = {
 const extensions: Record<string, Extension> = {
   ".asx": types.AudioPlaylist,
   ".bin": types.DiscImage,
+  ".el": types.EmacsDocument,
   ".exe": types.Application,
   ".htm": types.HtmlDocument,
   ".html": types.HtmlDocument,
@@ -122,6 +128,7 @@ const extensions: Record<string, Extension> = {
   ".m3u8": types.MediaPlaylist,
   ".md": types.Markdown,
   ".mp3": types.Music,
+  ".org": types.EmacsDocument,
   ".otf": types.Font,
   ".pdf": types.PdfDocument,
   ".pls": types.AudioPlaylist,

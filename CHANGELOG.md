@@ -4,6 +4,57 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.5.0] — 2026-06-17
+
+### Matrix — a full, end-to-end-encrypted client
+- **Real E2EE via matrix-js-sdk + Rust crypto (WASM).** Encrypted rooms now
+  **decrypt and display** — fixes the previous "can't see my messages" (the old
+  hand-rolled client silently dropped every `m.room.encrypted` event). All traffic
+  still goes only through the same-origin `/api/matrix` **Tor** proxy.
+- **Search people** (user directory) and start **encrypted DMs**; **Discover &
+  join** federated rooms (public room directory + join by alias/`!id`); **accept
+  or decline invites**.
+- **Image & file visualization**, including **encrypted attachments** (fetched
+  with the auth token and decrypted client-side via WebCrypto AES-CTR), plus image
+  upload. Crypto keys are kept **in memory only** (amnesic).
+
+### Emacs — Spacemacs experience
+- Spacemacs-dark theme + **Powerline** mode-line + header-line buffer tabs;
+  many more commands & keybindings (M-y kill-ring, query-replace, case ops,
+  recenter, comment-line, M-x completion); **SPC leader + which-key** popup.
+- **Org-mode** behaviors (headline folding, TODO cycling, sibling headlines,
+  agenda) and **simulated Telega + whatsappel** panels (offline). `.org`/`.el`
+  now open in Emacs.
+
+### Tor Browser — faster & safer
+- **Keep-alive socket pooling** to Tor (big latency win, isolation preserved),
+  **async + size-bounded decompression** (fixes event-loop stalls and gzip
+  bombs), **lazy-loaded images**, in-memory caching of immutable sub-resources,
+  and a strict CSP on non-HTML responses.
+
+### Desktop
+- **Taskbar Volume control** (click slider, scroll to change, mute) wired to a
+  persisted global media volume.
+- **Screen Capture** app (+ taskbar/desktop/Start-menu entries): screenshot →
+  Pictures, screen recording → Desktop, via `getDisplayMedia` (captures app
+  iframes too).
+- **Wallpapers:** restored the animated set (Matrix 2D/3D, Vanta Waves, Hexells)
+  and surfaced the themed library in the Background menu (Emacs, Guix, Matrix,
+  Christ, Security, Hacking, Anonymity, Nature, Technology, Forensics, Gentoo) +
+  new **BSD / Unix / Space / Art** themes.
+- **Music:** expanded the public-domain (CC0) Bach *Goldberg Variations* set.
+- **Desktop folders** Documents / Images / Music, and **`dev.md`** + **`terms.md`**
+  on the desktop (maintainer info + usage rules & liability).
+
+### Undercover (Windows 11 disguise)
+- Win11 Fluent light tokens, generic (trademark-free) folder/app display names,
+  and a stacked clock — toggles cleanly back to the SecurityOS theme.
+
+### Docs
+- README **Disclaimer & liability** section and `docs/TERMS.md` — SecurityOS is
+  for lawful, authorized use only; the sole maintainer is not responsible for
+  misuse; no warranty.
+
 ## [2026-06-14]
 
 ### Tor Browser — tabbed browsing

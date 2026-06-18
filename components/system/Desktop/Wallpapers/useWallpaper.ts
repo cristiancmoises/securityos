@@ -5,6 +5,7 @@ import {
   WALLPAPER_WORKERS,
 } from "components/system/Desktop/Wallpapers/constants";
 import type { WallpaperConfig } from "components/system/Desktop/Wallpapers/types";
+import { config as vantaConfig } from "components/system/Desktop/Wallpapers/vantaWaves/config";
 import { useFileSystem } from "contexts/fileSystem";
 import { useSession } from "contexts/session";
 import useWorker from "hooks/useWorker";
@@ -50,10 +51,12 @@ const useWallpaper = (
     useSession();
   const { colors } = useTheme();
   const [wallpaperName] = wallpaperImage.split(" ");
+  const vantaWireframe = wallpaperImage === "VANTA WIREFRAME";
   const wallpaperWorker = useWorker<void>(
     WALLPAPER_WORKERS[wallpaperName],
     undefined,
-      );
+    vantaWireframe ? "Wireframe" : ""
+  );
   const resizeListener = useCallback(() => {
     if (!desktopRef.current) return;
 
@@ -71,6 +74,17 @@ const useWallpaper = (
   }, [desktopRef, wallpaperWorker]);
   const loadWallpaper = useCallback(() => {
     if (!desktopRef.current) return;
+
+    let config: WallpaperConfig | undefined;
+
+    if (wallpaperName === "MATRIX") {
+      config = { volumetric: wallpaperImage === "MATRIX 3D" };
+    } else if (wallpaperName === "VANTA") {
+      config = { ...vantaConfig };
+      vantaConfig.material.options.wireframe = vantaWireframe;
+    } else if (wallpaperImage === "SLIDESHOW") {
+      config = { volumetric: true };
+    }
 
     document.documentElement.style.setProperty("background", "");
     desktopRef.current.querySelector(BASE_CANVAS_SELECTOR)?.remove();
@@ -101,6 +115,7 @@ const useWallpaper = (
     desktopRef,
     resizeListener,
     setWallpaper,
+    vantaWireframe,
     wallpaperImage,
     wallpaperName,
     wallpaperWorker,
