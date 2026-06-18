@@ -36,9 +36,11 @@ export type SessionData = {
   // WS->SOCKS bridge to route the in-browser Linux through Tor.
   emulatorRelayUrl: string;
   iconPositions: IconPositions;
+  muted: boolean;
   runHistory: string[];
   sortOrders: SortOrders;
   themeName: ThemeName;
+  volume: number;
   wallpaperFit: WallpaperFit;
   wallpaperImage: string;
   windowStates: WindowStates;
@@ -54,7 +56,9 @@ export type SessionContextState = SessionData & {
   setForegroundId: React.Dispatch<React.SetStateAction<string>>;
   setHaltSession: React.Dispatch<React.SetStateAction<boolean>>;
   setIconPositions: React.Dispatch<React.SetStateAction<IconPositions>>;
+  setMuted: React.Dispatch<React.SetStateAction<boolean>>;
   setRunHistory: React.Dispatch<React.SetStateAction<string[]>>;
+  setVolume: React.Dispatch<React.SetStateAction<number>>;
   setSortOrder: (
     directory: string,
     order: string[] | ((currentSortOrder: string[]) => string[]),

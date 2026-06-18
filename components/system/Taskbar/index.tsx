@@ -2,6 +2,7 @@ import Clock from "components/system/Taskbar/Clock";
 import StartButton from "components/system/Taskbar/StartButton";
 import StyledTaskbar from "components/system/Taskbar/StyledTaskbar";
 import TaskbarEntries from "components/system/Taskbar/TaskbarEntries";
+import Volume from "components/system/Taskbar/Volume";
 import useTaskbarContextMenu from "components/system/Taskbar/useTaskbarContextMenu";
 import dynamic from "next/dynamic";
 import { useState } from "react";
@@ -23,6 +24,7 @@ const Taskbar: FC = () => {
           toggleStartMenu={toggleStartMenu}
         />
         <TaskbarEntries />
+        <Volume />
         <Clock />
       </StyledTaskbar>
     </>

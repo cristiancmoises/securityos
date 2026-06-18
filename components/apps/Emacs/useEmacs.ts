@@ -1,3 +1,13 @@
+import { completeCommand, LEADER, type LeaderBinding } from "components/apps/Emacs/commands";
+import {
+  cycleTodo,
+  headlineAt,
+  lineBounds,
+  renderAgenda,
+  scanAgenda,
+  siblingHeadline,
+  subtreeBody,
+} from "components/apps/Emacs/orgMode";
 import type { ComponentProcessProps } from "components/system/Apps/RenderComponent";
 import useTitle from "components/system/Window/useTitle";
 import { useFileSystem } from "contexts/fileSystem";
@@ -26,7 +36,10 @@ type Prompt =
   | { kind: "save-as"; label: string }
   | { kind: "mx"; label: string }
   | { kind: "goto-line"; label: string }
-  | { kind: "isearch"; label: string };
+  | { kind: "isearch"; label: string }
+  | { kind: "query-replace-from"; label: string }
+  | { kind: "query-replace-to"; label: string; from: string }
+  | { kind: "eval-expression"; label: string };
 
 export type MinibufferState = {
   /** Plain message shown in the echo area (e.g. "Wrote /path"). */
@@ -35,6 +48,22 @@ export type MinibufferState = {
   prompt?: Prompt;
   /** Current text typed into the prompt's inline input. */
   input: string;
+  /** M-x completion candidates shown beneath the prompt. */
+  candidates?: string[];
+};
+
+/**
+ * The "kind" of the active buffer. Text buffers render the <textarea>; the
+ * panel kinds render the SIMULATED chat clients instead. This drives index.tsx.
+ */
+export type BufferKind = "text" | "telega" | "whatsappel";
+
+/** State for the Spacemacs SPC which-key transient popup. */
+export type WhichKeyState = {
+  /** The chord typed so far, e.g. "SPC" or "SPC f". */
+  title: string;
+  /** Bindings available at this chord depth. */
+  bindings: Record<string, LeaderBinding>;
 };
 
 export type ModeLine = {
@@ -45,6 +74,10 @@ export type ModeLine = {
   column: number;
   /** "Top" | "Bot" | "All" | "NN%". */
   position: string;
+  /** Evil-style state badge (cosmetic), e.g. "NORMAL". */
+  state: string;
+  /** Window number badge (Spacemacs shows this on the left). */
+  windowNumber: number;
 };
 
 type UseEmacs = {
@@ -52,6 +85,10 @@ type UseEmacs = {
   value: string;
   modeLine: ModeLine;
   minibuffer: MinibufferState;
+  /** Which buffer view is active (text vs. simulated panel). */
+  bufferKind: BufferKind;
+  /** Active which-key transient popup, or undefined when none. */
+  whichKey?: WhichKeyState;
   onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onSelect: () => void;
@@ -233,6 +270,8 @@ const useEmacs = ({ id }: ComponentProcessProps): UseEmacs => {
   const [path, setPath] = useState<string>("");
   const [bufferName, setBufferName] = useState<string>(SCRATCH_NAME);
   const [modified, setModified] = useState<boolean>(false);
+  const [bufferKind, setBufferKind] = useState<BufferKind>("text");
+  const [whichKey, setWhichKey] = useState<WhichKeyState | undefined>(undefined);
   const [minibuffer, setMinibuffer] = useState<MinibufferState>({
     message: "",
     input: "",
@@ -252,6 +291,15 @@ const useEmacs = ({ id }: ComponentProcessProps): UseEmacs => {
     undefined
   );
   const loaded = useRef(false);
+  // Pending kill-ring index for M-y (yank-pop); -1 means "no yank yet".
+  const yankIndex = useRef<number>(-1);
+  const lastYank = useRef<{ start: number; end: number } | undefined>(undefined);
+  // Org folding: headline-start -> the stashed (hidden) subtree body text.
+  const orgFolds = useRef<Map<number, string>>(new Map());
+  // C-c prefix (Org uses C-c C-t etc.).
+  const ctrlC = useRef<boolean>(false);
+  // The active SPC leader chord path (e.g. ["f"]); empty/undefined = inactive.
+  const leaderPath = useRef<string[] | undefined>(undefined);
 
   /** Echo a plain message to the minibuffer, clearing any prompt. */
   const echo = useCallback((message: string): void => {
@@ -323,6 +371,77 @@ const useEmacs = ({ id }: ComponentProcessProps): UseEmacs => {
     }
   }, []);
 
+  /** Replace a span of buffer text and place point at `caret`. */
+  const replaceSpan = useCallback(
+    (lo: number, hi: number, replacement: string, caret?: number): BufferState => {
+      const next: BufferState = {
+        text: buffer.text.slice(0, lo) + replacement + buffer.text.slice(hi),
+        point: caret ?? lo + replacement.length,
+      };
+
+      pushUndo(buffer);
+      applyBuffer(next);
+
+      return next;
+    },
+    [applyBuffer, buffer, pushUndo]
+  );
+
+  /** Replace every occurrence of `from` with `to` in the buffer. */
+  const replaceAll = useCallback(
+    (from: string, to: string): number => {
+      if (!from) return 0;
+      const parts = buffer.text.split(from);
+      const count = parts.length - 1;
+
+      if (count > 0) replaceSpan(0, buffer.text.length, parts.join(to), 0);
+
+      return count;
+    },
+    [buffer.text, replaceSpan]
+  );
+
+  /** Comment-line comment prefix for the current major mode. */
+  const commentPrefixFor = useCallback((): string => {
+    const ext = extname(bufferName).toLowerCase();
+
+    switch (ext) {
+      case ".el":
+      case ".lisp":
+      case ".cl":
+        return ";; ";
+      case ".js":
+      case ".mjs":
+      case ".cjs":
+      case ".ts":
+      case ".tsx":
+      case ".jsx":
+      case ".c":
+      case ".h":
+      case ".cpp":
+      case ".cc":
+      case ".hpp":
+      case ".rs":
+      case ".go":
+        return "// ";
+      case ".py":
+      case ".sh":
+      case ".bash":
+      case ".yml":
+      case ".yaml":
+        return "# ";
+      case ".css":
+        return "/* ";
+      case ".html":
+      case ".htm":
+        return "<!-- ";
+      case ".org":
+        return "# ";
+      default:
+        return "# ";
+    }
+  }, [bufferName]);
+
   // ---- File operations -----------------------------------------------------
 
   const saveTo = useCallback(
@@ -385,6 +504,8 @@ const useEmacs = ({ id }: ComponentProcessProps): UseEmacs => {
           undoStack.current = [];
           redoStack.current = [];
           mark.current = undefined;
+          orgFolds.current = new Map();
+          setBufferKind("text");
           setBuffer({ text, point: 0 });
           setPath(src);
           setBufferName(basename(src));
@@ -395,6 +516,8 @@ const useEmacs = ({ id }: ComponentProcessProps): UseEmacs => {
           undoStack.current = [];
           redoStack.current = [];
           mark.current = undefined;
+          orgFolds.current = new Map();
+          setBufferKind("text");
           setBuffer({ text: "", point: 0 });
           setPath(src);
           setBufferName(basename(src));
@@ -475,6 +598,57 @@ const useEmacs = ({ id }: ComponentProcessProps): UseEmacs => {
     setBuffer((b) => ({ ...b, point: clamped }));
   }, []);
 
+  /** Open one of the SIMULATED chat panels as the active buffer. */
+  const openPanel = useCallback(
+    (kind: "telega" | "whatsappel"): void => {
+      setBufferKind(kind);
+      setBufferName(kind === "telega" ? "*Telega*" : "*whatsappel*");
+      setModified(false);
+      prependFileToTitle(kind === "telega" ? "*Telega*" : "*whatsappel*");
+      echo(
+        kind === "telega"
+          ? "Opened *Telega* (SIMULATED — offline, no Telegram connection)"
+          : "Opened *whatsappel* (SIMULATED — offline, no WhatsApp connection)"
+      );
+    },
+    [echo, prependFileToTitle]
+  );
+
+  /** Return from a panel buffer to the scratch text buffer. */
+  const switchToScratch = useCallback((): void => {
+    setBufferKind("text");
+    orgFolds.current = new Map();
+    undoStack.current = [];
+    redoStack.current = [];
+    mark.current = undefined;
+    setBuffer({ text: SCRATCH_TEXT, point: SCRATCH_TEXT.length });
+    setPath("");
+    setBufferName(SCRATCH_NAME);
+    setModified(false);
+    prependFileToTitle(SCRATCH_NAME);
+    echo(SCRATCH_NAME);
+    window.requestAnimationFrame(() => textareaRef.current?.focus());
+  }, [echo, prependFileToTitle]);
+
+  /** Build a read-only Org agenda from the current buffer into a new buffer. */
+  const orgAgenda = useCallback((): void => {
+    const items = scanAgenda(buffer.text);
+    const report = renderAgenda(items, bufferName);
+
+    setBufferKind("text");
+    orgFolds.current = new Map();
+    undoStack.current = [];
+    redoStack.current = [];
+    mark.current = undefined;
+    setBuffer({ text: report, point: 0 });
+    setPath("");
+    setBufferName("*Org Agenda*");
+    setModified(false);
+    prependFileToTitle("*Org Agenda*");
+    echo(`Org agenda: ${items.length} item(s)`);
+    window.requestAnimationFrame(() => textareaRef.current?.focus());
+  }, [buffer.text, bufferName, echo, prependFileToTitle]);
+
   /**
    * Run a named M-x command.
    *  - "opened-prompt": the command replaced the minibuffer with its own prompt
@@ -521,11 +695,197 @@ const useEmacs = ({ id }: ComponentProcessProps): UseEmacs => {
           echo("Quit");
 
           return "done";
+        case "yank": {
+          const el = textareaRef.current;
+          const at = el?.selectionStart ?? buffer.point;
+          const end = el?.selectionEnd ?? buffer.point;
+          const yanked = killRing.current[killRing.current.length - 1] ?? "";
+
+          if (yanked) {
+            const next = replaceSpan(
+              Math.min(at, end),
+              Math.max(at, end),
+              yanked
+            );
+
+            yankIndex.current = killRing.current.length - 1;
+            lastYank.current = { start: Math.min(at, end), end: next.point };
+          } else {
+            echo("Kill ring is empty");
+          }
+
+          return "done";
+        }
+        case "query-replace":
+        case "replace-string":
+          openPrompt({ kind: "query-replace-from", label: "Replace string: " });
+          window.requestAnimationFrame(() => minibufferRef.current?.focus());
+
+          return "opened-prompt";
+        case "comment-line":
+        case "comment-dwim": {
+          const el = textareaRef.current;
+          const p = el?.selectionStart ?? buffer.point;
+          const { start, end } = lineBounds(buffer.text, p);
+          const line = buffer.text.slice(start, end);
+          const prefix = commentPrefixFor();
+          const trimmedPrefix = prefix.trimEnd();
+
+          if (line.trimStart().startsWith(trimmedPrefix)) {
+            const uncommented = line.replace(
+              new RegExp(`^(\\s*)${trimmedPrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s?`),
+              "$1"
+            );
+
+            replaceSpan(start, end, uncommented);
+          } else {
+            const indentMatch = /^\s*/.exec(line);
+            const indent = indentMatch ? indentMatch[0] : "";
+
+            replaceSpan(start, end, `${indent}${prefix}${line.slice(indent.length)}`);
+          }
+
+          return "done";
+        }
+        case "upcase-word":
+        case "downcase-word":
+        case "capitalize-word": {
+          const el = textareaRef.current;
+          const p = el?.selectionStart ?? buffer.point;
+          const t = buffer.text;
+          let i = p;
+
+          while (i < t.length && !/[\w$]/.test(t[i])) i += 1;
+          let j = i;
+
+          while (j < t.length && /[\w$]/.test(t[j])) j += 1;
+          if (j <= i) {
+            echo("No word at point");
+
+            return "done";
+          }
+          const word = t.slice(i, j);
+          let result = word;
+
+          if (name === "upcase-word") result = word.toUpperCase();
+          else if (name === "downcase-word") result = word.toLowerCase();
+          else result = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+          replaceSpan(i, j, result, j);
+
+          return "done";
+        }
+        case "recenter-top-bottom": {
+          const el = textareaRef.current;
+
+          if (el) {
+            const style = window.getComputedStyle(el);
+            const lineHeight = Number.parseFloat(style.lineHeight) || 16;
+            const before = el.value.slice(0, el.selectionStart).split("\n").length;
+            const target = (before - 1) * lineHeight - el.clientHeight / 2;
+
+            el.scrollTop = Math.max(0, target);
+          }
+          echo("Recenter");
+
+          return "done";
+        }
+        case "open-line": {
+          const el = textareaRef.current;
+          const p = el?.selectionStart ?? buffer.point;
+
+          replaceSpan(p, p, "\n", p);
+
+          return "done";
+        }
+        case "what-cursor-position": {
+          const el = textareaRef.current;
+          const p = el?.selectionStart ?? buffer.point;
+          const ch = buffer.text[p];
+          const total = buffer.text.length;
+          const pct = total ? Math.round((p / total) * 100) : 0;
+
+          if (ch === undefined) {
+            echo(`point=${p + 1} of ${total} (EOB) column=${lineColumn(buffer.text, p).column}`);
+          } else {
+            const code = ch.codePointAt(0) ?? 0;
+
+            echo(
+              `Char: ${ch === "\n" ? "\\n" : ch} (#o${code.toString(8)} #d${code} #x${code.toString(16)}) point=${p + 1} of ${total} (${pct}%) column=${lineColumn(buffer.text, p).column}`
+            );
+          }
+
+          return "done";
+        }
+        case "eval-expression":
+          openPrompt({
+            kind: "eval-expression",
+            label: "Eval (echo only): ",
+          });
+          window.requestAnimationFrame(() => minibufferRef.current?.focus());
+
+          return "opened-prompt";
+        case "org-agenda":
+          orgAgenda();
+
+          return "done";
+        case "org-todo": {
+          const el = textareaRef.current;
+          const p = el?.selectionStart ?? buffer.point;
+          const { start, end } = lineBounds(buffer.text, p);
+          const line = buffer.text.slice(start, end);
+          const next = cycleTodo(line);
+
+          if (next === line) {
+            echo("Not on an Org headline");
+          } else {
+            replaceSpan(start, end, next, start + next.length);
+          }
+
+          return "done";
+        }
+        case "magit-status":
+          echo(
+            "Magit (SIMULATED): On branch main · nothing to commit, working tree clean"
+          );
+
+          return "done";
+        case "telega":
+          openPanel("telega");
+
+          return "done";
+        case "whatsappel":
+          openPanel("whatsappel");
+
+          return "done";
+        case "switch-to-buffer":
+          switchToScratch();
+
+          return "done";
+        case "describe-bindings":
+          echo(
+            "C-x C-f find · C-x C-s save · M-x cmd · C-s search · M-w copy · C-w cut · C-y yank · M-y yank-pop · SPC leader"
+          );
+
+          return "done";
         default:
           return "unknown";
       }
     },
-    [buffer.point, echo, openPrompt, path, saveBuffer, saveTo, undo]
+    [
+      buffer.point,
+      buffer.text,
+      commentPrefixFor,
+      echo,
+      openPanel,
+      openPrompt,
+      orgAgenda,
+      path,
+      replaceSpan,
+      saveBuffer,
+      saveTo,
+      switchToScratch,
+      undo,
+    ]
   );
 
   const onKeyDown = useCallback(
@@ -567,6 +927,190 @@ const useEmacs = ({ id }: ComponentProcessProps): UseEmacs => {
         return;
       }
 
+      // ---- Spacemacs SPC leader (which-key) ----
+      // Resolve one key inside the current leader chord.
+      const stepLeader = (k: string): void => {
+        const node = leaderPath.current ?? [];
+        let map: Record<string, LeaderBinding> = LEADER;
+
+        for (const seg of node) {
+          const nested = map[seg]?.bindings;
+
+          if (!nested) {
+            leaderPath.current = undefined;
+            setWhichKey(undefined);
+
+            return;
+          }
+          map = nested;
+        }
+
+        const binding = map[k];
+
+        if (!binding) {
+          leaderPath.current = undefined;
+          setWhichKey(undefined);
+          echo(`SPC ${[...node, k].join(" ")} is undefined`);
+
+          return;
+        }
+        if (binding.command) {
+          leaderPath.current = undefined;
+          setWhichKey(undefined);
+          runCommand(binding.command);
+
+          return;
+        }
+        // Descend into a sub-map and refresh the which-key popup.
+        const nextPath = [...node, k];
+
+        leaderPath.current = nextPath;
+        setWhichKey({
+          title: `SPC ${nextPath.join(" ")}`,
+          bindings: binding.bindings ?? {},
+        });
+      };
+
+      // If a leader chord is in progress, route the next printable key into it.
+      if (leaderPath.current) {
+        if (key === "Escape") {
+          handled();
+          leaderPath.current = undefined;
+          setWhichKey(undefined);
+          echo("Quit");
+
+          return;
+        }
+        if (key.length === 1 && !ctrl && !altKey) {
+          handled();
+          stepLeader(key);
+
+          return;
+        }
+      }
+
+      const { start: curLineStart, end: curLineEnd } = lineBounds(text, point);
+      const lineIsBlank = text.slice(curLineStart, curLineEnd).trim() === "";
+
+      // SPC on a blank line, or M-m anywhere, opens the leader popup.
+      if (
+        (key === " " && !ctrl && !altKey && lineIsBlank) ||
+        (altKey && key === "m")
+      ) {
+        handled();
+        notKillCommand();
+        leaderPath.current = [];
+        setWhichKey({ title: "SPC", bindings: LEADER });
+
+        return;
+      }
+
+      // ---- C-c prefix map (Org: C-c C-t cycles TODO) ----
+      if (ctrlC.current) {
+        ctrlC.current = false;
+        notKillCommand();
+
+        if (ctrl && (key === "t" || key === "T")) {
+          handled();
+          runCommand("org-todo");
+
+          return;
+        }
+        if (ctrl && (key === "c" || key === "C")) {
+          handled();
+          echo("C-c C-c");
+
+          return;
+        }
+        handled();
+        echo(`C-c ${ctrl ? "C-" : ""}${key} is undefined`);
+
+        return;
+      }
+      if (ctrl && key === "c") {
+        handled();
+        ctrlC.current = true;
+        echo("C-c-");
+
+        return;
+      }
+
+      // ---- Org TAB / S-TAB folding & M-RET ----
+      const isOrg = extname(bufferName).toLowerCase() === ".org";
+
+      if (isOrg && key === "Tab" && !ctrl && !altKey) {
+        const headline = headlineAt(text, point);
+
+        if (shiftKey) {
+          // S-TAB: global cycle — unfold all if anything folded, else fold all.
+          handled();
+          notKillCommand();
+          if (orgFolds.current.size > 0) {
+            // Unfold everything by re-expanding stashed bodies from the bottom up.
+            const entries = [...orgFolds.current.entries()].sort(
+              (a, b) => b[0] - a[0]
+            );
+            let next = text;
+
+            for (const [hlStart, body] of entries) {
+              const { end } = lineBounds(next, hlStart);
+              const insertAt = end < next.length ? end + 1 : end;
+
+              next = next.slice(0, insertAt) + body + next.slice(insertAt);
+            }
+            orgFolds.current = new Map();
+            replaceSpan(0, text.length, next, Math.min(point, next.length));
+            echo("OVERVIEW -> SHOW ALL");
+          } else {
+            echo("Org: nothing folded (S-TAB)");
+          }
+
+          return;
+        }
+        if (headline) {
+          handled();
+          notKillCommand();
+          if (orgFolds.current.has(headline.start)) {
+            // Unfold this subtree: restore the stashed body after the headline.
+            const body = orgFolds.current.get(headline.start) ?? "";
+
+            orgFolds.current.delete(headline.start);
+            const insertAt = headline.lineEnd;
+
+            replaceSpan(insertAt, insertAt, body, headline.start);
+            echo("FOLDED -> CHILDREN");
+          } else {
+            const bodyRange = subtreeBody(text, headline);
+            const body = text.slice(bodyRange.start, bodyRange.end);
+
+            if (body.trim() === "") {
+              echo("Org: empty subtree");
+            } else {
+              orgFolds.current.set(headline.start, body);
+              replaceSpan(bodyRange.start, bodyRange.end, "", headline.start);
+              echo("CHILDREN -> FOLDED");
+            }
+          }
+
+          return;
+        }
+        // Non-headline TAB in Org falls through to literal tab insertion below.
+      }
+
+      if (isOrg && altKey && key === "Enter") {
+        handled();
+        notKillCommand();
+        const headline = headlineAt(text, point);
+        const level = headline ? headline.level : 1;
+        const eol = lineEnd(text, point);
+        const insertion = `\n${siblingHeadline(level)}`;
+
+        replaceSpan(eol, eol, insertion, eol + insertion.length);
+        echo("Org: inserted headline");
+
+        return;
+      }
+
       // ---- C-x prefix map ----
       if (ctrlX.current) {
         ctrlX.current = false;
@@ -602,6 +1146,9 @@ const useEmacs = ({ id }: ComponentProcessProps): UseEmacs => {
       if (ctrl && key === "g") {
         handled();
         ctrlX.current = false;
+        ctrlC.current = false;
+        leaderPath.current = undefined;
+        setWhichKey(undefined);
         mark.current = undefined;
         isearch.current = undefined;
         setMinibuffer({ message: "Quit", input: "" });
@@ -785,13 +1332,87 @@ const useEmacs = ({ id }: ComponentProcessProps): UseEmacs => {
       if (ctrl && key === "y") {
         handled();
         notKillCommand();
-        const yanked = killRing.current[killRing.current.length - 1] ?? "";
+        const ring = killRing.current;
+        const yanked = ring[ring.length - 1] ?? "";
 
         if (yanked) {
-          insertText(yanked, point, selEnd);
+          const next = insertText(yanked, point, selEnd);
+
+          // Record the yank span so a following M-y (yank-pop) can replace it.
+          yankIndex.current = ring.length - 1;
+          lastYank.current = { start: Math.min(point, selEnd), end: next.point };
         } else {
           echo("Kill ring is empty");
         }
+
+        return;
+      }
+      // ---- M-y yank-pop: cycle the kill-ring, replacing the just-yanked text ----
+      if (altKey && key === "y") {
+        handled();
+        notKillCommand();
+        const ring = killRing.current;
+
+        if (!lastYank.current || ring.length === 0) {
+          echo("Previous command was not a yank");
+
+          return;
+        }
+        yankIndex.current =
+          (yankIndex.current - 1 + ring.length) % ring.length;
+        const replacement = ring[yankIndex.current] ?? "";
+        const { start, end } = lastYank.current;
+        const next = replaceSpan(start, end, replacement);
+
+        lastYank.current = { start, end: next.point };
+        echo(`Yank-pop (${yankIndex.current + 1}/${ring.length})`);
+
+        return;
+      }
+      // ---- C-l recenter ----
+      if (ctrl && key === "l") {
+        handled();
+        notKillCommand();
+        runCommand("recenter-top-bottom");
+
+        return;
+      }
+      // ---- C-o open-line ----
+      if (ctrl && key === "o") {
+        handled();
+        notKillCommand();
+        insertText("\n", point, selEnd);
+        moveTo(point);
+
+        return;
+      }
+      // ---- M-; comment-line ----
+      if (altKey && (key === ";" || key === ":")) {
+        handled();
+        notKillCommand();
+        runCommand("comment-line");
+
+        return;
+      }
+      // ---- M-u / M-l / M-c case commands ----
+      if (altKey && key === "u") {
+        handled();
+        notKillCommand();
+        runCommand("upcase-word");
+
+        return;
+      }
+      if (altKey && key === "l") {
+        handled();
+        notKillCommand();
+        runCommand("downcase-word");
+
+        return;
+      }
+      if (altKey && key === "c") {
+        handled();
+        notKillCommand();
+        runCommand("capitalize-word");
 
         return;
       }
@@ -894,6 +1515,7 @@ const useEmacs = ({ id }: ComponentProcessProps): UseEmacs => {
       }
     },
     [
+      bufferName,
       closeWithTransition,
       echo,
       id,
@@ -901,6 +1523,8 @@ const useEmacs = ({ id }: ComponentProcessProps): UseEmacs => {
       kill,
       moveTo,
       openPrompt,
+      replaceSpan,
+      runCommand,
       saveBuffer,
       undo,
     ]
@@ -941,7 +1565,13 @@ const useEmacs = ({ id }: ComponentProcessProps): UseEmacs => {
     (event: React.ChangeEvent<HTMLInputElement>): void => {
       const input = event.currentTarget.value;
 
-      setMinibuffer((m) => ({ ...m, input }));
+      setMinibuffer((m) => ({
+        ...m,
+        input,
+        // Live M-x completion candidates as the user types.
+        candidates:
+          m.prompt?.kind === "mx" ? completeCommand(input) : undefined,
+      }));
 
       // Live incremental search as the user types.
       if (isearch.current) {
@@ -1010,6 +1640,38 @@ const useEmacs = ({ id }: ComponentProcessProps): UseEmacs => {
         return;
       }
 
+      // TAB completes the M-x command name to the best candidate.
+      if (key === "Tab" && current?.kind === "mx") {
+        event.preventDefault();
+        const candidates = completeCommand(input, 50);
+
+        if (candidates.length === 0) {
+          setMinibuffer((m) => ({ ...m, message: "[No match]" }));
+        } else if (candidates.length === 1) {
+          setMinibuffer((m) => ({
+            ...m,
+            input: candidates[0],
+            candidates,
+          }));
+        } else {
+          // Complete to the longest common prefix shared by all candidates.
+          let prefix = candidates[0];
+
+          for (const c of candidates) {
+            while (!c.toLowerCase().startsWith(prefix.toLowerCase())) {
+              prefix = prefix.slice(0, -1);
+            }
+          }
+          setMinibuffer((m) => ({
+            ...m,
+            input: prefix.length > input.length ? prefix : input,
+            candidates,
+          }));
+        }
+
+        return;
+      }
+
       if (key !== "Enter") return;
       event.preventDefault();
 
@@ -1028,6 +1690,30 @@ const useEmacs = ({ id }: ComponentProcessProps): UseEmacs => {
           saveTo(input);
           setMinibuffer({ message: "", input: "" });
           window.requestAnimationFrame(() => textareaRef.current?.focus());
+          break;
+        case "query-replace-from": {
+          if (!input) {
+            closeMinibuffer("Empty search string");
+            break;
+          }
+          openPrompt(
+            { kind: "query-replace-to", label: `Replace "${input}" with: `, from: input }
+          );
+          window.requestAnimationFrame(() => minibufferRef.current?.focus());
+          break;
+        }
+        case "query-replace-to": {
+          const n = replaceAll(current.from, input);
+
+          closeMinibuffer(
+            n > 0 ? `Replaced ${n} occurrence${n === 1 ? "" : "s"}` : "No matches"
+          );
+          break;
+        }
+        case "eval-expression":
+          // SAFETY: we DO NOT evaluate untrusted input. We only echo it back,
+          // exactly as typed, to keep the offline engine sandboxed.
+          closeMinibuffer(input ? `${input}  ;; (not evaluated)` : "");
           break;
         case "mx": {
           const result = runCommand(input.trim());
@@ -1089,6 +1775,8 @@ const useEmacs = ({ id }: ComponentProcessProps): UseEmacs => {
       minibuffer.input,
       minibuffer.prompt,
       moveTo,
+      openPrompt,
+      replaceAll,
       runCommand,
       saveTo,
     ]
@@ -1116,21 +1804,33 @@ const useEmacs = ({ id }: ComponentProcessProps): UseEmacs => {
       }
     }
 
+    const majorMode =
+      bufferKind === "telega"
+        ? "Telega"
+        : bufferKind === "whatsappel"
+          ? "Whatsappel"
+          : majorModeFor(bufferName);
+
     return {
       modified,
       bufferName,
-      majorMode: majorModeFor(bufferName),
+      majorMode,
       line,
       column,
       position,
+      // Cosmetic evil-style state badge (no real modal editing is implemented).
+      state: bufferKind === "text" ? "NORMAL" : "EMACS",
+      windowNumber: 1,
     };
-  }, [buffer.point, buffer.text, bufferName, modified]);
+  }, [buffer.point, buffer.text, bufferKind, bufferName, modified]);
 
   return {
     textareaRef,
     value: buffer.text,
     modeLine,
     minibuffer,
+    bufferKind,
+    whichKey,
     onKeyDown,
     onChange,
     onSelect,

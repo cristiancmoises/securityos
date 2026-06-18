@@ -313,6 +313,233 @@ const StyledMatrix = styled.div`
     cursor: default;
     opacity: 55%;
   }
+
+  /* Status spinner + sign-in hint */
+  .spinner,
+  .hint {
+    color: ${({ theme }) => theme.colors.titleBar.textInactive};
+    font-size: 10px;
+  }
+
+  .hint {
+    margin: 0;
+  }
+
+  /* Sidebar tabs */
+  .tabs {
+    border-bottom: 1px solid ${({ theme }) => theme.colors.window.outlineInactive};
+    display: flex;
+    flex: 0 0 auto;
+  }
+
+  .tab {
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    color: ${({ theme }) => theme.colors.text};
+    cursor: pointer;
+    flex: 1 1 0;
+    font-family: inherit;
+    font-size: 11px;
+    padding: 7px 4px;
+  }
+
+  .tab:hover {
+    background: ${({ theme }) => theme.colors.taskbar.hover};
+  }
+
+  .tab.active {
+    border-bottom-color: ${({ theme }) => theme.colors.highlight};
+    color: ${({ theme }) => theme.colors.highlight};
+  }
+
+  .list {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .section-label {
+    color: ${({ theme }) => theme.colors.titleBar.textInactive};
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    padding: 6px 10px 2px;
+    text-transform: uppercase;
+  }
+
+  /* Invites */
+  .invites {
+    border-bottom: 1px solid ${({ theme }) => theme.colors.window.outlineInactive};
+  }
+
+  .invite {
+    padding: 6px 10px 8px;
+  }
+
+  .invite-name {
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .invite-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 5px;
+  }
+
+  .mini-btn {
+    background: transparent;
+    border: 1px solid ${({ theme }) => theme.colors.window.outlineInactive};
+    border-radius: 4px;
+    color: ${({ theme }) => theme.colors.text};
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 10px;
+    padding: 3px 9px;
+  }
+
+  .mini-btn:hover {
+    background: ${({ theme }) => theme.colors.taskbar.hover};
+  }
+
+  .mini-btn.accept {
+    background: ${({ theme }) => theme.colors.highlightBackground};
+    border-color: ${({ theme }) => theme.colors.highlight};
+  }
+
+  /* Room item: name + unread badge */
+  .room-item {
+    align-items: center;
+    display: flex;
+    gap: 6px;
+    justify-content: space-between;
+  }
+
+  .room-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .badge {
+    background: ${({ theme }) => theme.colors.highlight};
+    border-radius: 9px;
+    color: ${({ theme }) => theme.colors.window.background};
+    flex: 0 0 auto;
+    font-size: 9px;
+    padding: 1px 6px;
+  }
+
+  /* People / Discover finder + results */
+  .finder {
+    display: flex;
+    gap: 6px;
+    padding: 8px 10px;
+  }
+
+  .finder input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 6px 8px;
+  }
+
+  .result {
+    align-items: center;
+    border-bottom: 1px solid ${({ theme }) => theme.colors.window.outlineInactive};
+    display: flex;
+    gap: 6px;
+    justify-content: space-between;
+    padding: 7px 10px;
+  }
+
+  .result-main {
+    min-width: 0;
+  }
+
+  .result-name {
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .result-sub {
+    color: ${({ theme }) => theme.colors.titleBar.textInactive};
+    font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Chat header becomes two-line (title + sub) */
+  .chat-header {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .chat-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chat-sub {
+    color: ${({ theme }) => theme.colors.titleBar.textInactive};
+    font-size: 10px;
+    font-weight: 400;
+  }
+
+  /* Media bubbles */
+  .media-img {
+    border-radius: 6px;
+    display: block;
+    max-height: 280px;
+    max-width: 100%;
+  }
+
+  .media-loading,
+  .media-fail {
+    color: ${({ theme }) => theme.colors.titleBar.textInactive};
+    font-size: 11px;
+    font-style: italic;
+  }
+
+  .file-link {
+    background: transparent;
+    border: 0;
+    color: ${({ theme }) => theme.colors.highlight};
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    padding: 0;
+    text-align: left;
+  }
+
+  .msg.locked .body {
+    font-style: italic;
+    opacity: 80%;
+  }
+
+  /* Composer attach button */
+  .attach-btn {
+    background: transparent;
+    border: 1px solid ${({ theme }) => theme.colors.window.outlineInactive};
+    border-radius: 4px;
+    color: ${({ theme }) => theme.colors.text};
+    cursor: pointer;
+    flex: 0 0 auto;
+    font-size: 14px;
+    padding: 6px 9px;
+  }
+
+  .attach-btn:hover {
+    background: ${({ theme }) => theme.colors.taskbar.hover};
+  }
 `;
 
 export default StyledMatrix;

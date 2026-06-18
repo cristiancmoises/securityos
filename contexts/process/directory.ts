@@ -154,8 +154,8 @@ const directory: Processes = {
     Component: dynamic(() => import("components/apps/Matrix")),
     backgroundColor: "#0a1420",
     defaultSize: {
-      height: 560,
-      width: 860,
+      height: 600,
+      width: 900,
     },
     icon: "/System/Icons/matrix.webp",
     singleton: true,
@@ -228,6 +228,17 @@ const directory: Processes = {
     libs: ["/Program Files/Ruffle/ruffle.js"],
     lockAspectRatio: true,
     title: "Ruffle",
+  },
+  ScreenCapture: {
+    Component: dynamic(() => import("components/apps/ScreenCapture")),
+    backgroundColor: "#150f1b",
+    defaultSize: {
+      height: 260,
+      width: 380,
+    },
+    icon: "/System/Icons/photo.webp",
+    singleton: true,
+    title: "Screen Capture",
   },
   Run: {
     Component: dynamic(() => import("components/system/Dialogs/Run")),

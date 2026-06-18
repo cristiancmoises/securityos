@@ -1,6 +1,7 @@
 import http from "http";
 import https from "https";
 import zlib from "zlib";
+import { promisify } from "util";
 import { lookup } from "dns/promises";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { SocksProxyAgent } from "socks-proxy-agent";
@@ -46,11 +47,22 @@ const MAX_BIN_BYTES = 512 * 1024 * 1024;
 const MAX_REDIRECTS = 5;
 
 const TOR_PROXY = process.env.TOR_PROXY || "";
+// Keep-alive / socket pooling for the SOCKS (Tor) agents. Reusing warm Tor circuits
+// instead of doing a fresh SOCKS handshake + circuit build per request is the single
+// biggest perf win here. Stream isolation is UNAFFECTED: each iso token already gets
+// its OWN agent instance (distinct SOCKS userinfo => distinct circuit), so a pooled
+// free socket is only ever reused within the same token's pool — never across tokens.
+const AGENT_OPTS = {
+  keepAlive: true,
+  maxSockets: 64,
+  maxFreeSockets: 16,
+  timeout: FETCH_TIMEOUT_MS,
+};
 // Never let a malformed TOR_PROXY value take down the whole proxy route at module
 // load. A bad/absent agent degrades to "Tor unreachable", reported clearly below.
 let socksAgent: SocksProxyAgent | undefined;
 try {
-  socksAgent = TOR_PROXY ? new SocksProxyAgent(TOR_PROXY) : undefined;
+  socksAgent = TOR_PROXY ? new SocksProxyAgent(TOR_PROXY, AGENT_OPTS) : undefined;
 } catch {
   socksAgent = undefined;
 }
@@ -115,7 +127,9 @@ const agentForToken = (token?: string): SocksProxyAgent | undefined => {
   let agent: SocksProxyAgent;
 
   try {
-    agent = new SocksProxyAgent(proxyUrl);
+    // Same keep-alive pooling as the global agent; this token's pool is private to
+    // its own circuit (distinct SOCKS userinfo), so isolation is preserved.
+    agent = new SocksProxyAgent(proxyUrl, AGENT_OPTS);
   } catch {
     return socksAgent;
   }
@@ -373,12 +387,21 @@ const httpGet = (
     request.end();
   });
 
+// Promisified zlib so decompression runs ASYNCHRONOUSLY (on the libuv threadpool)
+// instead of blocking the event loop with the *Sync variants. We also pass a hard
+// `maxOutputLength` so a small "gzip bomb" can't expand to gigabytes in RAM: zlib
+// aborts the inflate once the decoded size would exceed the cap (it errors, which we
+// treat as a decode failure below — i.e. serve raw bytes, never the unbounded blob).
+const gunzipAsync = promisify(zlib.gunzip);
+const inflateAsync = promisify(zlib.inflate);
+const brotliDecompressAsync = promisify(zlib.brotliDecompress);
+
 // Node's http/https never auto-decompress. We request `identity`, but some servers
 // gzip/deflate/brotli regardless — decode here so the HTML rewriter and the asset
 // passthrough see real bytes (otherwise the page is blank/garbled). A 206 partial
 // is never decoded (a sliced compressed stream can't stand alone) and any decode
 // error falls back to the raw body rather than failing the whole page.
-const decodeBody = (response: ProxyResponse): Buffer => {
+const decodeBody = async (response: ProxyResponse): Promise<Buffer> => {
   const encodingHeader = response.headers["content-encoding"];
   const encoding = (
     Array.isArray(encodingHeader) ? encodingHeader[0] : encodingHeader || ""
@@ -391,18 +414,29 @@ const decodeBody = (response: ProxyResponse): Buffer => {
     return response.body;
   }
 
+  // Bound the DECOMPRESSED size (anti-bomb): a compressed body already passed the
+  // on-the-wire cap in httpGet, but its inflated form could be far larger. Cap the
+  // decoded output at MAX_RESPONSE_BYTES so a tiny gzip bomb can't OOM the process.
   try {
     if (encoding === "gzip" || encoding === "x-gzip") {
-      return zlib.gunzipSync(response.body);
+      return await gunzipAsync(response.body, {
+        maxOutputLength: MAX_RESPONSE_BYTES,
+      });
     }
     if (encoding === "deflate") {
-      return zlib.inflateSync(response.body);
+      return await inflateAsync(response.body, {
+        maxOutputLength: MAX_RESPONSE_BYTES,
+      });
     }
     if (encoding === "br") {
-      return zlib.brotliDecompressSync(response.body);
+      return await brotliDecompressAsync(response.body, {
+        maxOutputLength: MAX_RESPONSE_BYTES,
+      });
     }
   } catch {
-    // Corrupt/truncated stream — serve raw bytes rather than failing the page.
+    // Corrupt/truncated stream, OR a body that inflates past MAX_RESPONSE_BYTES
+    // (gzip bomb): serve the raw bytes rather than failing the page or blowing up
+    // memory. The raw body is already capped on the wire by httpGet.
   }
 
   return response.body;
@@ -781,6 +815,15 @@ const rewriteHtml = (
       return `${pre}${quote}${rewritten}${quote}`;
     }
   );
+  // Lazy-load + async-decode images that don't already opt in: defer off-screen
+  // fetches (each one is a Tor round-trip) so the page paints sooner and idle images
+  // never hit the network. Only touch <img> tags lacking a loading= attribute, so an
+  // author's explicit loading="eager" is respected. Safe in all JS/no-JS modes.
+  out = out.replace(
+    /<img\b(?![^>]*\bloading=)/gi,
+    '<img loading="lazy" decoding="async"'
+  );
+
   out = out.replace(
     /url\(\s*(['"]?)([^'")]+)\1\s*\)/gi,
     (m, _q: string, u: string) => {
@@ -1056,8 +1099,9 @@ const handler = async (
       ? contentTypeHeader[0]
       : contentTypeHeader || "";
     // Decompress once (gzip/br/deflate) so HTML rewriting and asset passthrough
-    // both operate on real bytes; Node then sets a matching content-length.
-    const body = decodeBody(response);
+    // both operate on real bytes; Node then sets a matching content-length. Async +
+    // size-bounded so it neither blocks the event loop nor lets a gzip bomb OOM us.
+    const body = await decodeBody(response);
 
     Object.entries(response.headers).forEach(([key, value]) => {
       if (
@@ -1096,6 +1140,34 @@ const handler = async (
         )
       );
     } else {
+      // Defense in depth on non-HTML/binary bodies: even if a body is mislabeled or
+      // content-sniffed, an empty default-src + sandbox means it can't execute or
+      // pull in anything. X-Content-Type-Options: nosniff is already set above.
+      res.setHeader(
+        "Content-Security-Policy",
+        "default-src 'none'; sandbox"
+      );
+
+      // Immutable sub-resources (images, fonts, CSS, JS) are safe to keep in the
+      // BROWSER's memory cache: a short private max-age lets back/forward and revisits
+      // reuse them instead of re-fetching over Tor (a big perf + circuit-load win),
+      // while staying amnesic — NO disk cache, only this response header. Strictly
+      // scoped to a full (200, non-Range) success so partial/seekable media, HTML and
+      // anything credentialed keep the no-store default set above.
+      const isCacheableType =
+        /^(?:image\/|font\/|text\/css\b|application\/javascript\b)/i.test(
+          contentType
+        );
+
+      if (
+        response.status === 200 &&
+        !req.headers.range &&
+        !response.headers["content-range"] &&
+        isCacheableType
+      ) {
+        res.setHeader("Cache-Control", "private, max-age=600");
+      }
+
       res.end(body);
     }
   } catch (error) {

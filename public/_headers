@@ -5,7 +5,7 @@
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: no-referrer
-  Permissions-Policy: accelerometer=(), autoplay=(self), camera=(), display-capture=(), encrypted-media=(self), fullscreen=(self), gamepad=(self), geolocation=(), gyroscope=(), hid=(), idle-detection=(), magnetometer=(), microphone=(), midi=(), payment=(), publickey-credentials-get=(), screen-wake-lock=(), serial=(), usb=(), xr-spatial-tracking=()
+  Permissions-Policy: accelerometer=(), autoplay=(self "https://yt.securityops.co" "https://chat.securityops.co"), camera=(self "https://chat.securityops.co"), display-capture=(self "https://chat.securityops.co"), encrypted-media=(self "https://yt.securityops.co"), fullscreen=(self "https://yt.securityops.co" "https://chat.securityops.co"), gamepad=(self), geolocation=(), gyroscope=(), hid=(), idle-detection=(), magnetometer=(), microphone=(self "https://chat.securityops.co"), midi=(), payment=(), publickey-credentials-get=(), screen-wake-lock=(), serial=(), usb=(), xr-spatial-tracking=()
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-origin
   X-DNS-Prefetch-Control: off

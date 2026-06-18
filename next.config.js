@@ -78,6 +78,13 @@ const nextConfig = {
     config.resolve = config.resolve || {};
     config.resolve.alias = { ...config.resolve.alias, xmldom: false };
 
+    // matrix-js-sdk's Rust crypto (@matrix-org/matrix-sdk-crypto-wasm) ships a
+    // .wasm; let webpack emit it as a same-origin async chunk under /_next/static
+    // (instantiated via WebAssembly.instantiate — permitted by our
+    // 'wasm-unsafe-eval' CSP). Keeping it same-origin means the crypto never
+    // leaves Tor and never hits a CDN. Mirrors the other in-browser WASM apps.
+    config.experiments = { ...config.experiments, asyncWebAssembly: true };
+
     return config;
   },
 };

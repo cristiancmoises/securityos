@@ -50,6 +50,10 @@ export const DEFAULT_ASCENDING = true;
 
 export const DEFAULT_CLOCK_SOURCE: ClockSource = "local";
 
+// Global desktop media volume (0..1) for the taskbar Volume control.
+export const DEFAULT_VOLUME = 1;
+export const DEFAULT_MUTED = false;
+
 export const DEFAULT_THEME: ThemeName = "defaultTheme";
 
 export const DEFAULT_AI_API = "HuggingFace:"; // Engine:Key

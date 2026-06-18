@@ -515,6 +515,26 @@ const dove = (c, x, y, s, hex, op = 0.9) => {
   c.body.push(`<path d="M${x} ${y} q${s * 0.5} ${-s * 0.5} ${s} ${-s * 0.1} q${-s * 0.3} ${s * 0.05} ${-s * 0.5} ${s * 0.25} q${s * 0.5} ${-s * 0.2} ${s} ${s * 0.1}" fill="none" stroke="${hex}" stroke-width="${s * 0.12}" stroke-linecap="round" opacity="${op}"/>`);
 };
 
+// Stylized BSD "beastie" daemon emblem (horns, grin, trident tail).
+const beastie = (c, cx, cy, s, hex, glowHex) => {
+  const b = blur(c, 16);
+  c.body.push(`<ellipse cx="${cx}" cy="${cy}" rx="${s * 1.25}" ry="${s * 1.4}" fill="${glowHex}" opacity="0.4" filter="url(#${b})"/>`);
+  const grd = lin(c, [["0%", hex], ["100%", glowHex]], 0, 0, 0, 1);
+  // head/body silhouette
+  c.body.push(`<path d="M${cx} ${cy - s * 0.92} Q${cx + s * 0.86} ${cy - s * 0.8} ${cx + s * 0.7} ${cy + s * 0.1} Q${cx + s * 0.5} ${cy + s} ${cx} ${cy + s * 1.12} Q${cx - s * 0.5} ${cy + s} ${cx - s * 0.7} ${cy + s * 0.1} Q${cx - s * 0.86} ${cy - s * 0.8} ${cx} ${cy - s * 0.92} Z" fill="url(#${grd})" stroke="${glowHex}" stroke-width="4"/>`);
+  // horns
+  c.body.push(`<path d="M${cx - s * 0.5} ${cy - s * 0.78} Q${cx - s * 0.78} ${cy - s * 1.3} ${cx - s * 0.42} ${cy - s * 1.42} Q${cx - s * 0.5} ${cy - s * 1.06} ${cx - s * 0.3} ${cy - s * 0.82} Z" fill="${hex}"/>`);
+  c.body.push(`<path d="M${cx + s * 0.5} ${cy - s * 0.78} Q${cx + s * 0.78} ${cy - s * 1.3} ${cx + s * 0.42} ${cy - s * 1.42} Q${cx + s * 0.5} ${cy - s * 1.06} ${cx + s * 0.3} ${cy - s * 0.82} Z" fill="${hex}"/>`);
+  // eyes
+  c.body.push(`<circle cx="${cx - s * 0.26}" cy="${cy - s * 0.3}" r="${s * 0.11}" fill="#1a0202"/>`);
+  c.body.push(`<circle cx="${cx + s * 0.26}" cy="${cy - s * 0.3}" r="${s * 0.11}" fill="#1a0202"/>`);
+  // grin
+  c.body.push(`<path d="M${cx - s * 0.34} ${cy + s * 0.06} Q${cx} ${cy + s * 0.42} ${cx + s * 0.34} ${cy + s * 0.06}" fill="none" stroke="#1a0202" stroke-width="${s * 0.05}"/>`);
+  // trident tail
+  c.body.push(`<line x1="${cx + s * 0.66}" y1="${cy + s * 0.3}" x2="${cx + s * 1.2}" y2="${cy + s * 0.78}" stroke="${hex}" stroke-width="${s * 0.07}" stroke-linecap="round"/>`);
+  c.body.push(`<path d="M${cx + s * 1.1} ${cy + s * 0.6} L${cx + s * 1.34} ${cy + s * 0.62} M${cx + s * 1.2} ${cy + s * 0.78} L${cx + s * 1.42} ${cy + s * 0.86} M${cx + s * 1.12} ${cy + s * 0.92} L${cx + s * 1.3} ${cy + s * 1.04}" stroke="${hex}" stroke-width="${s * 0.06}" stroke-linecap="round"/>`);
+};
+
 // ---------- helper: HUD ring ----------
 const hudRing = (c, cx, cy, r, hex, dashed = true) => {
   c.body.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${hex}" stroke-width="2" opacity="0.5" ${dashed ? `stroke-dasharray="${ri(c, 14, 30)} ${ri(c, 8, 18)}"` : ""}/>`);
@@ -1065,6 +1085,248 @@ const THEMES = {
       particles(c, 44, "#ffe27a", "#c79a1e", 220);
       guixMark(c, W / 2, H * 0.4, 170, "#ffe9a3");
       glow(c, W / 2, H * 0.4, W * 0.16, "#ffcf00", 0.3);
+      vignette(c, 0.86);
+      grainLayer(c, 0.04);
+    },
+  },
+
+  // ---- BSD: the classic daemon ("beastie") on a terminal-red field ----
+  BSD: {
+    "beastie-emblem": (c) => {
+      radialBg(c, [["0%", "#3a0c12"], ["55%", "#1c060a"], ["100%", "#070103"]], W / 2, H * 0.46, W * 0.72);
+      lightRays(c, W / 2, H * 0.46, "#ff5d4d", 22, H * 1.2, 0.1);
+      hudRing(c, W / 2, H * 0.44, 350, "#ff6f5e");
+      glow(c, W / 2, H * 0.44, W * 0.26, "#ff4632", 0.36);
+      beastie(c, W / 2, H * 0.44, 250, "#ff7a63", "#ff4632");
+      brandText(c, W / 2, H * 0.82, "BSD", 92, "#ffd1c6", 30);
+      brandText(c, W / 2, H * 0.87, "the power to serve", 30, "#ff8f7e", 10, 500);
+      vignette(c, 0.9);
+      grainLayer(c, 0.04);
+    },
+    "bsd-daemon-shell": (c) => {
+      bgGrad(c, ["#1c0508", "#120406", "#060102"]);
+      glow(c, W / 2, H / 2, W * 0.5, "#ff4632", 0.12);
+      const tw = W * 0.62;
+      const th = H * 0.5;
+      const tx = (W - tw) / 2;
+      const ty = (H - th) / 2;
+      c.body.push(`<rect x="${tx}" y="${ty}" width="${tw}" height="${th}" rx="16" fill="#0e0405" stroke="#ff4632" stroke-width="2" opacity="0.96"/>`);
+      c.body.push(`<rect x="${tx}" y="${ty}" width="${tw}" height="44" rx="16" fill="#240a0c"/>`);
+      for (let i = 0; i < 3; i += 1)
+        c.body.push(`<circle cx="${tx + 28 + i * 28}" cy="${ty + 22}" r="7" fill="${["#ff5f56", "#ffbd2e", "#27c93f"][i]}"/>`);
+      const lines = [
+        "FreeBSD/amd64 (securityos) (ttyv0)",
+        "login: root   Password: ********",
+        "Last login: Wed Jun 17 on ttyv0",
+        "root@securityos:~ # uname -srm",
+        "FreeBSD 14.0-RELEASE amd64",
+        "root@securityos:~ # pkg install tor",
+        "[+] tor-0.4.8: installed",
+        "root@securityos:~ # service sshd start",
+        "Starting sshd.",
+        "root@securityos:~ # _",
+      ];
+      lines.forEach((ln, i) => {
+        const col = ln.startsWith("[+]") ? "#ff8f7e" : ln.includes("root@") ? "#ff5d4d" : "#ffd1c6";
+        c.body.push(`<text x="${tx + 34}" y="${ty + 92 + i * 46}" font-family="'Sarasa Mono J', monospace" font-size="27" fill="${col}" opacity="0.95">${ln}</text>`);
+      });
+      let sl = "";
+      for (let y = 0; y < H; y += 4) sl += `<rect x="0" y="${y}" width="${W}" height="2" fill="#000" opacity="0.18"/>`;
+      c.body.push(`<g>${sl}</g>`);
+      vignette(c, 0.9);
+    },
+    "bsd-horns": (c) => {
+      bgGrad(c, ["#2a080c", "#160406", "#060102"]);
+      hexGrid(c, "#5a181c", "#ff5d4d");
+      particles(c, 50, "#ff8f7e", "#c2362a", 230);
+      beastie(c, W * 0.74, H * 0.5, 180, "#ff7a63", "#ff4632");
+      glow(c, W * 0.74, H * 0.5, W * 0.2, "#ff4632", 0.28);
+      glow(c, W * 0.24, H * 0.7, W * 0.34, "#ff7a3a", 0.14);
+      vignette(c, 0.88);
+      grainLayer(c, 0.05);
+    },
+  },
+
+  // ---- Unix: classic teletype / PDP era terminal heritage ----
+  Unix: {
+    "unix-tty": (c) => {
+      bgGrad(c, ["#04140a", "#031007", "#000402"]);
+      glow(c, W / 2, H / 2, W * 0.5, "#33ff66", 0.12);
+      const tw = W * 0.66;
+      const th = H * 0.56;
+      const tx = (W - tw) / 2;
+      const ty = (H - th) / 2;
+      c.body.push(`<rect x="${tx}" y="${ty}" width="${tw}" height="${th}" rx="20" fill="#021006" stroke="#1f9c44" stroke-width="3" opacity="0.96"/>`);
+      const lines = [
+        "$ cat /usr/include/unix.h",
+        "/* This is the way the world ends */",
+        "$ ls -l /bin",
+        "-r-xr-xr-x  1 root  wheel  sh",
+        "-r-xr-xr-x  1 root  wheel  ed",
+        "-r-xr-xr-x  1 root  wheel  cc",
+        "$ echo 'hello, world' | rev",
+        "dlrow ,olleh",
+        "$ man 7 hier",
+        "$ _",
+      ];
+      lines.forEach((ln, i) => {
+        const col = ln.startsWith("/*") ? "#6fcf8a" : ln.startsWith("$") ? "#7dffb0" : "#bfffcf";
+        c.body.push(`<text x="${tx + 40}" y="${ty + 80 + i * 48}" font-family="'Sarasa Mono J', monospace" font-size="28" fill="${col}" opacity="0.95">${ln}</text>`);
+      });
+      // phosphor scanlines
+      let sl = "";
+      for (let y = 0; y < H; y += 4) sl += `<rect x="0" y="${y}" width="${W}" height="2" fill="#000" opacity="0.2"/>`;
+      c.body.push(`<g>${sl}</g>`);
+      vignette(c, 0.9);
+      grainLayer(c, 0.05);
+    },
+    "unix-pipes": (c) => {
+      radialBg(c, [["0%", "#08321c"], ["55%", "#041a0e"], ["100%", "#000402"]], W / 2, H * 0.46, W * 0.72);
+      lightRays(c, W / 2, H * 0.46, "#2effa0", 18, H * 1.1, 0.08);
+      hudRing(c, W / 2, H * 0.44, 350, "#39ff8d");
+      glow(c, W / 2, H * 0.44, W * 0.26, "#00e060", 0.32);
+      // ">_" prompt mark
+      c.body.push(`<text x="${W / 2 - 110}" y="${H * 0.46 + 90}" font-family="'Sarasa Mono J', monospace" font-weight="bold" font-size="320" fill="#aaffc8" opacity="0.95" text-anchor="middle">&gt;</text>`);
+      c.body.push(`<rect x="${W / 2 + 40}" y="${H * 0.46 - 30}" width="160" height="26" rx="6" fill="#aaffc8" opacity="0.95"/>`);
+      brandText(c, W / 2, H * 0.82, "U N I X", 88, "#cbffd9", 30);
+      brandText(c, W / 2, H * 0.87, "do one thing well", 30, "#39ff8d", 10, 500);
+      vignette(c, 0.9);
+      grainLayer(c, 0.04);
+    },
+    "unix-grid": (c) => {
+      bgGrad(c, ["#04160c", "#020e07", "#000301"]);
+      glow(c, W / 2, H * 0.6, W * 0.5, "#1aff6a", 0.18);
+      perspectiveGrid(c, "#15a04a", H * 0.6, W / 2, "#7dffb0");
+      particles(c, 44, "#7dffb0", "#1aa04a", 220);
+      glyphRain(c, "#7dffb0", "#14823c", 0.35, 22);
+      vignette(c, 0.86);
+      grainLayer(c, 0.04);
+    },
+  },
+
+  // ---- Space: deep-field nebula + starscape ----
+  Space: {
+    "deep-nebula": (c) => {
+      bgGrad(c, ["#05030f", "#0a0820", "#02010a"]);
+      nebulaLayer(c, "#5a2a9a", 0.0011, 5, 0.55);
+      nebulaLayer(c, "#1c5a8a", 0.0018, 4, 0.4);
+      nebulaLayer(c, "#aa3a7a", 0.0026, 3, 0.28);
+      stars(c, 360, ["#ffffff", "#cfe0ff", "#ffd6f0", "#bda6ff"]);
+      glow(c, W * 0.62, H * 0.4, W * 0.45, "#9d6cff", 0.2);
+      glow(c, W * 0.28, H * 0.68, W * 0.38, "#2fa0ff", 0.16);
+      vignette(c, 0.92);
+      grainLayer(c, 0.03);
+    },
+    "ringed-world": (c) => {
+      radialBg(c, [["0%", "#0a0a22"], ["60%", "#050414"], ["100%", "#010008"]], W / 2, H / 2, W * 0.8);
+      stars(c, 300, ["#ffffff", "#cfe0ff", "#ffe6c8"]);
+      const cx = W * 0.62;
+      const cy = H * 0.5;
+      const pr = 300;
+      // planet
+      const pg = rad(c, [["0%", "#ffd9a0"], ["55%", "#d9863a"], ["100%", "#5a2a14"]], cx - pr * 0.3, cy - pr * 0.3, pr * 1.6);
+      c.body.push(`<circle cx="${cx}" cy="${cy}" r="${pr}" fill="url(#${pg})"/>`);
+      // ring system
+      const b = blur(c, 2);
+      c.body.push(`<g transform="rotate(-18 ${cx} ${cy})" filter="url(#${b})">`);
+      for (let i = 0; i < 6; i += 1)
+        c.body.push(`<ellipse cx="${cx}" cy="${cy}" rx="${pr * (1.5 + i * 0.12)}" ry="${pr * (0.34 + i * 0.028)}" fill="none" stroke="${["#ffe2b0", "#caa46a", "#ffd9a0"][i % 3]}" stroke-width="${(14 - i * 1.6).toFixed(1)}" opacity="${(0.5 - i * 0.05).toFixed(2)}"/>`);
+      c.body.push(`</g>`);
+      // crescent shadow
+      c.body.push(`<circle cx="${cx + pr * 0.45}" cy="${cy}" r="${pr}" fill="#02010a" opacity="0.55"/>`);
+      glow(c, W * 0.2, H * 0.3, W * 0.4, "#3f6fff", 0.14);
+      vignette(c, 0.92);
+      grainLayer(c, 0.03);
+    },
+    "star-forge": (c) => {
+      radialBg(c, [["0%", "#241046"], ["45%", "#0e0a28"], ["100%", "#02010a"]], W / 2, H * 0.45, W * 0.8);
+      nebulaLayer(c, "#7c3aff", 0.0013, 5, 0.45);
+      nebulaLayer(c, "#ff5da0", 0.0021, 4, 0.3);
+      lightRays(c, W / 2, H * 0.45, "#c9a0ff", 26, H * 1.4, 0.12);
+      glow(c, W / 2, H * 0.45, W * 0.28, "#e0c4ff", 0.45);
+      stars(c, 320, ["#ffffff", "#cfe0ff", "#ffd6f0", "#bda6ff"]);
+      particles(c, 40, "#cfa6ff", "#6a4fff", 220);
+      vignette(c, 0.9);
+      grainLayer(c, 0.03);
+    },
+  },
+
+  // ---- Art: abstract generative pieces ----
+  Art: {
+    "flow-field": (c) => {
+      bgGrad(c, ["#101030", "#1a1240", "#070414"]);
+      // flowing ribbon streaks following sine fields
+      const b = blur(c, 2);
+      const cols = ["#ff7ad9", "#7c5cff", "#39e0ff", "#ffd24d", "#46f0b0"];
+      let g = "";
+      for (let i = 0; i < 220; i += 1) {
+        let x = rr(c, 0, W);
+        let y = rr(c, 0, H);
+        const col = pick(c, cols);
+        let d = `M${x.toFixed(1)} ${y.toFixed(1)} `;
+        const steps = ri(c, 14, 40);
+        for (let s = 0; s < steps; s += 1) {
+          const a = (Math.sin(x / 220) + Math.cos(y / 260)) * Math.PI;
+          x += Math.cos(a) * 16;
+          y += Math.sin(a) * 16;
+          d += `L${x.toFixed(1)} ${y.toFixed(1)} `;
+        }
+        g += `<path d="${d}" fill="none" stroke="${col}" stroke-width="${rr(c, 1, 2.6).toFixed(2)}" opacity="${rr(c, 0.18, 0.5).toFixed(2)}" stroke-linecap="round"/>`;
+      }
+      c.body.push(`<g style="mix-blend-mode:screen">${g}</g>`);
+      c.body.push(`<g filter="url(#${b})" opacity="0.5" style="mix-blend-mode:screen">${g}</g>`);
+      glow(c, W * 0.3, H * 0.3, W * 0.4, "#7c5cff", 0.16);
+      glow(c, W * 0.74, H * 0.66, W * 0.36, "#39e0ff", 0.14);
+      vignette(c, 0.82);
+      grainLayer(c, 0.04);
+    },
+    "bauhaus-bloom": (c) => {
+      bgGrad(c, ["#161430", "#241a44", "#0a0716"]);
+      const cols = ["#ff5d8f", "#ffd24d", "#39e0ff", "#7c5cff", "#46f0b0", "#ff7a3a"];
+      let g = "";
+      for (let i = 0; i < 70; i += 1) {
+        const x = rr(c, 0, W);
+        const y = rr(c, 0, H);
+        const s = rr(c, 40, 320);
+        const col = pick(c, cols);
+        const op = rr(c, 0.25, 0.7).toFixed(2);
+        const kind = c.r();
+        if (kind < 0.4)
+          g += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(s / 2).toFixed(1)}" fill="${col}" opacity="${op}"/>`;
+        else if (kind < 0.7)
+          g += `<rect x="${(x - s / 2).toFixed(1)}" y="${(y - s / 2).toFixed(1)}" width="${s.toFixed(1)}" height="${s.toFixed(1)}" fill="${col}" opacity="${op}" transform="rotate(${ri(c, 0, 90)} ${x.toFixed(1)} ${y.toFixed(1)})"/>`;
+        else
+          g += `<path d="M${x.toFixed(1)} ${(y - s / 2).toFixed(1)} L${(x + s / 2).toFixed(1)} ${(y + s / 2).toFixed(1)} L${(x - s / 2).toFixed(1)} ${(y + s / 2).toFixed(1)} Z" fill="${col}" opacity="${op}"/>`;
+      }
+      c.body.push(`<g style="mix-blend-mode:screen">${g}</g>`);
+      vignette(c, 0.8);
+      grainLayer(c, 0.05);
+    },
+    "liquid-marble": (c) => {
+      bgGrad(c, ["#0a0820", "#160e3a", "#05030f"]);
+      nebulaLayer(c, "#ff5da0", 0.0016, 5, 0.4);
+      nebulaLayer(c, "#39c4ff", 0.0024, 4, 0.34);
+      nebulaLayer(c, "#ffd24d", 0.0034, 3, 0.22);
+      // concentric warped rings for a marbled core
+      const b = blur(c, 3);
+      let g = "";
+      const cx = W / 2;
+      const cy = H / 2;
+      for (let i = 1; i <= 16; i += 1) {
+        const rr2 = i * 46;
+        let d = `M${(cx + rr2).toFixed(1)} ${cy.toFixed(1)} `;
+        for (let a = 0; a <= 360; a += 12) {
+          const ang = (a * Math.PI) / 180;
+          const wob = Math.sin(ang * 5 + i) * (12 + i * 2);
+          const px = cx + Math.cos(ang) * (rr2 + wob);
+          const py = cy + Math.sin(ang) * (rr2 + wob);
+          d += `L${px.toFixed(1)} ${py.toFixed(1)} `;
+        }
+        d += "Z";
+        g += `<path d="${d}" fill="none" stroke="${["#ffd6f0", "#bda6ff", "#a6f0ff"][i % 3]}" stroke-width="2" opacity="${(0.4 - i * 0.018).toFixed(2)}"/>`;
+      }
+      c.body.push(`<g filter="url(#${b})" style="mix-blend-mode:screen">${g}</g>`);
+      glow(c, cx, cy, W * 0.3, "#ff7ad9", 0.18);
       vignette(c, 0.86);
       grainLayer(c, 0.04);
     },
