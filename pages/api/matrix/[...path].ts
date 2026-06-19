@@ -148,6 +148,45 @@ const forwardToHomeserver = (
     request.end();
   });
 
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+// Cold/flaky Tor circuits make the FIRST requests fail (which surfaced in the
+// client as a stuck "Connecting over Tor…" — the initial /sync kept erroring).
+// Retry connection-level failures a few times: the Matrix CS-API is idempotent
+// or transaction-deduped (re-login, /sync, /keys/upload, PUT .../send/{txnId}),
+// so a retried request is safe, and a WARMING circuit then succeeds instead of
+// bubbling up an error. We do NOT retry a genuine upstream HTTP response (those
+// resolve), only Tor/socket failures (those reject).
+const MAX_FORWARD_ATTEMPTS = 3;
+const forwardWithRetry = async (
+  targetUrl: string,
+  method: string,
+  headers: Record<string, string>,
+  body: Buffer | undefined
+): Promise<UpstreamResponse> => {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= MAX_FORWARD_ATTEMPTS; attempt += 1) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      return await forwardToHomeserver(targetUrl, method, headers, body);
+    } catch (error) {
+      lastError = error;
+      // A fail-closed Tor misconfig won't fix itself — don't waste retries.
+      if ((error as Error)?.message === "tor-unavailable") break;
+      if (attempt < MAX_FORWARD_ATTEMPTS) {
+        // eslint-disable-next-line no-await-in-loop
+        await sleep(attempt * 800);
+      }
+    }
+  }
+
+  throw lastError;
+};
+
 const sendTorError = (res: NextApiResponse, error: string): void => {
   res
     .status(502)
@@ -223,7 +262,7 @@ const handler = async (
   }
 
   try {
-    const upstream = await forwardToHomeserver(
+    const upstream = await forwardWithRetry(
       targetUrl,
       method,
       headers,

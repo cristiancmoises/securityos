@@ -409,7 +409,22 @@ const useScreenCapture = (): UseScreenCapture => {
           }, 5000);
         });
 
+        const recorderToStop = recorderRef.current;
+
         recorderRef.current = undefined;
+        // CRITICAL: explicitly stop the recorder so it flushes + finalizes the
+        // file. Relying on the source tracks ending is NOT enough for the
+        // webcam-PiP path — the recorder records the canvas captureStream, which
+        // keeps emitting frames after the display/webcam tracks stop, so it would
+        // never stop. stopAllStreams() then tears down every track (incl. the
+        // canvas stream) + the RAF compositing loop.
+        if (recorderToStop && recorderToStop.state !== "inactive") {
+          try {
+            recorderToStop.stop();
+          } catch {
+            // already inactive
+          }
+        }
         stopAllStreams();
 
         return stopPromise;
@@ -549,6 +564,9 @@ const useScreenCapture = (): UseScreenCapture => {
               .getAudioTracks()
               .forEach((track) => composited.addTrack(track));
             recordStream = composited;
+            // Track the canvas captureStream so stopAllStreams() also stops it —
+            // otherwise it keeps emitting and the recorder never stops.
+            auxStreamsRef.current.push(composited);
           }
         } catch {
           // Webcam denied/unavailable — record the screen without the overlay.

@@ -217,6 +217,17 @@ const directory: Processes = {
     lockAspectRatio: true,
     title: "Quake III Arena",
   },
+  Radio: {
+    Component: dynamic(() => import("components/apps/Radio")),
+    backgroundColor: "#1c1e22",
+    defaultSize: {
+      height: 560,
+      width: 760,
+    },
+    icon: "/System/Icons/music.webp",
+    singleton: true,
+    title: "Radio",
+  },
   Ruffle: {
     Component: dynamic(() => import("components/apps/Ruffle")),
     backgroundColor: "#000",

@@ -1,13 +1,15 @@
 import StyledVolume from "components/system/Taskbar/Volume/StyledVolume";
 import { useSession } from "contexts/session";
+import useMasterAudio from "hooks/useMasterAudio";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FOCUSABLE_ELEMENT } from "utils/constants";
 import { haltEvent, label } from "utils/functions";
 
 // Taskbar Volume control: a speaker button (scroll to change, click for a slider
-// popover, with a mute toggle) wired to the global session volume/muted, which is
-// applied to every <audio>/<video> on the desktop. (Webamp/WebAudio apps keep
-// their own internal mixer — this reliably governs native media elements.)
+// popover, with a mute toggle) wired to the global session volume/muted. The
+// actual mixing is done by useMasterAudio(), a TRUE master that governs every
+// <audio>/<video> element AND WebAudio apps (Webamp, the v86 emulator, AudioContext
+// games) via a per-context master GainNode — so this slider controls everything.
 
 const clamp = (value: number): number => Math.min(1, Math.max(0, value));
 
@@ -25,40 +27,17 @@ const VolumeIcon: FC<{ level: number; muted: boolean }> = ({ level, muted }) => 
   </svg>
 );
 
-const applyToMedia = (root: ParentNode, volume: number, muted: boolean): void => {
-  root.querySelectorAll<HTMLMediaElement>("video, audio").forEach((element) => {
-    element.volume = volume;
-    element.muted = muted;
-  });
-};
-
 const Volume: FC = () => {
   const { muted, setMuted, setVolume, volume } = useSession();
   const [showSlider, setShowSlider] = useState(false);
   const lastVolumeRef = useRef(volume || 0.5);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Apply the session volume to all current media + any media added later.
-  useEffect(() => {
-    applyToMedia(document, volume, muted);
-
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-          if (node instanceof HTMLMediaElement) {
-            node.volume = volume;
-            node.muted = muted;
-          } else if (node instanceof Element) {
-            applyToMedia(node, volume, muted);
-          }
-        });
-      });
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    return () => observer.disconnect();
-  }, [muted, volume]);
+  // Master mixer: applies the session volume/muted to ALL web-OS sound — native
+  // media elements AND WebAudio apps (Webamp, v86, AudioContext games). Active
+  // for as long as the taskbar (this component) is mounted, so no other wiring
+  // is needed.
+  useMasterAudio();
 
   // Dismiss the slider on an outside click.
   useEffect(() => {

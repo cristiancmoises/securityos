@@ -4,6 +4,42 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.10.0] — 2026-06-18
+
+### New
+- **Radio** app — listen to internet radio worldwide (radio-browser API), filter
+  by country/genre, HTTPS streams, favorites.
+- **Desktop widgets** (Rainmeter-style, draggable, toggleable): clock, weather
+  (open-meteo, searchable city), JS-heap memory gauge, estimated CPU load, and an
+  RSS news feed (fetched over Tor via the proxy).
+- **Lock screen** + a **Lock** button in the Start Menu: frosted overlay with a
+  big clock over the (blurred) wallpaper, optional PIN (salted SHA-256), idle
+  auto-lock; stays locked across reload.
+- **Master volume** — the taskbar volume now controls ALL web-OS sound: native
+  `<audio>/<video>` plus WebAudio apps (Webamp, the v86 emulator, AudioContext
+  games) via per-context master gain nodes, and Webamp's own mixer.
+
+### Cloudmacs
+- **TDLib** built into the image (`libtdjson` 1.8.65) + a C toolchain, so Telega
+  is fully functional (`M-x telega-server-build`). Telega + **whatsappel** are
+  loaded; **Spacemacs** boots with a **SecurityOps ASCII banner** and auto-installs
+  everything on first open. Cloudmacs also appears in **"Open with"** for text/code.
+
+### Fixes
+- **Screen recorder: Stop now actually stops.** With the webcam picture-in-picture
+  the recorder was recording the canvas `captureStream` (untracked) and the stop
+  path never called `recorder.stop()` — so it kept going. Now it stops the recorder
+  explicitly and tears down the canvas stream.
+- **Matrix "Connecting over Tor…" stuck.** Diagnosed: crypto init is fast; the
+  initial `/sync` failed on cold/flaky Tor. Added **server-side retry** in the
+  matrix proxy so cold circuits succeed on retry (on top of the tight sync filter).
+- **Video/VLC player bar icons** — visible again (dark glyphs on the light button
+  chrome, instead of theme-light → invisible).
+- **Vaptvupt download/upload "Method Not Allowed".** The Tor proxy now forwards
+  **POST/multipart** bodies (64 MiB cap) over Tor — SSRF-guarded, cookie-less,
+  fail-closed, redirects re-validated — so the share's upload form + downloads work
+  through the proxy.
+
 ## [2.9.0] — 2026-06-18
 
 ### Cloudmacs — Spacemacs + productivity tools
