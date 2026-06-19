@@ -30,7 +30,14 @@ RUN cp /root/go/bin/gotty /usr/local/bin/gotty \
 # build telega-server against TDLib at first use.
 COPY --from=tdlib /usr/local/lib/ /usr/local/lib/
 COPY --from=tdlib /usr/local/include/td /usr/local/include/td
-RUN apk add --no-cache build-base openssl-dev zlib-dev \
+# git + ca-certificates: REQUIRED so Spacemacs can install GitHub-recipe packages.
+#   Spacemacs' built-in spacemacs-editing-visual layer installs `term-cursor` via a
+#   github recipe (h0d/term-cursor.el) which quelpa clones with `git`. Without git
+#   that ONE package fails ("error during installing of term-cursor") while the
+#   ~215 MELPA tarball packages install fine — exactly the symptom we hit.
+# gnupg: lets ELPA verify signed package archives instead of warning/failing.
+# ripgrep: Spacemacs' preferred search tool (dotspacemacs-search-tools "rg" …).
+RUN apk add --no-cache build-base openssl-dev zlib-dev git ca-certificates gnupg ripgrep \
  && (ldconfig /usr/local/lib 2>/dev/null || true)
 ENV LD_LIBRARY_PATH=/usr/local/lib
 

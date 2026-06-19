@@ -4,6 +4,40 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.11.0] — 2026-06-18
+
+### Fixes
+- **Matrix "stuck before login" — root-caused with a headless browser.** Reproduced
+  the hang in Chromium: the login form renders fine, but the very first request
+  (`POST /login`) lands on a **cold Tor circuit**, which takes 16–40s to build, so
+  it looks frozen. (Measured: cold `POST /login` = 16.4s, warm = 1.4s; the proxy and
+  E2EE were never the problem.) Fix: the app now **pre-warms the Tor circuit** the
+  moment it opens (background `GET /versions`), so by the time you've typed your
+  credentials the circuit is built and sign-in is ~1.5s. The login screen shows the
+  circuit state (⏳ establishing / ✓ ready / slow) and a "first connection can take
+  15–40s" hint, and a wrong password now says **"Invalid username or password"**
+  instead of a scary "Connection error".
+- **Cloudmacs: `term-cursor` package failed to install + missing folders.** The
+  image had **no `git`**, so Spacemacs' built-in `spacemacs-editing-visual` layer
+  couldn't clone its one GitHub-recipe package (`term-cursor`) — while the ~215
+  MELPA tarball packages installed fine. Added `git` (+ `ca-certificates`, `gnupg`,
+  `ripgrep`) to the image, and pre-create the `data/org` + `.telega` folders
+  (telega state now persists across restarts).
+
+### New
+- **Webcam effects / themes** in Screen Capture — pick a theme for the webcam
+  picture-in-picture (and a live preview): **Matrix (digital rain)**, Grayscale,
+  Sepia, Neon/Invert, Blur, and a **Background blur** option (best-effort,
+  CSP-clean; true segmentation would need a self-hosted model).
+- **Widgets: Calendar** (month grid, today highlighted, prev/next) and a **Post-it**
+  sticky note (editable, persisted).
+
+### Changed
+- **Widgets default layout** — on first start the desktop now shows the **Clock
+  centered at top** and **News at top-right** (both visible); other widgets stay
+  hidden until toggled. Existing saved layouts are untouched.
+- **Removed the CPU widget** (the estimate was noisy/inaccurate).
+
 ## [2.10.0] — 2026-06-18
 
 ### New

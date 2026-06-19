@@ -96,6 +96,8 @@ services:
       - ${HOME}/.spacemacs.d:/home/emacs/.spacemacs.d
       - ${HOME}/whatsappel:/home/emacs/whatsappel:ro
       - ${HOME}/cloudmacs-data:/home/emacs/data
+      # Persist telega (Telegram) state/cache so you don't re-auth every restart.
+      - ${HOME}/cloudmacs-telega:/home/emacs/.telega
     mem_limit: 2g
     pids_limit: 1024
     ports:

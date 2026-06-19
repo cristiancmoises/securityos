@@ -58,6 +58,7 @@ const Matrix: FC<ComponentProcessProps> = () => {
     acceptInvite,
     activeRoom,
     busy,
+    circuit,
     conn,
     cryptoReady,
     error,
@@ -458,6 +459,20 @@ const Matrix: FC<ComponentProcessProps> = () => {
             <button className="primary-btn" disabled={loggingIn} type="submit">
               {loggingIn ? "Signing in…" : "Sign in"}
             </button>
+            {loggingIn ? (
+              <p className="hint">
+                Connecting over Tor… the first connection can take 15–40 seconds
+                while the circuit builds.
+              </p>
+            ) : circuit === "warming" ? (
+              <p className="hint">⏳ Establishing Tor circuit — makes sign-in fast…</p>
+            ) : circuit === "ready" ? (
+              <p className="hint">✓ Tor circuit ready — sign-in will be quick.</p>
+            ) : (
+              <p className="hint">
+                Tor circuit is slow right now — sign-in may take up to a minute.
+              </p>
+            )}
             <p className="hint">
               Encryption keys live in memory only — closing this window forgets
               them.

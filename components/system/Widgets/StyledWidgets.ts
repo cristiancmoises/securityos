@@ -13,7 +13,8 @@ export const StyledWidgetsLayer = styled.div`
   /* Re-enable interaction on the actual interactive children. */
   button,
   input,
-  select {
+  select,
+  textarea {
     pointer-events: auto;
   }
 `;
@@ -330,5 +331,107 @@ export const StyledWidgetCard = styled.div`
 
   .widget-error {
     color: ${({ theme }) => theme.colors.titleBar.closeHover};
+  }
+
+  .calendar {
+    font-family: ${({ theme }) => theme.formats.systemFont};
+    width: 224px;
+
+    .calendar-header {
+      align-items: center;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .calendar-month {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .calendar-nav {
+      background: none;
+      border: 1px solid ${({ theme }) => theme.colors.accent.edge};
+      border-radius: 4px;
+      color: ${({ theme }) => theme.colors.text};
+      cursor: pointer;
+      font-size: 14px;
+      height: 22px;
+      line-height: 1;
+      padding: 0;
+      width: 22px;
+
+      &:hover,
+      &:focus-visible {
+        background-color: ${({ theme }) => theme.colors.highlightBackground};
+        outline: none;
+      }
+    }
+
+    .calendar-grid {
+      display: grid;
+      gap: 2px;
+      grid-template-columns: repeat(7, 1fr);
+    }
+
+    .calendar-weekday {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      opacity: 0.55;
+      padding-bottom: 2px;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .calendar-day {
+      align-items: center;
+      border-radius: 4px;
+      display: flex;
+      font-size: 12px;
+      height: 26px;
+      justify-content: center;
+
+      &.muted {
+        opacity: 0.3;
+      }
+
+      &.today {
+        background-color: ${({ theme }) => theme.colors.highlight};
+        color: ${({ theme }) => theme.colors.background};
+        font-weight: 600;
+      }
+    }
+  }
+
+  &.postit {
+    background-color: hsla(48, 95%, 60%, 92%);
+    border-color: hsla(45, 80%, 45%, 80%);
+    color: hsl(40, 35%, 12%);
+
+    .widget-title {
+      opacity: 0.6;
+    }
+
+    .postit-text {
+      background: transparent;
+      border: none;
+      color: inherit;
+      cursor: text;
+      font-family: ${({ theme }) => theme.formats.systemFont};
+      font-size: 13px;
+      height: 132px;
+      line-height: 1.4;
+      outline: none;
+      padding: 0;
+      resize: none;
+      -webkit-user-select: text;
+      user-select: text;
+      width: 188px;
+
+      &::placeholder {
+        color: hsla(40, 35%, 12%, 55%);
+      }
+    }
   }
 `;

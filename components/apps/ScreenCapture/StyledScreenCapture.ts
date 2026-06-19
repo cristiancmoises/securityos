@@ -88,6 +88,27 @@ const StyledScreenCapture = styled.div`
     padding: 2px 6px;
   }
 
+  .webcam-preview {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .webcam-preview canvas {
+    background: #000;
+    border: 1px solid ${({ theme }) => theme.colors.highlight};
+    border-radius: 6px;
+    height: 120px;
+    object-fit: cover;
+    width: 160px;
+  }
+
+  .webcam-preview .preview-label {
+    color: ${({ theme }) => theme.colors.titleBar.textInactive};
+    font-size: 10px;
+  }
+
   .actions {
     display: flex;
     flex-wrap: wrap;
