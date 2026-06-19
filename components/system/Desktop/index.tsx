@@ -1,3 +1,4 @@
+import { ErrorBoundary } from "components/pages/ErrorBoundary";
 import StyledDesktop from "components/system/Desktop/StyledDesktop";
 import useFilePaste from "components/system/Desktop/useFilePaste";
 import useWallpaper from "components/system/Desktop/Wallpapers/useWallpaper";
@@ -25,7 +26,12 @@ const Desktop: FC = ({ children }) => {
         loadIconsImmediately
         preloadShortcuts
       />
-      <Widgets />
+      {/* A widget crash must NEVER take down the desktop. A non-null fallback
+          (empty fragment) keeps this boundary local + silent: it renders nothing
+          and does NOT trigger the top-level auto-reload. */}
+      <ErrorBoundary FallbackRender={<></>}>
+        <Widgets />
+      </ErrorBoundary>
       {children}
     </StyledDesktop>
   );

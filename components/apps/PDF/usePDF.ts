@@ -84,21 +84,27 @@ const usePDF = (
     if (window.pdfjsLib && url && containerRef.current) {
       setLoading(true);
 
-      const doc = await window.pdfjsLib.getDocument(await readFile(url))
-        .promise;
+      try {
+        const doc = await window.pdfjsLib.getDocument(await readFile(url))
+          .promise;
 
-      argument(id, "count", doc.numPages);
-      setPages(
-        await Promise.all(
-          Array.from({ length: doc.numPages }).map((_, i) =>
-            renderPage(i + 1, doc)
+        argument(id, "count", doc.numPages);
+        setPages(
+          await Promise.all(
+            Array.from({ length: doc.numPages }).map((_, i) =>
+              renderPage(i + 1, doc)
+            )
           )
-        )
-      );
-      prependFileToTitle(basename(url));
+        );
+        prependFileToTitle(basename(url));
+      } catch {
+        setPages([]);
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      setLoading(false);
     }
-
-    setLoading(false);
   }, [
     argument,
     containerRef,
@@ -111,15 +117,17 @@ const usePDF = (
   ]);
 
   useEffect(() => {
-    loadFiles(libs).then(() => {
-      if (window.pdfjsLib) {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-          "/Program Files/PDF.js/pdf.worker.js";
+    loadFiles(libs)
+      .then(() => {
+        if (window.pdfjsLib) {
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+            "/Program Files/PDF.js/pdf.worker.js";
 
-        renderPages();
-      }
-    });
-  }, [libs, renderPages]);
+          renderPages();
+        }
+      })
+      .catch(() => setLoading(false));
+  }, [libs, renderPages, setLoading]);
 
   useEffect(() => {
     if (pages.length > 0) {

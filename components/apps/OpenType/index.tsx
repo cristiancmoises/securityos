@@ -61,12 +61,18 @@ const OpenType: FC<ComponentProcessProps> = ({ id }) => {
   const { processes: { [id]: { url = "" } = {} } = {}, title } = useProcesses();
   const { readFile } = useFileSystem();
   const [font, setFont] = useState<Font>();
+  const mountedRef = useRef(true);
   const loadFont = useCallback(
     async (fontUrl: string) => {
-      const { default: openType } = await import("opentype.js");
-      const { buffer } = await readFile(fontUrl);
+      try {
+        const { default: openType } = await import("opentype.js");
+        const { buffer } = await readFile(fontUrl);
+        const parsedFont = openType.parse(buffer);
 
-      setFont(openType.parse(buffer));
+        if (mountedRef.current) setFont(parsedFont);
+      } catch {
+        // Stale/missing/invalid font: leave font undefined and show nothing
+      }
     },
     [readFile]
   );
@@ -84,6 +90,13 @@ const OpenType: FC<ComponentProcessProps> = ({ id }) => {
       version: extractTextValue(font?.names.version),
     };
   }, [font]);
+
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+    },
+    []
+  );
 
   useEffect(() => {
     if (url) loadFont(url);

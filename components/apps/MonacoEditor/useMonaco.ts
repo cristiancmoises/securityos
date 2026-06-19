@@ -82,7 +82,7 @@ const useMonaco = (
   }, [monaco]);
 
   useEffect(() => {
-    editor?.onKeyDown(async (event) => {
+    const d = editor?.onKeyDown(async (event) => {
       const { ctrlKey, code, keyCode } = event;
 
       if (ctrlKey && (code === "KeyS" || keyCode === 83)) {
@@ -97,6 +97,8 @@ const useMonaco = (
         }
       }
     });
+
+    return () => d?.dispose();
   }, [editor, prependFileToTitle, updateFolder, url, writeFile]);
 
   useEffect(() => {

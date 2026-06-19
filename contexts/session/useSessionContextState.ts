@@ -191,7 +191,20 @@ const useSessionContextState = (): SessionContextState => {
             session.iconPositions &&
             Object.keys(session.iconPositions).length > 0
           ) {
-            setIconPositions(session.iconPositions);
+            // Persisted icon positions are passed straight to React as a `style`
+            // prop on the desktop; a malformed value (string/array/null from an
+            // old or corrupt session) makes React throw during render and blanks
+            // the desktop. Keep only well-formed object entries.
+            const validIconPositions = Object.fromEntries(
+              Object.entries(session.iconPositions).filter(
+                ([, pos]) =>
+                  pos && typeof pos === "object" && !Array.isArray(pos)
+              )
+            );
+
+            if (Object.keys(validIconPositions).length > 0) {
+              setIconPositions(validIconPositions);
+            }
           }
           if (
             session.windowStates &&

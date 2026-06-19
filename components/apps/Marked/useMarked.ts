@@ -29,7 +29,14 @@ const useMarked = (
   const { prependFileToTitle } = useTitle(id);
   const { open, processes: { [id]: { libs = [] } = {} } = {} } = useProcesses();
   const loadFile = useCallback(async () => {
-    const markdownFile = await readFile(url);
+    let markdownFile: Buffer;
+
+    try {
+      markdownFile = await readFile(url);
+    } catch {
+      markdownFile = Buffer.from("");
+    }
+
     const container = containerRef.current?.querySelector(
       "article"
     ) as HTMLElement;
@@ -60,16 +67,18 @@ const useMarked = (
 
   useEffect(() => {
     if (loading) {
-      loadFiles(libs).then(() => {
-        if (window.marked) {
-          setLoading(false);
-        }
-      });
+      loadFiles(libs)
+        .then(() => {
+          if (window.marked) {
+            setLoading(false);
+          }
+        })
+        .catch(() => setLoading(false));
     }
   }, [libs, loading, setLoading]);
 
   useEffect(() => {
-    if (!loading && url) loadFile();
+    if (!loading && url) loadFile().catch(() => {});
   }, [loadFile, loading, url]);
 };
 

@@ -143,9 +143,22 @@ const useRadio = (): UseRadio => {
   const [countries, setCountries] = useState<Country[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
-  const [favorites, setFavorites] = useState<Favorite[]>(() =>
-    readJson<Favorite[]>(LS_FAVORITES, [])
-  );
+  const [favorites, setFavorites] = useState<Favorite[]>(() => {
+    // Guard against corrupt/stale localStorage that is valid JSON but not an
+    // array of well-formed favorites — otherwise favorites.some/.map throw
+    // during render. Drop malformed entries instead of crashing the app.
+    const stored = readJson<Favorite[]>(LS_FAVORITES, []);
+
+    return Array.isArray(stored)
+      ? stored.filter(
+          (f) =>
+            f &&
+            typeof f.uuid === "string" &&
+            typeof f.url === "string" &&
+            typeof f.name === "string"
+        )
+      : [];
+  });
   const [country, setCountryState] = useState(initialPrefs.country);
   const [tag, setTagState] = useState(initialPrefs.tag);
   const [searchTerm, setSearchTerm] = useState("");

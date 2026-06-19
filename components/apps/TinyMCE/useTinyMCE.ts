@@ -79,24 +79,28 @@ const useTinyMCE = (
   }, [containerRef, editor?.mode, open]);
   const loadFile = useCallback(async () => {
     if (editor) {
-      const fileContents = await readFile(url);
+      try {
+        const fileContents = await readFile(url);
 
-      if (fileContents.length > 0) setReadOnlyMode(editor);
+        if (fileContents.length > 0) setReadOnlyMode(editor);
 
-      if (extname(url) === ".rtf") {
-        const { RTFJS } = (await import("rtf.js")) as unknown as IRTFJS;
-        const rtfDoc = new RTFJS.Document(fileContents);
-        const rtfHtml = await rtfDoc.render();
+        if (extname(url) === ".rtf") {
+          const { RTFJS } = (await import("rtf.js")) as unknown as IRTFJS;
+          const rtfDoc = new RTFJS.Document(fileContents);
+          const rtfHtml = await rtfDoc.render();
 
-        editor.setContent(
-          rtfHtml.map((domElement) => domElement.outerHTML).join("")
-        );
-      } else {
-        editor.setContent(fileContents.toString());
+          editor.setContent(
+            rtfHtml.map((domElement) => domElement.outerHTML).join("")
+          );
+        } else {
+          editor.setContent(fileContents.toString());
+        }
+
+        linksToProcesses();
+        updateTitle(url);
+      } catch {
+        // Stale/missing file: leave a blank document instead of hanging
       }
-
-      linksToProcesses();
-      updateTitle(url);
     }
   }, [editor, linksToProcesses, readFile, updateTitle, url]);
 
@@ -189,7 +193,7 @@ const useTinyMCE = (
   ]);
 
   useEffect(() => {
-    if (url && editor) loadFile();
+    if (url && editor) loadFile().catch(() => {});
   }, [editor, loadFile, readFile, url]);
 
   useEffect(

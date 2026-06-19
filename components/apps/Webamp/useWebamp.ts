@@ -65,6 +65,7 @@ const useWebamp = (id: string): Webamp => {
   const { onDrop } = useFileDrop({ id });
   const metadataProviderRef = useRef<number>();
   const windowPositionDebounceRef = useRef<number>();
+  const cycleTimerRef = useRef<number>();
   const initWebamp = useCallback(
     (
       containerElement: HTMLDivElement,
@@ -171,6 +172,7 @@ const useWebamp = (id: string): Webamp => {
           }, TRANSITIONS_IN_MILLISECONDS.WINDOW);
           window.clearInterval(metadataProviderRef.current);
           window.clearInterval(windowPositionDebounceRef.current);
+          window.clearInterval(cycleTimerRef.current);
         }),
         webamp.onMinimize(() => onMinimize()),
         webamp.onTrackDidChange((track) => {
@@ -255,7 +257,9 @@ const useWebamp = (id: string): Webamp => {
       webamp.renderWhenReady(containerElement).then(() => {
         closeEqualizer(webamp);
         enabledMilkdrop(webamp);
-        loadMilkdropWhenNeeded(webamp);
+        loadMilkdropWhenNeeded(webamp, (cycleTimerId) => {
+          cycleTimerRef.current = cycleTimerId;
+        });
         updateWebampPosition(webamp, position);
         setupElements();
 

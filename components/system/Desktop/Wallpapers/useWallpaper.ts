@@ -47,8 +47,17 @@ const useWallpaper = (
 ): void => {
   const { exists, lstat, readFile, readdir, updateFolder, writeFile } =
     useFileSystem();
-  const { sessionLoaded, setWallpaper, wallpaperImage, wallpaperFit } =
-    useSession();
+  const {
+    sessionLoaded,
+    setWallpaper,
+    wallpaperImage: rawWallpaperImage,
+    wallpaperFit,
+  } = useSession();
+  // A corrupt/old session could persist a non-string wallpaperImage; coerce so
+  // `.split`/comparisons below never throw during render (which would bubble to
+  // the top ErrorBoundary).
+  const wallpaperImage =
+    typeof rawWallpaperImage === "string" ? rawWallpaperImage : "";
   const { colors } = useTheme();
   const [wallpaperName] = wallpaperImage.split(" ");
   const vantaWireframe = wallpaperImage === "VANTA WIREFRAME";

@@ -71,9 +71,13 @@ const StatusBar: FC<ComponentProcessProps> = ({ id }) => {
       updatePosition();
     };
 
-    editor?.onDidChangeModelContent(updateLineCount);
-    editor?.onDidChangeCursorPosition(updatePosition);
-    editor?.onDidChangeModel(updateModel);
+    const subs = [
+      editor?.onDidChangeModelContent(updateLineCount),
+      editor?.onDidChangeCursorPosition(updatePosition),
+      editor?.onDidChangeModel(updateModel),
+    ];
+
+    return () => subs.forEach((s) => s?.dispose());
   }, [editor]);
 
   return (

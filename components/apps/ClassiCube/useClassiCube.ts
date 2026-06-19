@@ -43,6 +43,13 @@ const useClassiCube = (
   );
 
   useEffect(() => {
+    // CCModule is created asynchronously in the load effect below. A restored
+    // window size can fire this effect before it exists, and reading a property
+    // of an undefined window.CCModule throws (optional-chaining the method does
+    // not help). Mirror Quake3 and bail until the module is present, avoiding a
+    // crash that can bubble to the top boundary and trigger a desktop reload loop.
+    if (!window.CCModule) return;
+
     if (size) {
       window.CCModule.setCanvasSize?.(
         pxToNum(size.width),
