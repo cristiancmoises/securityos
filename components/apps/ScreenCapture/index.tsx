@@ -1,3 +1,10 @@
+import {
+  createWebcamEffectState,
+  DEFAULT_WEBCAM_EFFECT,
+  drawWebcamEffect,
+  WEBCAM_EFFECT_OPTIONS,
+  type WebcamEffect,
+} from "components/apps/ScreenCapture/effects";
 import StyledScreenCapture from "components/apps/ScreenCapture/StyledScreenCapture";
 import type { ComponentProcessProps } from "components/system/Apps/RenderComponent";
 import { useProcesses } from "contexts/process";
@@ -9,7 +16,7 @@ import useScreenCapture, {
   type RecordFrameRate,
   type ScreenshotFormat,
 } from "hooks/useScreenCapture";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // Screen Capture — a small first-party tool that screenshots (PNG/JPEG → Pictures)
 // or records (WEBM → Desktop) the screen via getDisplayMedia. Captures everything
@@ -56,6 +63,9 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
     takeScreenshot,
   } = useScreenCapture();
   const { open } = useProcesses();
+  // Canvas for the small live webcam-effect preview shown while configuring the
+  // overlay (before a recording starts).
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const [status, setStatus] = useState("");
   const [delaySeconds, setDelaySeconds] = useState(0);
   const [format, setFormat] = useState<ScreenshotFormat>("png");
@@ -67,6 +77,8 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
   const [webcamPosition, setWebcamPosition] =
     useState<PipPosition>("bottom-right");
   const [webcamSize, setWebcamSize] = useState<PipSize>("medium");
+  const [webcamEffect, setWebcamEffect] =
+    useState<WebcamEffect>(DEFAULT_WEBCAM_EFFECT);
   const [frameRate, setFrameRate] = useState<RecordFrameRate>(30);
   const [quality, setQuality] = useState<QualityPreset>("balanced");
   // Pre-recording countdown (seconds) before the recorder starts.
@@ -113,6 +125,78 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
       setWebcamDeviceId(cameras[0].deviceId);
     }
   }, [cameras, webcamDeviceId]);
+
+  // Whether the small live webcam-effect preview should be active: the overlay
+  // is enabled and we're idle (not counting/recording — the recorder owns the
+  // camera then, and most browsers won't open it twice).
+  const showWebcamPreview =
+    canWebcam && webcam && !isRecording && !counting;
+
+  // Live preview of the chosen webcam theme. Opens a low-res webcam stream and
+  // runs the same effect renderer used by the recording draw loop, so the user
+  // sees exactly what the PiP overlay will look like. Fully fail-soft: any
+  // permission/effect error just leaves the preview blank and never disrupts
+  // the recording flow. The stream is released as soon as the preview hides.
+  useEffect(() => {
+    if (!showWebcamPreview) return undefined;
+
+    let stream: MediaStream | undefined;
+    let rafId = 0;
+    let cancelled = false;
+    const video = document.createElement("video");
+    const effectState = createWebcamEffectState();
+
+    const start = async (): Promise<void> => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: webcamDeviceId
+            ? { deviceId: { exact: webcamDeviceId } }
+            : true,
+        });
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+
+          return;
+        }
+        video.srcObject = stream;
+        video.muted = true;
+        await video.play();
+
+        const render = (): void => {
+          const canvas = previewCanvasRef.current;
+          const context = canvas?.getContext("2d");
+
+          if (canvas && context) {
+            try {
+              drawWebcamEffect(
+                context,
+                video,
+                canvas.width,
+                canvas.height,
+                webcamEffect,
+                effectState
+              );
+            } catch {
+              // An effect bug must never break the preview loop.
+            }
+          }
+          rafId = requestAnimationFrame(render);
+        };
+
+        render();
+      } catch {
+        // Camera denied/unavailable — leave the preview blank.
+      }
+    };
+
+    start();
+
+    return () => {
+      cancelled = true;
+      if (rafId) cancelAnimationFrame(rafId);
+      stream?.getTracks().forEach((track) => track.stop());
+    };
+  }, [showWebcamPreview, webcamDeviceId, webcamEffect]);
 
   // Open the freshly saved capture in its viewer (Photos / VideoPlayer). Never
   // let a failed open break the core save flow.
@@ -172,6 +256,7 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
         systemAudio,
         webcam,
         webcamDeviceId,
+        webcamEffect,
         webcamPosition,
         webcamSize,
       });
@@ -391,6 +476,30 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
             </select>
           </label>
         )}
+        {canWebcam && webcam && (
+          <label
+            title={
+              webcamEffect === "background-blur"
+                ? "Best-effort background blur (true segmentation needs a self-hosted model)"
+                : "Visual theme applied to the webcam overlay"
+            }
+          >
+            Webcam theme
+            <select
+              disabled={!canRecord || isRecording || counting}
+              onChange={(event) =>
+                setWebcamEffect(event.target.value as WebcamEffect)
+              }
+              value={webcamEffect}
+            >
+              {WEBCAM_EFFECT_OPTIONS.map((effect) => (
+                <option key={effect.value} value={effect.value}>
+                  {effect.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label>
           <input
             checked={openAfter}
@@ -401,6 +510,12 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
           Open after capture
         </label>
       </div>
+      {showWebcamPreview && (
+        <div className="webcam-preview">
+          <canvas height={120} ref={previewCanvasRef} width={160} />
+          <span className="preview-label">Webcam theme preview</span>
+        </div>
+      )}
       <div className="actions">
         <button
           disabled={!canScreenshot || isRecording || counting}

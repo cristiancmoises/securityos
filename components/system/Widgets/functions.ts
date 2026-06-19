@@ -1,11 +1,15 @@
 import {
+  CLOCK_CARD_WIDTH,
   DEFAULT_WIDGETS_STATE,
+  EDGE_MARGIN,
+  NEWS_CARD_WIDTH,
   WIDGET_ORDER,
   WIDGETS_STORAGE_KEY,
 } from "components/system/Widgets/constants";
 import type {
   WeatherLocation,
   WidgetId,
+  WidgetPosition,
   WidgetsState,
 } from "components/system/Widgets/types";
 
@@ -80,13 +84,118 @@ export const shortDay = (isoDate: string): string => {
     : date.toLocaleDateString(undefined, { weekday: "short" });
 };
 
+/** A single day cell in the Calendar widget's month grid. */
+export type CalendarCell = {
+  /** Day-of-month number (1..31). */
+  day: number;
+  /** True when this cell is today (only for the displayed month/year). */
+  isToday: boolean;
+  /** False for leading/trailing cells that belong to an adjacent month. */
+  inMonth: boolean;
+};
+
+/**
+ * Build a 6-row (42-cell) month grid for `year`/`month` (month is 0-based),
+ * Sunday-first, including the leading/trailing days of the neighbouring months
+ * so every week is full. `today` is passed in so the logic stays pure/testable.
+ */
+export const buildCalendarGrid = (
+  year: number,
+  month: number,
+  today: Date
+): CalendarCell[] => {
+  const firstOfMonth = new Date(year, month, 1);
+  const startWeekday = firstOfMonth.getDay(); // 0 = Sunday
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+  const isCurrentMonth =
+    today.getFullYear() === year && today.getMonth() === month;
+  const todayDate = today.getDate();
+
+  const cells: CalendarCell[] = [];
+
+  // Leading days from the previous month.
+  for (let i = startWeekday - 1; i >= 0; i -= 1) {
+    cells.push({
+      day: daysInPrevMonth - i,
+      inMonth: false,
+      isToday: false,
+    });
+  }
+
+  // Days of the displayed month.
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    cells.push({
+      day,
+      inMonth: true,
+      isToday: isCurrentMonth && day === todayDate,
+    });
+  }
+
+  // Trailing days from the next month to fill a 6x7 grid.
+  let nextDay = 1;
+
+  while (cells.length < 42) {
+    cells.push({
+      day: nextDay,
+      inMonth: false,
+      isToday: false,
+    });
+    nextDay += 1;
+  }
+
+  return cells;
+};
+
+/** "June 2026" style label for the Calendar header. */
+export const monthLabel = (year: number, month: number): string =>
+  new Date(year, month, 1).toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
+
+/**
+ * Responsive first-run positions: Clock centered near the top, News pinned to
+ * the top-right. Falls back to the static defaults when there is no viewport
+ * (SSR), so first paint still has sensible positions.
+ */
+export const defaultFirstRunPositions = (): Partial<
+  Record<WidgetId, WidgetPosition>
+> => {
+  const positions = { ...DEFAULT_WIDGETS_STATE.positions };
+
+  if (typeof window === "undefined") return positions;
+
+  const width = window.innerWidth || 0;
+
+  positions.clock = {
+    x: Math.max(EDGE_MARGIN, Math.round((width - CLOCK_CARD_WIDTH) / 2)),
+    y: EDGE_MARGIN,
+  };
+  positions.news = {
+    x: Math.max(EDGE_MARGIN, width - NEWS_CARD_WIDTH - EDGE_MARGIN),
+    y: EDGE_MARGIN,
+  };
+
+  return positions;
+};
+
 /**
  * Defensive merge of persisted state onto defaults so adding a new widget id
  * later never breaks an older saved layout.
+ *
+ * When `raw` is empty/invalid (no saved layout) we apply the responsive
+ * first-run positions (Clock middle-top, News top-right). Any saved layout is
+ * left untouched apart from filling in fields/widgets that didn't exist yet.
  */
 export const normalizeState = (raw: unknown): WidgetsState => {
+  const hasSaved = Boolean(raw) && typeof raw === "object";
+
   const base: WidgetsState = {
-    positions: { ...DEFAULT_WIDGETS_STATE.positions },
+    positions: hasSaved
+      ? { ...DEFAULT_WIDGETS_STATE.positions }
+      : defaultFirstRunPositions(),
     settings: {
       ...DEFAULT_WIDGETS_STATE.settings,
       weatherLocation: {
@@ -96,7 +205,7 @@ export const normalizeState = (raw: unknown): WidgetsState => {
     visible: { ...DEFAULT_WIDGETS_STATE.visible },
   };
 
-  if (!raw || typeof raw !== "object") return base;
+  if (!hasSaved) return base;
 
   const parsed = raw as Partial<WidgetsState>;
 
@@ -120,6 +229,10 @@ export const normalizeState = (raw: unknown): WidgetsState => {
 
   if (typeof parsed.settings?.newsFeedUrl === "string") {
     base.settings.newsFeedUrl = parsed.settings.newsFeedUrl;
+  }
+
+  if (typeof parsed.settings?.postItText === "string") {
+    base.settings.postItText = parsed.settings.postItText;
   }
 
   const location = parsed.settings?.weatherLocation;

@@ -16,6 +16,7 @@ export type UseWidgets = {
   isLoaded: boolean;
   setNewsFeedUrl: (url: string) => void;
   setPosition: (id: WidgetId, position: WidgetPosition) => void;
+  setPostItText: (text: string) => void;
   setWeatherLocation: (location: WeatherLocation) => void;
   state: WidgetsState;
   toggleWidget: (id: WidgetId, visible?: boolean) => void;
@@ -76,6 +77,13 @@ const useWidgets = (): UseWidgets => {
     }));
   }, []);
 
+  const setPostItText = useCallback((text: string) => {
+    setState((prev) => ({
+      ...prev,
+      settings: { ...prev.settings, postItText: text },
+    }));
+  }, []);
+
   const bringToFront = useCallback((id: WidgetId) => {
     setOrder((prev) => {
       if (prev[prev.length - 1] === id) return prev;
@@ -95,6 +103,7 @@ const useWidgets = (): UseWidgets => {
       isLoaded,
       setNewsFeedUrl,
       setPosition,
+      setPostItText,
       setWeatherLocation,
       state,
       toggleWidget,
@@ -105,6 +114,7 @@ const useWidgets = (): UseWidgets => {
       isLoaded,
       setNewsFeedUrl,
       setPosition,
+      setPostItText,
       setWeatherLocation,
       state,
       toggleWidget,

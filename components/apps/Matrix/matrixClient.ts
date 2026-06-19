@@ -27,6 +27,42 @@ export const matrixBaseUrl = (): string =>
   `${typeof window === "undefined" ? "" : window.location.origin}${MATRIX_API_PATH}`;
 export const HOMESERVER_LABEL = "matrix.securityops.co";
 
+// PRE-WARM THE TOR CIRCUIT. The single biggest cause of "Matrix is stuck before
+// login" is that the FIRST request over Tor lands on a COLD circuit: building a
+// fresh Tor circuit to the .onion/homeserver takes ~15–40s, and since the app
+// makes no request until the user clicks "Sign in", the login POST is always
+// that slow first request — so it looks frozen. We fix this by firing a cheap
+// GET /_matrix/client/versions the moment the app opens; by the time the user has
+// typed their credentials the circuit is already built, so login is ~1.5s.
+// Fire-and-forget, never throws — a failed warm-up just means login pays the cold
+// cost itself (same as before).
+export const prewarmCircuit = async (signal?: AbortSignal): Promise<boolean> => {
+  try {
+    const response = await fetch(`${matrixBaseUrl()}/_matrix/client/versions`, {
+      cache: "no-store",
+      signal,
+    });
+
+    return response.ok;
+  } catch {
+    return false;
+  }
+};
+
+// Distinguish a real AUTH failure (wrong username/password, deactivated account)
+// from a CONNECTION/Tor failure, so the login screen can say "Invalid username or
+// password" instead of a scary "Connection error" when the credentials are wrong.
+export const isAuthError = (error: unknown): boolean => {
+  const err = error as { errcode?: string; httpStatus?: number };
+
+  return (
+    err?.errcode === "M_FORBIDDEN" ||
+    err?.errcode === "M_USER_DEACTIVATED" ||
+    err?.httpStatus === 401 ||
+    err?.httpStatus === 403
+  );
+};
+
 export type CreatedSession = {
   accessToken: string;
   client: MatrixClient;

@@ -1,7 +1,13 @@
 // Shared types for the Rainmeter-like desktop Widgets layer.
 
 /** The stable id for each available widget. */
-export type WidgetId = "clock" | "weather" | "memory" | "cpu" | "news";
+export type WidgetId =
+  | "clock"
+  | "weather"
+  | "memory"
+  | "news"
+  | "calendar"
+  | "postit";
 
 /** A widget's on-desktop position (top-left, in px, relative to the layer). */
 export type WidgetPosition = {
@@ -18,9 +24,11 @@ export type WeatherLocation = {
   name: string;
 };
 
-/** User-tunable settings (location, feed URL, ...). */
+/** User-tunable settings (location, feed URL, sticky-note text, ...). */
 export type WidgetSettings = {
   newsFeedUrl: string;
+  /** Free-text content of the Post-it (sticky note) widget. */
+  postItText: string;
   weatherLocation: WeatherLocation;
 };
 

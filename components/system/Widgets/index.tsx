@@ -1,10 +1,11 @@
 import { DEFAULT_WIDGETS_STATE } from "components/system/Widgets/constants";
 import { StyledWidgetsLayer } from "components/system/Widgets/StyledWidgets";
 import useWidgets from "components/system/Widgets/useWidgets";
+import CalendarWidget from "components/system/Widgets/widgets/CalendarWidget";
 import ClockWidget from "components/system/Widgets/widgets/ClockWidget";
-import CpuWidget from "components/system/Widgets/widgets/CpuWidget";
 import MemoryWidget from "components/system/Widgets/widgets/MemoryWidget";
 import NewsWidget from "components/system/Widgets/widgets/NewsWidget";
+import PostItWidget from "components/system/Widgets/widgets/PostItWidget";
 import WeatherWidget from "components/system/Widgets/widgets/WeatherWidget";
 import WidgetsSettings from "components/system/Widgets/WidgetsSettings";
 import type { WidgetId } from "components/system/Widgets/types";
@@ -22,6 +23,7 @@ const Widgets: FC = () => {
     bringToFront,
     setNewsFeedUrl,
     setPosition,
+    setPostItText,
     setWeatherLocation,
     state,
     toggleWidget,
@@ -49,11 +51,18 @@ const Widgets: FC = () => {
         />
       )}
       {state.visible.memory && <MemoryWidget {...cardProps("memory")} />}
-      {state.visible.cpu && <CpuWidget {...cardProps("cpu")} />}
       {state.visible.news && (
         <NewsWidget
           {...cardProps("news")}
           feedUrl={state.settings.newsFeedUrl}
+        />
+      )}
+      {state.visible.calendar && <CalendarWidget {...cardProps("calendar")} />}
+      {state.visible.postit && (
+        <PostItWidget
+          {...cardProps("postit")}
+          text={state.settings.postItText}
+          onChange={setPostItText}
         />
       )}
       <WidgetsSettings

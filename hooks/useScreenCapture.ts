@@ -1,8 +1,19 @@
+import {
+  createWebcamEffectState,
+  DEFAULT_WEBCAM_EFFECT,
+  drawWebcamEffect,
+  wantsPlatformBackgroundBlur,
+  type WebcamEffect,
+} from "components/apps/ScreenCapture/effects";
 import { useFileSystem } from "contexts/fileSystem";
 import { join } from "path";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DEFAULT_LOCALE, DESKTOP_PATH, PICTURES_FOLDER } from "utils/constants";
 import { bufferToBlob, isFirefox, isSafari } from "utils/functions";
+
+// Re-export so the UI can import the webcam effect type from the hook alongside
+// the other capture option types it already imports.
+export type { WebcamEffect } from "components/apps/ScreenCapture/effects";
 
 // Shared screen-capture engine: screen RECORDING (webm video → Desktop) and
 // SCREENSHOT (png/jpeg → Pictures), both via getDisplayMedia so they faithfully
@@ -194,6 +205,9 @@ export type RecordOptions = {
   // deviceId of the camera to use for the webcam PiP overlay. Omitted/empty →
   // the system default camera.
   webcamDeviceId?: string;
+  // Visual effect / theme applied to the webcam PiP overlay in the draw loop
+  // (defaults to "none"). See components/apps/ScreenCapture/effects.ts.
+  webcamEffect?: WebcamEffect;
   // Corner the webcam PiP overlay is pinned to (defaults to bottom-right).
   webcamPosition?: PipPosition;
   // Size of the webcam PiP overlay as a width fraction (defaults to medium).
@@ -495,9 +509,40 @@ const useScreenCapture = (): UseScreenCapture => {
           // Use the chosen camera when provided; fall back to the system
           // default if no/empty deviceId. `exact` so we honor the user's pick.
           const deviceId = options.webcamDeviceId;
-          const webcamStream = await navigator.mediaDevices.getUserMedia({
-            video: deviceId ? { deviceId: { exact: deviceId } } : true,
-          });
+          const webcamEffect: WebcamEffect =
+            options.webcamEffect ?? DEFAULT_WEBCAM_EFFECT;
+
+          // Base video constraints (chosen camera or system default).
+          const baseVideo: MediaTrackConstraints = deviceId
+            ? { deviceId: { exact: deviceId } }
+            : {};
+
+          // Best-effort "Remove background": if the browser exposes the
+          // experimental platform background-blur constraint, ask for it on the
+          // camera track. CSP-clean (no model download). Chromium-only today;
+          // ignored/rejected elsewhere, where the canvas blur fallback takes
+          // over. True person segmentation needs a self-hosted model (see
+          // effects.ts).
+          // `backgroundBlur` is an experimental, non-standard constraint, so it
+          // isn't in the TS MediaTrackConstraints type — widen via a cast.
+          const withBgBlur = wantsPlatformBackgroundBlur(webcamEffect)
+            ? ({ ...baseVideo, backgroundBlur: true } as MediaTrackConstraints)
+            : undefined;
+
+          let webcamStream: MediaStream;
+
+          try {
+            webcamStream = await navigator.mediaDevices.getUserMedia({
+              video: withBgBlur ?? baseVideo,
+            });
+          } catch {
+            // The experimental constraint can hard-fail on some builds — retry
+            // once without it so the recording (and the canvas blur fallback)
+            // still proceed.
+            webcamStream = await navigator.mediaDevices.getUserMedia({
+              video: baseVideo,
+            });
+          }
 
           auxStreamsRef.current.push(webcamStream);
 
@@ -531,6 +576,14 @@ const useScreenCapture = (): UseScreenCapture => {
             const isLeft = pipPosition.endsWith("-left");
             const isTop = pipPosition.startsWith("top-");
 
+            // Render the (themed) webcam into its own offscreen canvas first so
+            // an effect's filters/blends stay contained to the PiP box and never
+            // bleed onto the screen content. Persistent state (e.g. the matrix
+            // rain columns) lives in effectState across frames.
+            const pipCanvas = document.createElement("canvas");
+            const pipContext = pipCanvas.getContext("2d");
+            const effectState = createWebcamEffectState();
+
             const drawFrame = (): void => {
               context.drawImage(screenVideo, 0, 0, width, height);
 
@@ -545,13 +598,45 @@ const useScreenCapture = (): UseScreenCapture => {
                 ? PIP_MARGIN
                 : height - pipHeight - PIP_MARGIN;
 
-              context.drawImage(
-                webcamVideo,
-                pipX,
-                pipY,
-                pipWidth,
-                pipHeight
-              );
+              // Apply the selected webcam theme. Fail-soft: any effect error
+              // falls back to a plain webcam draw so a recording can never break.
+              if (pipContext && pipWidth > 0 && pipHeight > 0) {
+                try {
+                  if (
+                    pipCanvas.width !== pipWidth ||
+                    pipCanvas.height !== pipHeight
+                  ) {
+                    pipCanvas.width = pipWidth;
+                    pipCanvas.height = pipHeight;
+                  }
+                  drawWebcamEffect(
+                    pipContext,
+                    webcamVideo,
+                    pipWidth,
+                    pipHeight,
+                    webcamEffect,
+                    effectState
+                  );
+                  context.drawImage(pipCanvas, pipX, pipY, pipWidth, pipHeight);
+                } catch {
+                  context.drawImage(
+                    webcamVideo,
+                    pipX,
+                    pipY,
+                    pipWidth,
+                    pipHeight
+                  );
+                }
+              } else {
+                context.drawImage(
+                  webcamVideo,
+                  pipX,
+                  pipY,
+                  pipWidth,
+                  pipHeight
+                );
+              }
+
               pipRafRef.current = requestAnimationFrame(drawFrame);
             };
 

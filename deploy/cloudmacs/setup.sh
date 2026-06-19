@@ -26,6 +26,12 @@ cp "$HERE/spacemacs-init.el" "$HOME/.spacemacs.d/init.el"
 cp "$HERE/securityos-banner.txt" "$HOME/.spacemacs.d/securityos-banner.txt"
 echo "Installed ~/.spacemacs.d/init.el + securityos-banner.txt"
 
+# 2b) Folders Emacs expects so first launch never errors on a missing dir:
+#   ~/cloudmacs-data/org -> /home/emacs/data/org   (org-directory + agenda files)
+#   ~/cloudmacs-telega   -> /home/emacs/.telega     (telega cache/state, persisted)
+mkdir -p "$HOME/cloudmacs-data/org" "$HOME/cloudmacs-telega"
+echo "Created data/org + telega folders"
+
 # 3) whatsappel (optional — only mounted if it exists).
 if [ ! -d "$HOME/whatsappel" ]; then
   echo "NOTE: ~/whatsappel not found — clone github.com/cristiancmoises/whatsappel"

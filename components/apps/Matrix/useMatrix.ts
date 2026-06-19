@@ -2,6 +2,8 @@ import {
   createMatrixSession,
   decryptAttachment,
   encryptAttachment,
+  isAuthError,
+  prewarmCircuit,
 } from "components/apps/Matrix/matrixClient";
 import type { MatrixClient, MatrixEvent, Room } from "matrix-js-sdk";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -17,6 +19,11 @@ export type ConnState =
   | "offline"
   | "online"
   | "syncing";
+
+// State of the pre-warmed Tor circuit shown on the login screen so the user knows
+// when sign-in will be fast ("ready") vs. still building ("warming") vs. slow
+// ("cold"). See prewarmCircuit() in matrixClient.ts.
+export type CircuitState = "cold" | "ready" | "warming";
 
 export type MsgKind = "encrypted" | "file" | "image" | "notice" | "text";
 
@@ -65,6 +72,7 @@ type UseMatrix = {
   acceptInvite: (id: string) => Promise<void>;
   activeRoom?: MatrixRoom;
   busy: boolean;
+  circuit: CircuitState;
   conn: ConnState;
   cryptoReady: boolean;
   error: string;
@@ -193,6 +201,7 @@ const useMatrix = (): UseMatrix => {
   const preparedRef = useRef(false);
 
   const [session, setSession] = useState<Session>();
+  const [circuit, setCircuit] = useState<CircuitState>("warming");
   const [rooms, setRooms] = useState<MatrixRoom[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState("");
@@ -341,12 +350,19 @@ const useMatrix = (): UseMatrix => {
         }, 45_000);
       } catch (caught) {
         if (!mountedRef.current) return;
-        setConn("error");
-        setError(
-          caught instanceof Error
-            ? caught.message
-            : "Could not reach the homeserver over Tor."
-        );
+        // Wrong credentials are NOT a connection problem — go back to the login
+        // screen with a clear message instead of a scary "Connection error".
+        if (isAuthError(caught)) {
+          setConn("offline");
+          setError("Invalid username or password.");
+        } else {
+          setConn("error");
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : "Could not reach the homeserver over Tor."
+          );
+        }
       } finally {
         if (mountedRef.current) setLoggingIn(false);
       }
@@ -675,6 +691,27 @@ const useMatrix = (): UseMatrix => {
     if (!selectedRoomId && rooms.length > 0) setSelectedRoomId(rooms[0].id);
   }, [rooms, selectedRoomId]);
 
+  // Pre-warm the Tor circuit as soon as the app opens (before login) so the user
+  // doesn't pay the cold-circuit cost (~15–40s) on the login request itself. One
+  // retry — a cold circuit's first probe can itself fail before it's built.
+  useEffect(() => {
+    const controller = new AbortController();
+    let cancelled = false;
+
+    void (async () => {
+      setCircuit("warming");
+      let ready = await prewarmCircuit(controller.signal);
+
+      if (!ready && !cancelled) ready = await prewarmCircuit(controller.signal);
+      if (!cancelled) setCircuit(ready ? "ready" : "cold");
+    })();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, []);
+
   useEffect(() => {
     mountedRef.current = true;
 
@@ -696,6 +733,7 @@ const useMatrix = (): UseMatrix => {
     acceptInvite,
     activeRoom,
     busy,
+    circuit,
     conn,
     cryptoReady,
     error,
