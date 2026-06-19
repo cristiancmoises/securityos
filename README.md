@@ -36,11 +36,47 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
   (Alpine, Tiny Core, SliTaz, …) amnesically, routable through Tor.
 - **🧅 TAILS** — a launcher with **CI-verified** (OpenPGP signature + SHA-256) downloads,
   auto-updated by the `tails-iso` GitHub/Forgejo action.
+- **💬 Matrix (end-to-end-encrypted chat)** — a full Matrix client
+  (matrix-js-sdk + Rust crypto/WASM) where **every request is tunneled through the
+  same-origin Tor proxy** to `matrix.securityops.co`. It decrypts E2EE rooms,
+  searches the user directory, browses/joins federated rooms, handles invites, and
+  renders image/file attachments. It **pre-warms the Tor circuit on open** so the
+  first login is fast (cold Tor otherwise makes the first request take 15–40s).
+  **Amnesic** — keys live in memory only. See [Matrix](#-matrix).
+- **🎥 SecChat** — first-party end-to-end-encrypted video chat
+  (`chat.securityops.co`), embedded in-OS.
+- **📻 Radio** — listen to internet radio worldwide (radio-browser API), filter by
+  country/genre, HTTPS streams, favorites.
+- **📝 Cloudmacs** — a full **Emacs** (Spacemacs) in the browser (Gotty serving a
+  terminal Emacs), with **telega** (Telegram — TDLib built into the image),
+  **whatsappel** (WhatsApp), **org-mode**, and **eww**. Appears in *Open with* for
+  text/code files.
 - **📺 SecTube** — the SecurityOps video frontend, embedded for playback.
-- **📁 Vaptvupt file share & SecChat** — first-party SecurityOps apps embedded
-  in-OS at their real origin for full usage: **Vaptvupt** opens the file share
-  (`share.securityops.co`); **SecChat** is encrypted video chat. (Both require the
-  site to allow framing from the SecurityOS origin.)
+- **📁 Vaptvupt file share** — the first-party SecurityOps file share
+  (`share.securityops.co`), embedded in-OS at its real origin for full usage.
+  (Requires the site to allow framing from the SecurityOS origin.)
+- **⏺️ Screen Capture** — screen recording + screenshots via `getDisplayMedia`
+  (captures everything on screen, incl. cross-origin app iframes): countdown,
+  microphone + system audio, quality/format/codec presets, and a max-duration. A
+  **webcam picture-in-picture overlay** offers selectable effect themes — Matrix
+  (digital rain), Grayscale, Sepia, Neon/Invert, Blur, and a best-effort
+  Background blur.
+- **🧩 Desktop Widgets** — Rainmeter-style, draggable, toggleable, and persisted:
+  **Clock**, **Weather** (searchable city, open-meteo), a JS-heap **Memory** gauge,
+  **RSS News** (fetched over Tor), a month-grid **Calendar**, and a **Post-it**
+  sticky note. A Clock and the News feed are shown on first run.
+- **🔒 Lock screen** — a frosted overlay with a large clock over the blurred
+  wallpaper, an optional **PIN** (salted SHA-256), **idle auto-lock**, and it stays
+  locked across reload; a **Lock** button lives in the Start menu.
+- **🔊 Master volume** — the taskbar volume now controls **all** web-OS sound —
+  native audio/video plus WebAudio apps like **Webamp** and the **v86** emulator.
+- **🎵 Music + Webamp** — bundled free/classical music and the **Webamp**
+  (Winamp-style) player, plus lots of wallpapers (including animated ones).
+- **🪟 Undercover mode** — a Windows-11-like appearance (folders/wallpaper/theming)
+  for blending in.
+- **🛟 Resilience / recovery** — if corrupted saved data from an old version would
+  otherwise stop the desktop from starting, SecurityOS shows a **recovery screen**
+  (*Try again* / *Reset*) instead of reloading forever.
 - **🧰 Security Tools** — an offline suite (hashing, encoding, entropy, UUID, …).
 - **⌨️ Expanded terminal** — UNIX-style commands plus `curl`/`wget` over Tor, `du`,
   `df`, `tree`, `stat`, and more.
@@ -77,6 +113,24 @@ goes over Tor.)
 > under URL rewriting. That's the inherent ceiling of a privacy proxy, not a bug.
 > For genuinely full, anonymous browsing of arbitrary sites, use the **Linux VM
 > via Tor Control**.
+
+---
+
+## 💬 Matrix
+
+SecurityOS ships a **full end-to-end-encrypted Matrix client** (matrix-js-sdk with
+the **Rust crypto/WASM** stack), wired so that **every request is tunneled through
+the same-origin Tor proxy** to the `matrix.securityops.co` homeserver — nothing
+talks to Matrix off-Tor.
+
+- **E2EE** — decrypts encrypted rooms; keys are **kept in memory only** (amnesic —
+  nothing is written to disk).
+- **Federation** — search the user directory, browse and join federated rooms, and
+  accept/decline invites.
+- **Attachments** — renders image and file attachments.
+- **Fast first login** — the client **pre-warms the Tor circuit the moment you open
+  it**, so login is quick. (A cold Tor circuit otherwise makes the first request
+  take ~15–40s.)
 
 ---
 
@@ -127,6 +181,7 @@ See [`CHANGELOG.md`](CHANGELOG.md) for what's new, and [`docs/`](docs) for
 |---|---|
 | **Frontend** | Next.js + TypeScript + styled-components (the desktop, apps, virtual filesystem) |
 | **Privacy proxy** | `pages/api/proxy.ts` — server-side Tor fetch, SSRF guard, header allowlist, HTML rewriting |
+| **Matrix proxy** | same-origin Tor tunnel to `matrix.securityops.co` for the E2EE Matrix client (matrix-js-sdk + Rust crypto/WASM) |
 | **Rust sidecar** | `sidecar/` — memory-safe equivalent of the proxy fetch/rewrite path |
 | **Crypto** | `wasm/vaptvupt/` → `public/Program Files/Vaptvupt/vaptvupt.js` (the WASM engine) |
 | **Emulation** | v86 (x86 Linux), BoxedWine, js-dos, Ruffle — all WebAssembly |

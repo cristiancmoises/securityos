@@ -4,6 +4,63 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.12.0] — 2026-06-19
+
+### Fixes
+- **The desktop could get stuck "blinking" / never finish loading.** Root cause: the
+  top-level `ErrorBoundary` reloaded the page on *any* uncaught error with **no
+  limit and no fallback UI** — so any component that threw during render/effect
+  (typically from **corrupted/stale saved data** in IndexedDB / the session file /
+  localStorage) reloaded forever. The boundary now **auto-reloads at most once**,
+  then shows a real **recovery screen** ("Try again" / "Reset SecurityOS" — the
+  reset clears localStorage + sessionStorage + IndexedDB) instead of looping.
+- **Widgets are now wrapped in their own error boundary** so a single misbehaving
+  widget can never take down the whole desktop (icons/wallpaper) again — it just
+  fails silently and the desktop stays up.
+- **Widgets first-run layout actually applies now** — the Clock (top-center) and
+  News (top-right) were rendering at their static fallback positions because the
+  draggable card kept its initial position and ignored the post-mount responsive
+  layout. Cards now render straight from state when not being dragged.
+
+### Docs
+- Updated **README.md**, the in-OS **Welcome** (Desktop/README.md) and the
+  **SecurityOS Handbook** to cover everything added since: Matrix (E2EE over Tor),
+  SecChat, Radio, Cloudmacs (Emacs + telega/whatsappel/org/eww), Screen Capture
+  (+ webcam effect themes), desktop Widgets (incl. Calendar + Post-it), the Lock
+  screen, master volume, and the new recovery/resilience behavior.
+
+### Boot resilience (from the deep review — these were the *real* causes)
+- **A second, independent infinite-reload loop in the filesystem layer.** On a
+  corrupt IndexedDB overlay, `writeFile` hit `ENOENT '/'` and called
+  `window.location.reload()` **unconditionally** — and `resetStorage` couldn't
+  clear the corrupt layer (it skipped the `browserfs` database), so every reload
+  hit the same error. Now the reload is **capped** (sessionStorage guard) and
+  `resetStorage` deletes the raw `browserfs` IndexedDB when the writable layer is
+  unreachable, so a reset actually clears the corruption.
+- **FS init now falls back to an in-memory filesystem** if BrowserFS fails to
+  initialize the IndexedDB overlay (corrupt persisted layer) — the OS boots
+  amnesically instead of with a dead/half-initialized filesystem.
+- **The top-level ErrorBoundary now wraps the context providers** (process / FS /
+  session), so a render-throw from the layer that restores persisted state shows
+  the recovery screen instead of blanking past it.
+- **A crashing app window can no longer take down the desktop** — the per-app
+  error boundary now wraps the `Window` itself.
+- **Hardened against corrupt saved state**: the wallpaper coerces a non-string
+  saved value, and restored desktop **icon positions are validated** before being
+  used as a React `style` (a malformed entry used to throw during render).
+
+### App robustness (from the deep review)
+- Opening a **stale/missing file** from a restored session no longer hangs the
+  spinner or shows a blank window in **Marked, TinyMCE, Vim, Terminal, PDF,
+  Photos, OpenType, and DevTools** (unhandled promise rejections → graceful
+  fallbacks).
+- **Radio** tolerates corrupt `localStorage` favorites (validated as an array).
+- **ClassiCube** guards `window.CCModule` so a restored window size can't throw
+  (it could trip the desktop reload loop).
+- **Monaco editor** disposes its Ctrl-S / status-bar subscriptions (leak + dup
+  saves); **Webamp** clears its Butterchurn cycle interval on close and guards
+  preset selection against empty/exhausted lists.
+
 ## [2.11.0] — 2026-06-18
 
 ### Fixes

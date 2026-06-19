@@ -157,7 +157,12 @@ const useTerminal = (
       const prompt = (): Promise<void> =>
         localEcho
           .read(`\r\n${cd.current}${PROMPT_CHARACTER}`)
-          .then((command) => processCommand.current?.(command).then(prompt));
+          .then((command) =>
+            processCommand.current?.(command).then(prompt).catch((e) => {
+              localEcho.println(String(e?.message || e));
+              prompt();
+            })
+          );
 
       localEcho.println(`${alias} [Version ${displayVersion()}]`);
       localEcho.println(`Por ${author.name}. ${displayLicense}.`);
@@ -167,7 +172,13 @@ const useTerminal = (
           `\r\n${cd.current}${PROMPT_CHARACTER}${initialCommand}\r\n`
         );
         localEcho.history.entries = [initialCommand];
-        processCommand.current(initialCommand).then(prompt);
+        processCommand
+          .current(initialCommand)
+          .then(prompt)
+          .catch((e) => {
+            localEcho.println(String(e?.message || e));
+            prompt();
+          });
       } else {
         prompt();
       }

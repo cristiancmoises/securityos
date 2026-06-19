@@ -24,6 +24,21 @@ that runs entirely in your browser. No install, no tracking, no logs.
 - 🧰 **A real toolkit.** The **Security Tools** suite (hashing, HMAC, JWT, encoders,
   password/entropy, regex, CIDR, ciphers, hash-ID, UUID — all offline), a curated
   **Security** launcher, and a real **Linux VM** (v86) you can route through Tor.
+- 💬 **Private chat & calls.** **Matrix** is a full end-to-end-encrypted chat
+  client with every request tunneled over Tor to `matrix.securityops.co` — it
+  decrypts encrypted rooms, joins federated rooms, and keeps your keys **in memory
+  only** (amnesic). **SecChat** is end-to-end-encrypted video chat.
+- 📝 **A real Emacs, in the browser.** **Cloudmacs** runs a full Spacemacs (with
+  org-mode, eww, **telega** for Telegram, and **whatsappel** for WhatsApp) — and
+  shows up in *Open with* for text/code.
+- ⏺️ **Capture your screen.** **Screen Capture** records or screenshots everything
+  on screen (countdown, mic + system audio, quality/format presets) with an
+  optional **webcam overlay** and fun effect themes (Matrix rain, sepia, blur…).
+- 🧩 **Make it yours.** Draggable **desktop widgets** (clock, weather, RSS news over
+  Tor, calendar, memory gauge, sticky note), a **lock screen** with an optional PIN
+  and idle auto-lock, **internet Radio**, bundled music + the **Webamp** player,
+  and an **Undercover mode** that makes the desktop look like Windows 11 for
+  blending in.
 - 🖥️ **A genuine desktop.** Files, windows, a UNIX-like Terminal (50+ commands),
   editors, media, emulators, and more.
 
@@ -32,6 +47,12 @@ that runs entirely in your browser. No install, no tracking, no logs.
 | Want to… | Open |
 | --- | --- |
 | Browse anonymously | **Tor Browser** (Start menu) |
+| Chat end-to-end encrypted (over Tor) | **Matrix** |
+| Encrypted video chat | **SecChat** |
+| Listen to internet radio | **Radio** |
+| Edit code/text in real Emacs | **Cloudmacs** |
+| Record your screen | **Screen Capture** |
+| Lock the desktop | Start menu → **Lock** |
 | Configure Tor / route the Linux VM | **Tor Control** |
 | Use offline crypto/encoding tools | **Security Tools** |
 | Encrypt a file | **Terminal** → `encrypt myfile.txt <password>` |

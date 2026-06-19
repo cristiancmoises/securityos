@@ -140,17 +140,22 @@ const loadButterchurnPresets = (
     type: "GOT_BUTTERCHURN_PRESETS",
   });
 
-const getButterchurnPresetIndex = (webamp: WebampCI): number => {
+const getButterchurnPresetIndex = (webamp: WebampCI, attempts = 0): number => {
   const { presetHistory = [], presets = [] } =
     webamp.store.getState()?.milkdrop || {};
+
+  if (presets.length === 0) return 0;
+
   const index = Math.floor(Math.random() * presets.length);
   const preset = presets[index];
 
-  return preset.name &&
+  if (attempts >= presets.length) return index;
+
+  return preset?.name &&
     !BROKEN_PRESETS.has(preset.name) &&
     !presetHistory.slice(-5).includes(index)
     ? index
-    : getButterchurnPresetIndex(webamp);
+    : getButterchurnPresetIndex(webamp, attempts + 1);
 };
 
 export const loadButterchurnPreset = (webamp: WebampCI): void => {
@@ -167,18 +172,20 @@ export const loadButterchurnPreset = (webamp: WebampCI): void => {
   });
 };
 
-let cycleTimerId = 0;
-
-const cycleButterchurnPresets = (webamp: WebampCI): void => {
-  window.clearInterval(cycleTimerId);
-  cycleTimerId = window.setInterval(() => {
+const cycleButterchurnPresets = (webamp: WebampCI): number => {
+  const cycleTimerId = window.setInterval(() => {
     if (!webamp) window.clearInterval(cycleTimerId);
 
     loadButterchurnPreset(webamp);
   }, 20000);
+
+  return cycleTimerId;
 };
 
-export const loadMilkdropWhenNeeded = (webamp: WebampCI): void => {
+export const loadMilkdropWhenNeeded = (
+  webamp: WebampCI,
+  onCycleStart?: (cycleTimerId: number) => void
+): void => {
   const unsubscribe = webamp.store.subscribe(() => {
     const { milkdrop, windows } = webamp.store.getState();
 
@@ -233,7 +240,7 @@ export const loadMilkdropWhenNeeded = (webamp: WebampCI): void => {
 
           loadButterchurnPresets(webamp, resolvedPresets);
           loadButterchurnPreset(webamp);
-          cycleButterchurnPresets(webamp);
+          onCycleStart?.(cycleButterchurnPresets(webamp));
         });
       });
     }

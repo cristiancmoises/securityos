@@ -94,38 +94,42 @@ const Photos: FC<ComponentProcessProps> = ({ id }) => {
   );
   const { fullscreen, toggleFullscreen } = useFullscreen(containerRef);
   const loadPhoto = useCallback(async (): Promise<void> => {
-    let fileContents: Buffer | string = await readFile(url);
-    const ext = extname(url).toLowerCase();
+    try {
+      let fileContents: Buffer | string = await readFile(url);
+      const ext = extname(url).toLowerCase();
 
-    if ([".ani", ".cur"].includes(ext)) {
-      fileContents = await aniToGif(fileContents);
-    } else if (ext === ".jxl") {
-      fileContents = imgDataToBuffer(await decodeJxl(fileContents));
-    } else if (ext === ".qoi") {
-      const { decodeQoi } = await import("components/apps/Photos/qoi");
+      if ([".ani", ".cur"].includes(ext)) {
+        fileContents = await aniToGif(fileContents);
+      } else if (ext === ".jxl") {
+        fileContents = imgDataToBuffer(await decodeJxl(fileContents));
+      } else if (ext === ".qoi") {
+        const { decodeQoi } = await import("components/apps/Photos/qoi");
 
-      fileContents = decodeQoi(fileContents);
-    } else if (TIFF_IMAGE_FORMATS.has(ext)) {
-      fileContents = (await import("utif"))
-        .bufferToURI(fileContents)
-        .replace("data:image/png;base64,", "");
-    }
-
-    setSrc((currentSrc) => {
-      const [currentUrl] = Object.keys(currentSrc);
-
-      if (currentUrl) {
-        if (currentUrl === url) return currentSrc;
-        reset?.();
+        fileContents = decodeQoi(fileContents);
+      } else if (TIFF_IMAGE_FORMATS.has(ext)) {
+        fileContents = (await import("utif"))
+          .bufferToURI(fileContents)
+          .replace("data:image/png;base64,", "");
       }
 
-      return { [url]: imageToBufferUrl(url, fileContents) };
-    });
-    prependFileToTitle(basename(url));
+      setSrc((currentSrc) => {
+        const [currentUrl] = Object.keys(currentSrc);
+
+        if (currentUrl) {
+          if (currentUrl === url) return currentSrc;
+          reset?.();
+        }
+
+        return { [url]: imageToBufferUrl(url, fileContents) };
+      });
+      prependFileToTitle(basename(url));
+    } catch {
+      setBrokenImage(true);
+    }
   }, [prependFileToTitle, readFile, reset, url]);
 
   useEffect(() => {
-    if (url && !src[url] && !closing) loadPhoto();
+    if (url && !src[url] && !closing) loadPhoto().catch(() => setBrokenImage(true));
   }, [closing, loadPhoto, src, url]);
 
   return (

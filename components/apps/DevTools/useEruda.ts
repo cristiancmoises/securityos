@@ -34,31 +34,36 @@ const useEruda = (
     useProcesses();
 
   useEffect(() => {
-    loadFiles(libs).then(() => {
-      if (window.eruda && containerRef.current) {
-        const container = containerRef.current.querySelector(
-          "div"
-        ) as HTMLElement;
-        const vw = viewWidth();
+    loadFiles(libs)
+      .then(() => {
+        if (window.eruda && containerRef.current) {
+          const container = containerRef.current.querySelector(
+            "div"
+          ) as HTMLElement;
+          const vw = viewWidth();
 
-        if (container) {
-          window.eruda.init({
-            ...config,
-            container,
-          });
-          window.eruda.remove("info");
-          window.eruda.remove("snippets");
-          if (vw < FULL_TOOLBAR_WIDTH) {
-            window.eruda.remove("resources");
+          if (container) {
+            window.eruda.init({
+              ...config,
+              container,
+            });
+            window.eruda.remove("info");
+            window.eruda.remove("snippets");
+            if (vw < FULL_TOOLBAR_WIDTH) {
+              window.eruda.remove("resources");
+            }
+            if (vw < FULL_TOOLBAR_WIDTH - RESOURCES_BUTTON_WIDTH) {
+              window.eruda.remove("sources");
+            }
+            window.eruda.show();
+            setLoading(false);
           }
-          if (vw < FULL_TOOLBAR_WIDTH - RESOURCES_BUTTON_WIDTH) {
-            window.eruda.remove("sources");
-          }
-          window.eruda.show();
-          setLoading(false);
         }
-      }
-    });
+      })
+      .catch((error) => {
+        console.error("Failed to load DevTools (eruda).", error);
+        setLoading(false);
+      });
   }, [containerRef, libs, setLoading]);
 
   useEffect(() => {

@@ -261,22 +261,35 @@ export const resetStorage = (rootFs?: RootFileSystem): Promise<void> =>
     window.localStorage.clear();
     window.sessionStorage.clear();
 
-    const clearFs = (): void => {
-      const overlayFs = rootFs?._getFs("/")?.fs as OverlayFS;
-      const overlayedFileSystems = overlayFs?.getOverlayedFileSystems();
-      const readable = overlayedFileSystems?.readable as HTTPRequest;
-      const writable = overlayedFileSystems?.writable as IndexedDBFileSystem;
-
-      readable?.empty();
-
-      if (writable?.getName() === "InMemory" || !writable?.empty) {
-        resolve();
-      } else {
-        writable.empty((apiError) => (apiError ? reject(apiError) : resolve()));
-      }
-    };
-
     import("idb").then(({ deleteDB }) => {
+      const clearFs = (): void => {
+        const overlayFs = rootFs?._getFs("/")?.fs as OverlayFS;
+        const overlayedFileSystems = overlayFs?.getOverlayedFileSystems();
+        const readable = overlayedFileSystems?.readable as HTTPRequest;
+        const writable = overlayedFileSystems?.writable as IndexedDBFileSystem;
+
+        readable?.empty();
+
+        if (writable?.getName() === "InMemory") {
+          resolve();
+        } else if (!writable?.empty) {
+          // The writable IndexedDB layer is unreachable (e.g. a corrupt or
+          // half-initialized overlay left rootFs null). We can't empty it via
+          // the API, so delete the raw `browserfs` database directly —
+          // otherwise the corrupt filesystem survives the reset and re-breaks
+          // the next boot (an unbreakable reload loop). Excluded from the bulk
+          // delete below precisely so we can target it here.
+          deleteDB("browserfs").then(
+            () => resolve(),
+            () => resolve()
+          );
+        } else {
+          writable.empty((apiError) =>
+            apiError ? reject(apiError) : resolve()
+          );
+        }
+      };
+
       if (window.indexedDB.databases) {
         window.indexedDB
           .databases()

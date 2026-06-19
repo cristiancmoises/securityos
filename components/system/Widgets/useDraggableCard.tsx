@@ -29,18 +29,19 @@ const useDraggableCard = (
 ): UseDraggableCard => {
   const ref = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  // Live position used while dragging (avoids a state update per pointermove).
+  // Live position used ONLY while dragging (avoids a state update per
+  // pointermove). When NOT dragging, the rendered style is driven directly from
+  // the `position` prop (the persisted/responsive layout) — see `style` below —
+  // so the card always reflects the current state. Relying on a synced copy here
+  // was fragile: the post-mount responsive first-run layout (Clock centered top,
+  // News top-right) didn't take effect and cards stuck at their static initial
+  // positions.
   const [livePosition, setLivePosition] = useState<WidgetPosition>(position);
   const dragState = useRef<{
     offsetX: number;
     offsetY: number;
     pointerId: number;
   } | null>(null);
-
-  // Sync from props when not actively dragging (e.g. external reset/load).
-  useEffect(() => {
-    if (!dragState.current) setLivePosition(position);
-  }, [position]);
 
   const onPointerMove = useCallback((event: PointerEvent) => {
     if (!dragState.current || event.pointerId !== dragState.current.pointerId) {
@@ -132,8 +133,11 @@ const useDraggableCard = (
     onPointerDown,
     ref,
     style: {
-      left: livePosition.x,
-      top: livePosition.y,
+      // While dragging, follow the live pointer position; otherwise render the
+      // authoritative `position` prop straight from state (drop + onMove are
+      // batched, so there's no flicker on release).
+      left: isDragging ? livePosition.x : position.x,
+      top: isDragging ? livePosition.y : position.y,
     },
   };
 };

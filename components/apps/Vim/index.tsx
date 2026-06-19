@@ -31,9 +31,19 @@ const Vim: FC<ComponentProcessProps> = ({ id }) => {
 
     window.VimWrapperModule = {};
 
-    await loadFiles(libs, false, !!window.VimWrapperModule);
+    let fileData: Buffer;
 
-    const fileData = url ? await readFile(saveUrl) : Buffer.from("");
+    try {
+      await loadFiles(libs, false, !!window.VimWrapperModule);
+
+      fileData = url ? await readFile(saveUrl) : Buffer.from("");
+    } catch {
+      // Stale/missing file or failed lib load: don't leave Vim stuck
+      loading.current = false;
+      closeWithTransition(id);
+
+      return;
+    }
 
     window.VimWrapperModule?.init?.({
       VIMJS_ALLOW_EXIT: true,
@@ -105,7 +115,9 @@ const Vim: FC<ComponentProcessProps> = ({ id }) => {
   useEffect(() => {
     if (!loading.current) {
       loading.current = true;
-      loadVim();
+      loadVim().catch(() => {
+        loading.current = false;
+      });
     }
 
     return () => {

@@ -21,6 +21,7 @@ import type { WidgetId } from "components/system/Widgets/types";
 const Widgets: FC = () => {
   const {
     bringToFront,
+    isLoaded,
     setNewsFeedUrl,
     setPosition,
     setPostItText,
@@ -29,6 +30,13 @@ const Widgets: FC = () => {
     toggleWidget,
     zIndexFor,
   } = useWidgets();
+
+  // Render NOTHING until the client has mounted + hydrated state from storage.
+  // The page is server-rendered, and React 18 does not patch inline-style
+  // mismatches during hydration — so if the cards were SSR'd at their static
+  // fallback positions, they'd stay stuck there even after state loaded the
+  // responsive first-run layout. Rendering client-only avoids that entirely.
+  if (!isLoaded) return null;
 
   const cardProps = (id: WidgetId) => ({
     id,

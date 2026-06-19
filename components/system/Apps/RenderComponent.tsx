@@ -20,13 +20,21 @@ const RenderComponent: FC<RenderComponentProps> = ({
   hasWindow = true,
   id,
 }) => {
-  const SafeComponent = (
-    <ErrorBoundary FallbackRender={<ComponentError />}>
+  // The ErrorBoundary wraps the Window TOO (not just the Component) so a throw
+  // from Window/RndWindow itself — e.g. on a stale/corrupt persisted windowState
+  // — is caught locally (ComponentError, no reload) instead of bubbling to the
+  // top-level boundary and taking down the whole desktop.
+  const content = hasWindow ? (
+    <Window id={id}>
       <Component id={id} />
-    </ErrorBoundary>
+    </Window>
+  ) : (
+    <Component id={id} />
   );
 
-  return hasWindow ? <Window id={id}>{SafeComponent}</Window> : SafeComponent;
+  return (
+    <ErrorBoundary FallbackRender={<ComponentError />}>{content}</ErrorBoundary>
+  );
 };
 
 export default memo(RenderComponent);

@@ -165,7 +165,35 @@ const useAsyncFs = (): AsyncFSModule => {
             (error) => {
               if (error && (!overwrite || error.code !== "EEXIST")) {
                 if (error.code === "ENOENT" && error.path === "/") {
-                  resetStorage(rootFs).finally(() => window.location.reload());
+                  // The FS root is missing → the IndexedDB overlay is corrupt.
+                  // Reset it, then reload AT MOST ONCE (capped via sessionStorage)
+                  // so a reset that can't fully clear the corrupt layer can't spin
+                  // into an endless boot reload loop (this path is independent of
+                  // the React ErrorBoundary's own reload cap).
+                  void resetStorage(rootFs).finally(() => {
+                    try {
+                      const KEY = "securityos:fs-reset-reloads";
+                      const now = Date.now();
+                      const log = JSON.parse(
+                        window.sessionStorage.getItem(KEY) || "[]"
+                      ) as number[];
+                      const recent = log.filter((time) => now - time < 30_000);
+
+                      if (recent.length < 1) {
+                        window.sessionStorage.setItem(
+                          KEY,
+                          JSON.stringify([...recent, now])
+                        );
+                        window.location.reload();
+                      }
+                      // Already retried once recently — don't loop. The corrupt
+                      // overlay was reset; let boot proceed (or fail into the
+                      // RecoveryScreen) instead of reloading forever.
+                    } catch {
+                      // sessionStorage unavailable → do NOT risk an unguarded
+                      // reload loop.
+                    }
+                  });
                 }
 
                 reject(error);
@@ -224,12 +252,29 @@ const useAsyncFs = (): AsyncFSModule => {
       runQueuedFsCalls(fs);
     } else {
       const setupFs = (writeToIndexedDB: boolean): void =>
-        configure(FileSystemConfig(!writeToIndexedDB), () => {
+        configure(FileSystemConfig(!writeToIndexedDB), (error) => {
+          // If BrowserFS fails to init the IndexedDB-backed overlay (a corrupt
+          // persisted layer), fall back ONCE to an in-memory filesystem so the
+          // OS still boots (amnesically) instead of a dead/half-init FS. The
+          // `writeToIndexedDB` guard prevents infinite retry recursion.
+          if (error) {
+            if (writeToIndexedDB) setupFs(false);
+
+            return;
+          }
+
           const loadedFs = BFSRequire("fs");
+          const root = loadedFs.getRootFS() as RootFileSystem | null;
+
+          if (!root) {
+            if (writeToIndexedDB) setupFs(false);
+
+            return;
+          }
 
           fsRef.current = loadedFs;
           setFs(loadedFs);
-          setRootFs(loadedFs.getRootFS() as RootFileSystem);
+          setRootFs(root);
         });
 
       supportsIndexedDB().then(setupFs);
