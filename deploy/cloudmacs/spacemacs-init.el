@@ -142,7 +142,9 @@ It should only modify the values of Spacemacs settings."
    ;; directory. A string value must be a path to an image format supported
    ;; by your Emacs build.
    ;; If the value is nil then no banner is displayed. (default 'official)
-   dotspacemacs-startup-banner 'official
+   ;; SecurityOS ASCII banner (TTY Emacs can't show a PNG; .txt works in the
+   ;; terminal). Path is inside the container where ~/.spacemacs.d is mounted.
+   dotspacemacs-startup-banner "/home/emacs/.spacemacs.d/securityos-banner.txt"
 
    ;; Scale factor controls the scaling (size) of the startup banner. Default
    ;; value is `auto' for scaling the logo automatically to fit all buffer
@@ -595,7 +597,11 @@ before packages are loaded."
   ;; connection additionally needs `telega-server' (built from TDLib) — run
   ;; `M-x telega-server-build' once TDLib is available in the container.
   (with-eval-after-load 'telega
-    (setq telega-use-images t))
+    ;; TDLib (libtdjson) is installed at /usr/local in the cloudmacs image, so
+    ;; `M-x telega-server-build' links telega-server against it. Images don't
+    ;; render in a TTY, so keep them off for the terminal client.
+    (setq telega-server-libs-prefix "/usr/local"
+          telega-use-images nil))
   (spacemacs/set-leader-keys "at" #'telega)
 
   ;; whatsappel — WhatsApp in Emacs (github.com/cristiancmoises/whatsappel),

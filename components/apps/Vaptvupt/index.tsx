@@ -14,13 +14,11 @@ import { SANDBOXED_IFRAME_CONFIG } from "utils/constants";
 // refused by the browser and the app shows blank. The proxy strips those framing
 // headers and serves the page in the sandbox, so it loads reliably.
 //
-// DOWNLOADS work: SANDBOXED_IFRAME_CONFIG already grants `allow-downloads`.
-// UPLOADS: the HTML-rewriting proxy is GET-only (it can't forward a multipart
-// body), so in-page file UPLOAD is the one thing the proxy path can't do. To get
-// native upload too, allow framing on share.securityops.co — set CSP
-// `frame-ancestors` to the SecurityOS origin (and drop `X-Frame-Options: DENY`),
-// same as chat.securityops.co does for SecChat — then this can switch to a direct
-// embed (which supports native download + upload).
+// DOWNLOADS + UPLOADS both work over the proxy: SANDBOXED_IFRAME_CONFIG grants
+// `allow-downloads`, and pages/api/proxy.ts now forwards POST/multipart request
+// bodies over Tor (SSRF-guarded, cookie-less), so the share's upload form submits
+// through the proxy and downloads stream back — all routed through Tor in the
+// opaque-origin sandbox (no direct connection, no framing requirement).
 const VAPTVUPT_URL =
   "http://secopsuwwht2unomwt3jofl33kfqsfd2z6cwip6rbqlapi7s4pys5vyd.onion/";
 const VAPTVUPT_SRC = `${PROXY_PATH}${encodeURIComponent(VAPTVUPT_URL)}`;

@@ -8,7 +8,10 @@ type Extension = {
   type?: string;
 };
 
-export const TEXT_EDITORS = ["MonacoEditor", "Vim"];
+// Cloudmacs (full Emacs in the browser) appears in "Open with" for text/code
+// files. It opens the editor window (the container has its own filesystem, so it
+// doesn't load the specific web-OS file — it launches the editor).
+export const TEXT_EDITORS = ["MonacoEditor", "Vim", "Cloudmacs"];
 
 const types = {
   Application: {

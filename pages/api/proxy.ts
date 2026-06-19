@@ -44,7 +44,25 @@ const MAX_RESPONSE_BYTES = 25 * 1024 * 1024;
 // Larger cap for explicit binary fetches (?bin=1), e.g. the V86 app pulling a
 // live ISO it will boot. Self-hosted single-user OS, so a bigger buffer is fine.
 const MAX_BIN_BYTES = 512 * 1024 * 1024;
+// Cap on the REQUEST body we will buffer + forward upstream for non-GET methods
+// (file uploads via the embedded Vaptvupt share, POST forms, etc.). Bounds memory
+// per upload so a hostile/buggy client can't OOM the route; 64 MiB comfortably
+// covers the share's interactive uploads. A body over the cap is rejected (413).
+const MAX_UPLOAD_BYTES = 64 * 1024 * 1024;
 const MAX_REDIRECTS = 5;
+// HTTP methods we forward upstream. GET/HEAD carry no body; the rest may carry one
+// (read + forwarded byte-for-byte). Anything else is rejected before we touch Tor.
+const ALLOWED_METHODS = new Set([
+  "GET",
+  "HEAD",
+  "POST",
+  "PUT",
+  "PATCH",
+  "DELETE",
+  "OPTIONS",
+]);
+// Body-less methods: never read or forward a request body for these.
+const BODYLESS_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 const TOR_PROXY = process.env.TOR_PROXY || "";
 // Keep-alive / socket pooling for the SOCKS (Tor) agents. Reusing warm Tor circuits
@@ -186,6 +204,30 @@ const FORWARD_RESPONSE_HEADERS = new Set([
   "content-range",
 ]);
 
+// REQUEST-header ALLOWLIST for the body we forward upstream (non-GET methods).
+// STRICTLY the bytes needed to interpret the body: the content-type (with its
+// multipart boundary), and content-language. We deliberately do NOT forward
+// cookies, authorization, referer, origin, the real user-agent or ANY other client
+// header — the proxy stays cookie-less / identity-less in BOTH directions, exactly
+// like the GET path. content-length is recomputed in httpRequest from the buffer we
+// actually send (never trusted from the client). content-encoding is NOT forwarded:
+// we send the body verbatim and label it as-is.
+const FORWARD_REQUEST_HEADERS = new Set(["content-type", "content-language"]);
+
+// Build the upstream request headers for a forwarded body from the allowlist above.
+const pickRequestHeaders = (req: NextApiRequest): Record<string, string> => {
+  const out: Record<string, string> = {};
+
+  FORWARD_REQUEST_HEADERS.forEach((name) => {
+    const value = req.headers[name];
+
+    if (typeof value === "string" && value) out[name] = value;
+    else if (Array.isArray(value) && value[0]) out[name] = value[0];
+  });
+
+  return out;
+};
+
 const isPrivateV4 = (a: number, b: number): boolean =>
   a === 0 ||
   a === 127 ||
@@ -279,25 +321,81 @@ const assertAllowedUrl = async (
   return addresses[0].address;
 };
 
+// Read the raw, undecoded request body for a non-GET method off the Next stream.
+// bodyParser is disabled (see `config` below), so `req` is the raw IncomingMessage
+// and we own the stream. We buffer (not stream) because forwarding over a SOCKS/Tor
+// agent with a precise content-length is simplest and correctness comes first; the
+// buffer is hard-capped at MAX_UPLOAD_BYTES so it can never grow unbounded. Rejects
+// (resolves { tooLarge:true }) the instant the cap is exceeded — we stop reading.
+const readRequestBody = (
+  req: NextApiRequest,
+  maxBytes: number = MAX_UPLOAD_BYTES
+): Promise<{ body: Buffer; tooLarge: boolean }> =>
+  new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let total = 0;
+    let aborted = false;
+
+    req.on("data", (chunk: Buffer) => {
+      if (aborted) return;
+      total += chunk.length;
+      if (total > maxBytes) {
+        aborted = true;
+        // Stop consuming and tear down the stream so we don't buffer past the cap.
+        req.destroy();
+        resolve({ body: Buffer.alloc(0), tooLarge: true });
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => {
+      if (aborted) return;
+      resolve({ body: Buffer.concat(chunks), tooLarge: false });
+    });
+    req.on("error", (err) => {
+      if (aborted) return;
+      reject(err);
+    });
+  });
+
 type ProxyResponse = {
   body: Buffer;
   headers: http.IncomingHttpHeaders;
   status: number;
 };
 
-// GET via Node http/https so we can route through a SOCKS (Tor) agent. Caps the
-// body size and never auto-follows redirects (the caller revalidates each hop).
-const httpGet = (
-  urlStr: string,
-  maxBytes: number = MAX_RESPONSE_BYTES,
-  useTor = true,
-  pinnedIp?: string,
-  extraHeaders: Record<string, string> = {},
+// Options for a single upstream request hop. `method` defaults to GET; `body` is
+// the raw bytes to write for non-GET methods (undefined for body-less methods).
+type HttpRequestOptions = {
+  maxBytes?: number;
+  useTor?: boolean;
+  pinnedIp?: string;
+  extraHeaders?: Record<string, string>;
   // The SOCKS agent to use in Tor mode. Defaults to the shared global agent; an
   // isolation token (see agentForToken) supplies a per-token agent on a separate
   // circuit. Fail-closed is still gated on the GLOBAL socksAgent below: if Tor
   // isn't configured at all, we never open a direct connection.
-  torAgent: SocksProxyAgent | undefined = socksAgent
+  torAgent?: SocksProxyAgent | undefined;
+  method?: string;
+  body?: Buffer;
+};
+
+// One upstream request hop via Node http/https so we can route through a SOCKS
+// (Tor) agent. Method-aware: GET (default) and HEAD carry no body; POST/PUT/PATCH/
+// DELETE/OPTIONS forward `body` byte-for-byte with the caller's content-type. Caps
+// the RESPONSE body size and never auto-follows redirects (the caller revalidates
+// each hop and decides method/body preservation per the 3xx status code).
+const httpRequest = (
+  urlStr: string,
+  {
+    maxBytes = MAX_RESPONSE_BYTES,
+    useTor = true,
+    pinnedIp,
+    extraHeaders = {},
+    torAgent = socksAgent,
+    method = "GET",
+    body,
+  }: HttpRequestOptions = {}
 ): Promise<ProxyResponse> =>
   new Promise((resolve, reject) => {
     // Fail CLOSED: in Tor mode, never fall back to a direct (clearnet) connection
@@ -310,6 +408,14 @@ const httpGet = (
       return;
     }
 
+    const upperMethod = method.toUpperCase();
+    // Only write a body for methods that may carry one; GET/HEAD/OPTIONS never do.
+    // `bodyToSend` is the definite Buffer to write (undefined => no body), which also
+    // lets TypeScript narrow it cleanly at both use sites below.
+    const bodyToSend =
+      body !== undefined && body.length > 0 && !BODYLESS_METHODS.has(upperMethod)
+        ? body
+        : undefined;
     const lib = new URL(urlStr).protocol === "https:" ? https : http;
     const request = lib.request(
       urlStr,
@@ -319,9 +425,18 @@ const httpGet = (
         // In Tor mode an isolation token routes via a per-circuit agent; otherwise
         // the shared global agent. Either way it is ALWAYS a Tor SOCKS agent here.
         agent: useTor ? torAgent : undefined,
-        // Per-request extras (e.g. a forwarded Range header for media seeking) win.
-        headers: { ...BROWSER_HEADERS, ...extraHeaders },
-        method: "GET",
+        // Per-request extras win over the browser defaults; for non-GET this carries
+        // the forwarded content-type (multipart boundary / urlencoded / octet-stream)
+        // and content-length. The header allowlist that builds extraHeaders never
+        // forwards cookies/auth, so the proxy stays cookie-less in BOTH directions.
+        headers: {
+          ...BROWSER_HEADERS,
+          ...extraHeaders,
+          ...(bodyToSend
+            ? { "Content-Length": String(bodyToSend.length) }
+            : {}),
+        },
+        method: upperMethod,
         // Pin the IP the SSRF guard already validated so DNS can't rebind to a
         // private address between the check and connect (direct mode only; Tor
         // resolves at the exit). Host/SNI/cert still use the URL hostname.
@@ -384,7 +499,12 @@ const httpGet = (
       request.destroy(new Error("timeout"))
     );
     request.on("error", reject);
-    request.end();
+    // Forward the request body byte-for-byte for non-GET methods, then close. The
+    // body is already capped at MAX_UPLOAD_BYTES by readRequestBody, so this buffer
+    // is bounded. multipart bodies are written verbatim (no re-encoding) so the
+    // boundary and binary file parts pass through unchanged.
+    if (bodyToSend) request.end(bodyToSend);
+    else request.end();
   });
 
 // Promisified zlib so decompression runs ASYNCHRONOUSLY (on the libuv threadpool)
@@ -415,7 +535,7 @@ const decodeBody = async (response: ProxyResponse): Promise<Buffer> => {
   }
 
   // Bound the DECOMPRESSED size (anti-bomb): a compressed body already passed the
-  // on-the-wire cap in httpGet, but its inflated form could be far larger. Cap the
+  // on-the-wire cap in httpRequest, but its inflated form could be far larger. Cap the
   // decoded output at MAX_RESPONSE_BYTES so a tiny gzip bomb can't OOM the process.
   try {
     if (encoding === "gzip" || encoding === "x-gzip") {
@@ -436,7 +556,7 @@ const decodeBody = async (response: ProxyResponse): Promise<Buffer> => {
   } catch {
     // Corrupt/truncated stream, OR a body that inflates past MAX_RESPONSE_BYTES
     // (gzip bomb): serve the raw bytes rather than failing the page or blowing up
-    // memory. The raw body is already capped on the wire by httpGet.
+    // memory. The raw body is already capped on the wire by httpRequest.
   }
 
   return response.body;
@@ -728,12 +848,25 @@ const rewriteHtml = (
       return `${pre}"${rewritten}"`;
     }
   );
-  // GET forms: a GET submit REPLACES the action's query string with the form
-  // fields, which drops our injected ?url=<target> (and the mode flags) -> the
-  // request reaches the proxy with no url and 400s ("internal error" when a page's
-  // search box is used). Move the target + flags into hidden inputs (which survive
-  // as query params) and bare the action; the handler's __pxurl path reassembles
-  // the real URL + appends the form fields. POST forms keep their body untouched.
+  // FORM submission, by method:
+  //
+  // POST (and other body methods): the generic attribute pass above already
+  // rewrote `action` to `${origin}/api/proxy?url=<resolved action>&flags` (relative
+  // or absolute actions are resolved against the page base by proxify). A POST does
+  // NOT replace the action's query string — it sends the fields in the BODY — so our
+  // injected ?url=<target> survives, and the handler reads it + forwards the body
+  // byte-for-byte (multipart/urlencoded/octet-stream) upstream over Tor with
+  // method=POST. So POST forms need NO further rewriting here; we leave the body
+  // untouched (do NOT inject hidden inputs — that would mutate a multipart field
+  // set) and fall through. An action-less POST form submits to the page's own
+  // proxied URL (the iframe location), which is the correct HTML default.
+  //
+  // GET: a GET submit REPLACES the action's query string with the form fields,
+  // which drops our injected ?url=<target> (and the mode flags) -> the request
+  // reaches the proxy with no url and 400s ("internal error" when a page's search
+  // box is used). Move the target + flags into hidden inputs (which survive as query
+  // params) and bare the action; the handler's __pxurl path reassembles the real URL
+  // + appends the form fields.
   out = out.replace(/<form\b([^>]*)>/gi, (whole: string, attrs: string) => {
     const methodMatch = /\smethod\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(
       attrs
@@ -747,6 +880,8 @@ const rewriteHtml = (
       .trim()
       .toLowerCase();
 
+    // Non-GET (POST/PUT/...) forms: action already proxified; body forwarded by the
+    // handler. Nothing to rewrite here.
     if (method !== "get") return whole;
 
     const actionMatch = /\saction\s*=\s*("([^"]*)"|'([^']*)')/i.exec(attrs);
@@ -922,6 +1057,23 @@ const handler = async (
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> => {
+  // The forwarded method. GET by default; the embedded Vaptvupt share (and other
+  // proxied pages) submit POST forms / file uploads, which we now forward instead
+  // of letting the upstream Flask/onion reject everything as 405. An unknown method
+  // is refused before we touch Tor (no SSRF / open-relay surface widening).
+  const method = (req.method || "GET").toUpperCase();
+
+  if (!ALLOWED_METHODS.has(method)) {
+    res
+      .status(405)
+      .setHeader("Allow", [...ALLOWED_METHODS].join(", "))
+      .setHeader("Content-Type", "text/plain")
+      .end("Method Not Allowed");
+    return;
+  }
+
+  const hasBody = !BODYLESS_METHODS.has(method);
+
   let raw = Array.isArray(req.query.url) ? req.query.url[0] : req.query.url;
   const noJs =
     req.query.nojs === "1" ||
@@ -1006,11 +1158,54 @@ const handler = async (
   res.setHeader("Referrer-Policy", "no-referrer");
   res.setHeader("X-Robots-Tag", "noindex, nofollow");
 
+  // Read + buffer the request body for non-GET methods (file uploads, POST forms).
+  // bodyParser is disabled, so we own the raw stream. Hard-capped at
+  // MAX_UPLOAD_BYTES — an over-cap upload is refused with 413 (no partial forward).
+  // GET/HEAD/OPTIONS never read a body.
+  let requestBody: Buffer | undefined;
+
+  if (hasBody) {
+    let read: { body: Buffer; tooLarge: boolean };
+
+    try {
+      read = await readRequestBody(req, MAX_UPLOAD_BYTES);
+    } catch {
+      res
+        .status(400)
+        .setHeader("Content-Type", "text/plain")
+        .end("Could not read request body");
+      return;
+    }
+
+    if (read.tooLarge) {
+      res
+        .status(413)
+        .setHeader("Content-Type", "text/plain")
+        .end("Upload too large");
+      return;
+    }
+
+    requestBody = read.body;
+  }
+
+  // Per-request upstream headers. Range (media seeking) is forwarded for any method;
+  // for a body-carrying method we ALSO forward the allowlisted request headers
+  // (content-type with its multipart boundary, content-language) so the upstream can
+  // interpret the body. NO cookies/auth/referer/user-agent are ever forwarded.
+  const range = req.headers.range;
+  const extraHeaders: Record<string, string> = {
+    ...(typeof range === "string" ? { Range: range } : {}),
+    ...(hasBody ? pickRequestHeaders(req) : {}),
+  };
+
   // Delegate to the memory-safe Rust sidecar when configured. Extension-injection
   // requests stay on the Node path (that feature lives here). On ANY sidecar error
   // we fall through to the built-in proxy below, so browsing never hard-fails.
   if (
     PROXY_SIDECAR_URL &&
+    // The sidecar is GET-only (no body forwarding); non-GET methods (uploads, POST
+    // forms) must use the Node path below so the body is forwarded over Tor.
+    !hasBody &&
     !injectExt &&
     !isBin &&
     !isDirect &&
@@ -1056,25 +1251,28 @@ const handler = async (
     // multiply the per-hop cap (6 hops * 512 MB) into an OOM. Each hop is capped at
     // whatever budget remains.
     let budget = isBin ? MAX_BIN_BYTES : MAX_RESPONSE_BYTES;
-    // Forward the browser's Range header so <video>/<audio> can seek: upstream
-    // answers 206 Partial Content, which we relay through (status + content-range)
-    // unchanged. Absent a Range, media still streams as a normal 200.
-    const range = req.headers.range;
-    const extraHeaders: Record<string, string> =
-      typeof range === "string" ? { Range: range } : {};
+    // The method/body for THIS hop. A redirect may downgrade them (303 / legacy
+    // 301-302 POST -> GET) before the next hop; 307/308 preserve both.
+    let hopMethod = method;
+    let hopBody = requestBody;
+    // The forwarded request headers for THIS hop. When a redirect downgrades the
+    // method to GET we drop the body-describing headers (content-type) — there is no
+    // longer a body to describe — while keeping any Range header.
+    let hopHeaders = extraHeaders;
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
       // eslint-disable-next-line no-await-in-loop
       const pinnedIp = await assertAllowedUrl(current, isDirect);
       // eslint-disable-next-line no-await-in-loop
-      response = await httpGet(
-        current.href,
-        budget,
-        !isDirect,
+      response = await httpRequest(current.href, {
+        maxBytes: budget,
+        useTor: !isDirect,
         pinnedIp,
-        extraHeaders,
-        torAgent
-      );
+        extraHeaders: hopHeaders,
+        torAgent,
+        method: hopMethod,
+        body: hopBody,
+      });
 
       budget -= response.body.length;
       if (budget <= 0 && response.status >= 300 && response.status < 400) {
@@ -1085,7 +1283,28 @@ const handler = async (
 
       if (response.status >= 300 && response.status < 400 && location) {
         if (hop === MAX_REDIRECTS) throw new Error("too-many-redirects");
+        // Re-validate EVERY hop (the new URL is run through assertAllowedUrl at the
+        // top of the next iteration), so a redirect can't bounce a POST onto a
+        // private/loopback/metadata host (SSRF) any more than a GET can.
         current = new URL(location, current);
+
+        // Method/body preservation per RFC 7231 / browser behaviour:
+        //   • 307 / 308 — repeat the request UNCHANGED (same method + body): we
+        //                 leave hopMethod/hopBody/hopHeaders as-is.
+        //   • 303       — always switch to GET and drop the body.
+        //   • 301 / 302 — a POST (any body method) is re-issued as a bodyless GET,
+        //                 matching long-standing browser behaviour; GET/HEAD stay.
+        const status = response.status;
+        const downgradeToGet =
+          status === 303 || ((status === 301 || status === 302) && hasBody);
+
+        if (downgradeToGet) {
+          hopMethod = "GET";
+          hopBody = undefined;
+          // Drop the body-describing request headers; keep Range (if any).
+          hopHeaders = typeof range === "string" ? { Range: range } : {};
+        }
+
         continue;
       }
 

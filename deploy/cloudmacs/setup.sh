@@ -20,10 +20,11 @@ else
   echo "Spacemacs already present in ~/.cloudmacs.d"
 fi
 
-# 2) The SecurityOS dotfile.
+# 2) The SecurityOS dotfile + ASCII startup banner.
 mkdir -p "$HOME/.spacemacs.d" "$HOME/cloudmacs-data"
 cp "$HERE/spacemacs-init.el" "$HOME/.spacemacs.d/init.el"
-echo "Installed ~/.spacemacs.d/init.el"
+cp "$HERE/securityos-banner.txt" "$HOME/.spacemacs.d/securityos-banner.txt"
+echo "Installed ~/.spacemacs.d/init.el + securityos-banner.txt"
 
 # 3) whatsappel (optional — only mounted if it exists).
 if [ ! -d "$HOME/whatsappel" ]; then

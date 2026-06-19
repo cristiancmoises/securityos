@@ -1,6 +1,7 @@
 import StyledDesktop from "components/system/Desktop/StyledDesktop";
 import useFilePaste from "components/system/Desktop/useFilePaste";
 import useWallpaper from "components/system/Desktop/Wallpapers/useWallpaper";
+import Widgets from "components/system/Widgets";
 import FileManager from "components/system/Files/FileManager";
 import { useRef } from "react";
 import { DESKTOP_PATH } from "utils/constants";
@@ -24,6 +25,7 @@ const Desktop: FC = ({ children }) => {
         loadIconsImmediately
         preloadShortcuts
       />
+      <Widgets />
       {children}
     </StyledDesktop>
   );
