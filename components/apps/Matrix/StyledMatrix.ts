@@ -235,6 +235,36 @@ const StyledMatrix = styled.div`
     flex: 1 1 auto;
     flex-direction: column;
     min-width: 0;
+    position: relative;
+  }
+
+  /* Drag-and-drop / paste image upload overlay */
+  .drop-overlay {
+    align-items: center;
+    background: ${({ theme }) => theme.colors.background};
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    left: 0;
+    opacity: 92%;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
+    top: 0;
+    z-index: 5;
+  }
+
+  .drop-card {
+    border: 2px dashed ${({ theme }) => theme.colors.highlight};
+    border-radius: 10px;
+    color: ${({ theme }) => theme.colors.highlight};
+    font-size: 14px;
+    font-weight: 600;
+    padding: 26px 36px;
+  }
+
+  .hint.warn {
+    color: rgb(255, 205, 107);
   }
 
   .chat-header {

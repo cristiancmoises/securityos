@@ -518,6 +518,7 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
       )}
       <div className="actions">
         <button
+          className="shoot-btn"
           disabled={!canScreenshot || isRecording || counting}
           onClick={onScreenshot}
           type="button"
@@ -527,7 +528,9 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
             : "📷 Screenshot"}
         </button>
         <button
-          className={isRecording ? `recording${isPaused ? " paused" : ""}` : ""}
+          className={`rec-btn${
+            isRecording ? ` recording${isPaused ? " paused" : ""}` : ""
+          }`}
           // Disabled only during a screenshot countdown; a recording countdown
           // keeps this clickable so the user can cancel it.
           disabled={!canRecord || screenshotCounting}

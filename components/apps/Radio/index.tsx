@@ -137,15 +137,19 @@ const Radio: FC<ComponentProcessProps> = ({ id }) => {
           <select
             aria-label="Filter by country"
             onChange={(event) => {
-              setCountry(event.target.value);
+              const next = event.target.value;
+
+              setCountry(next);
               setTab("stations");
-              search();
+              // Pass the new country explicitly — setState is async, so search()
+              // without it would query the PREVIOUS country (the bug being fixed).
+              search({ country: next });
             }}
             value={country}
           >
             <option value="">All countries</option>
             {countries.map((entry) => (
-              <option key={entry.name} value={entry.name}>
+              <option key={entry.code} value={entry.code}>
                 {entry.name} ({entry.stationcount})
               </option>
             ))}
@@ -153,9 +157,11 @@ const Radio: FC<ComponentProcessProps> = ({ id }) => {
           <select
             aria-label="Filter by genre"
             onChange={(event) => {
-              setTag(event.target.value);
+              const next = event.target.value;
+
+              setTag(next);
               setTab("stations");
-              search();
+              search({ tag: next });
             }}
             value={tag}
           >
@@ -363,6 +369,14 @@ const Radio: FC<ComponentProcessProps> = ({ id }) => {
           a station is chosen; src is always an https URL (http streams filtered). */}
       <audio
         ref={audioRef}
+        onError={() => {
+          // A dead/unreachable stream fires `error` (not just stalled) — surface it
+          // so the user knows to pick another, instead of a silently stuck player.
+          if (current) {
+            setStreamError("This stream is offline or unsupported.");
+            setPlaying(false);
+          }
+        }}
         onPause={() => setPlaying(false)}
         onPlaying={() => {
           setPlaying(true);

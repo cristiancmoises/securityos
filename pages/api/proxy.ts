@@ -44,11 +44,31 @@ const MAX_RESPONSE_BYTES = 25 * 1024 * 1024;
 // Larger cap for explicit binary fetches (?bin=1), e.g. the V86 app pulling a
 // live ISO it will boot. Self-hosted single-user OS, so a bigger buffer is fine.
 const MAX_BIN_BYTES = 512 * 1024 * 1024;
+// Downloads (attachments / generic binary content-types) get a budget well above
+// the 25 MiB HTML cap so real shared files transfer in full — but BELOW the media
+// budget, because a download is fully buffered (and Buffer.concat transiently
+// doubles it at the end), whereas media streams as Range/206 partials. This keeps a
+// single download's peak memory bounded.
+const MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024;
+// Global ceiling on bytes buffered across ALL in-flight upstream RESPONSES. Without
+// it, a hostile proxied page referencing many large sub-resources (each labeled as a
+// download/binary type) could buffer enough concurrent responses to exceed the
+// container's memory limit and OOM-kill it (remote DoS). Once the running total
+// passes this, further large responses are aborted ("server-busy") instead of
+// allocated, so total buffered RESPONSE memory stays bounded regardless of
+// concurrency. (Request/upload bodies are a separate pool, bounded per-request by
+// MAX_UPLOAD_BYTES below and not counted here: they carry no amplification — a client
+// must actually send every byte it makes us buffer, so peak upload memory is capped
+// by the client's own bandwidth rather than by a cheap reference in a hostile page.)
+const MAX_TOTAL_BUFFER_BYTES = 640 * 1024 * 1024;
+let inFlightBuffered = 0;
 // Cap on the REQUEST body we will buffer + forward upstream for non-GET methods
 // (file uploads via the embedded Vaptvupt share, POST forms, etc.). Bounds memory
-// per upload so a hostile/buggy client can't OOM the route; 64 MiB comfortably
-// covers the share's interactive uploads. A body over the cap is rejected (413).
-const MAX_UPLOAD_BYTES = 64 * 1024 * 1024;
+// per upload so a hostile/buggy client can't OOM the route. Raised to 256 MiB so
+// real file-share uploads (the common cause of "upload failed") aren't rejected as
+// 413; it's a self-hosted single-user OS, so a larger transient buffer is fine. A
+// body over the cap is still rejected (413) rather than partially forwarded.
+const MAX_UPLOAD_BYTES = 256 * 1024 * 1024;
 const MAX_REDIRECTS = 5;
 // HTTP methods we forward upstream. GET/HEAD carry no body; the rest may carry one
 // (read + forwarded byte-for-byte). Anything else is rejected before we touch Tor.
@@ -416,6 +436,18 @@ const httpRequest = (
       body !== undefined && body.length > 0 && !BODYLESS_METHODS.has(upperMethod)
         ? body
         : undefined;
+    // Global buffered-bytes accounting for THIS request: subtract exactly what we
+    // added back, exactly once, whether the request ends, errors, times out, or is
+    // aborted — otherwise inFlightBuffered would leak and eventually reject all
+    // traffic. Defined here (not in the response callback) so the request-level
+    // error/timeout handlers below can release too.
+    let counted = 0;
+    let released = false;
+    const release = (): void => {
+      if (released) return;
+      released = true;
+      inFlightBuffered -= counted;
+    };
     const lib = new URL(urlStr).protocol === "https:" ? https : http;
     const request = lib.request(
       urlStr,
@@ -467,38 +499,83 @@ const httpRequest = (
       (response) => {
         const chunks: Buffer[] = [];
         let total = 0;
-        // Media (video/audio) and 206 Partial responses can dwarf the HTML cap —
-        // give them the large binary budget so playback/seeking isn't truncated.
+
+        // Pick the per-response byte budget. Media (video/audio) + 206 partials keep
+        // the large media budget for smooth playback/seeking; file DOWNLOADS
+        // (attachments / generic binary content-types) get the smaller download
+        // budget so a shared file over 25 MiB transfers in full without granting the
+        // full media buffer. REDIRECT (3xx) bodies never need a large buffer, so they
+        // are excluded — this also preserves the loop's cumulative-redirect budget
+        // (an attacker can't use a 3xx + binary content-type to bypass `maxBytes`).
+        const status = response.statusCode || 0;
+        const isRedirect = status >= 300 && status < 400;
         const responseType = String(response.headers["content-type"] || "");
-        const cap =
-          response.statusCode === 206 ||
-          /^(?:video|audio)\//i.test(responseType)
-            ? MAX_BIN_BYTES
-            : maxBytes;
+        const disposition = String(
+          response.headers["content-disposition"] || ""
+        );
+        // Anchored to the disposition TOKEN so an inline resource whose *filename*
+        // merely contains "attachment" doesn't get the larger budget.
+        const isAttachment = /^\s*attachment\b/i.test(disposition);
+        const isMedia = /^(?:video|audio)\//i.test(responseType);
+        const isBinaryDownloadType =
+          /^application\/(?:octet-stream|zip|x-zip|gzip|x-gzip|x-tar|x-7z|x-rar|x-bzip|pdf|epub|x-iso|vnd|x-msdownload|x-debian|x-redhat|java-archive)\b/i.test(
+            responseType
+          );
+        let cap = maxBytes;
+
+        if (!isRedirect) {
+          if (status === 206 || isMedia) cap = Math.max(maxBytes, MAX_BIN_BYTES);
+          else if (isAttachment || isBinaryDownloadType) {
+            cap = Math.max(maxBytes, MAX_DOWNLOAD_BYTES);
+          }
+        }
 
         response.on("data", (chunk: Buffer) => {
+          // Once we've released (aborted) this request, ignore any late chunk so it
+          // can't re-inflate the global counter after it was subtracted.
+          if (released) return;
           total += chunk.length;
+          inFlightBuffered += chunk.length;
+          counted += chunk.length;
+          // Per-response cap: this single response is too big.
           if (total > cap) {
+            release();
             request.destroy(new Error("too-large"));
+            return;
+          }
+          // Global cap: total buffered across ALL in-flight responses would exceed
+          // the safe memory ceiling — abort rather than risk OOM-killing the route.
+          if (inFlightBuffered > MAX_TOTAL_BUFFER_BYTES) {
+            release();
+            request.destroy(new Error("server-busy"));
             return;
           }
           chunks.push(chunk);
         });
-        response.on("end", () =>
+        response.on("end", () => {
+          release();
           resolve({
             body: Buffer.concat(chunks),
             headers: response.headers,
             status: response.statusCode || 502,
-          })
-        );
-        response.on("error", reject);
+          });
+        });
+        response.on("error", (error) => {
+          release();
+          reject(error);
+        });
       }
     );
 
     request.setTimeout(FETCH_TIMEOUT_MS, () =>
       request.destroy(new Error("timeout"))
     );
-    request.on("error", reject);
+    request.on("error", (error) => {
+      // Release any bytes this request counted before failing (timeout/abort/socket
+      // error) so the global buffer accounting can't leak and starve later requests.
+      release();
+      reject(error);
+    });
     // Forward the request body byte-for-byte for non-GET methods, then close. The
     // body is already capped at MAX_UPLOAD_BYTES by readRequestBody, so this buffer
     // is bounded. multipart bodies are written verbatim (no re-encoding) so the

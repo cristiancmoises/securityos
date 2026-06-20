@@ -244,8 +244,8 @@ const directory: Processes = {
     Component: dynamic(() => import("components/apps/ScreenCapture")),
     backgroundColor: "#150f1b",
     defaultSize: {
-      height: 260,
-      width: 380,
+      height: 532,
+      width: 480,
     },
     icon: "/System/Icons/photo.webp",
     singleton: true,
@@ -330,6 +330,39 @@ const directory: Processes = {
     icon: "/System/Icons/tails.webp",
     singleton: true,
     title: "Tails",
+  },
+  WhatsApp: {
+    Component: dynamic(() => import("components/apps/WhatsApp")),
+    backgroundColor: "#120c18",
+    defaultSize: {
+      height: 600,
+      width: 500,
+    },
+    icon: "/System/Icons/whatsapp.webp",
+    singleton: true,
+    title: "WhatsApp",
+  },
+  Telegram: {
+    Component: dynamic(() => import("components/apps/Telegram")),
+    backgroundColor: "#120c18",
+    defaultSize: {
+      height: 600,
+      width: 500,
+    },
+    icon: "/System/Icons/telegram.webp",
+    singleton: true,
+    title: "Telegram",
+  },
+  Session: {
+    Component: dynamic(() => import("components/apps/Session")),
+    backgroundColor: "#120c18",
+    defaultSize: {
+      height: 600,
+      width: 500,
+    },
+    icon: "/System/Icons/session.webp",
+    singleton: true,
+    title: "Session",
   },
   TorBrowser: {
     Component: dynamic(() => import("components/apps/TorBrowser")),

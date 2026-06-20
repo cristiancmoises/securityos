@@ -4,6 +4,111 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.14.0] — 2026-06-20
+
+### Matrix — works end-to-end (real bug fixes)
+Sign-in, syncing and sending were investigated end-to-end. The login and sync code
+paths were verified correct — a persistent "can't sign in / stuck syncing" is an
+**infrastructure** condition (Tor not running, or the `matrix.securityops.co`
+homeserver unreachable over Tor, or wrong credentials), which the app already
+surfaces with an actionable message. Four genuine **code** bugs were found and fixed:
+
+- **Image/file attachments now display.** The SDK builds media URLs with
+  `new URL(absolutePath, baseUrl)`, which silently **dropped the `/api/matrix`
+  proxy prefix** — so every attachment fetch bypassed the Tor proxy and 404'd.
+  Media requests now re-insert the prefix and load over Tor like everything else.
+- **Uploads no longer time out over Tor.** `matrix-js-sdk`'s `uploadContent` uses an
+  `XMLHttpRequest` with a hard-coded **30 s idle timeout**; the body flushes
+  instantly to the same-origin proxy, then the request waits on the slow Tor leg,
+  so a healthy upload aborted with *"Timeout"*. Uploads now go through a plain
+  `fetch` (no idle timer), reliably over Tor.
+- **The Matrix Tor proxy no longer leaks circuits.** When the browser aborts a
+  `/sync` long-poll (or the window closes), the proxy now **tears down the upstream
+  Tor request** instead of holding the socket/circuit open for up to 90 s — which
+  previously accumulated orphaned sockets and degraded Matrix over a session.
+- **No more duplicate rooms / uploads / joins.** The proxy retried *all* failed
+  requests, including non-idempotent `POST`s the homeserver had **already
+  processed** — a slow Tor response on create-room/upload/join could duplicate the
+  action. Retries are now gated to idempotent methods (and not-yet-sent bodies).
+
+### Radio — only working stations, exact countries
+- **Country filter is now exact.** Picking a country used a fuzzy **name** match
+  against stations' inconsistent free-text labels, so results leaked in from the
+  wrong place. It now matches the **ISO 3166-1 country code** exactly, so each
+  country shows stations actually *from* that country. (Stale name-based prefs from
+  older builds are migrated away.)
+- **Offline / non-playable stations removed.** The list now keeps only stations
+  that actually work here: an **HTTPS** stream (http-only streams can never play on
+  an HTTPS page — mixed content is blocked) that **passed the directory's last
+  reachability check**, on top of the API's `hidebroken` filter.
+
+### Messengers (WhatsApp · Telegram · Session) — honest Tor guidance
+- Each launcher now includes an in-app **"Using … over Tor"** explainer: these
+  clients can't run through the in-OS Tor proxy (they need WebSockets it blocks;
+  WhatsApp/Telegram also forbid framing; Session has no web client), so the window
+  is a **direct** connection. To use them anonymously, run **SecurityOS itself in
+  the Tor Browser / Tails** — documented in-app and in the **SecurityOS Handbook**.
+
+### Docs
+- **README + in-desktop Handbook** updated: messengers + their Tor trade-off, the
+  Radio improvements, and a corrected **VaptVupt** description — it embeds the
+  share's **`.onion` over the Tor proxy** (uploads to 256 MiB, downloads stream in
+  full, with a **Reload** / **Open in Tor Browser** toolbar), replacing the stale
+  "real-origin `share.securityops.co`" wording.
+
+## [2.13.0] — 2026-06-20
+
+### New apps
+- **WhatsApp, Telegram & Session** launchers. WhatsApp Web and Telegram Web can't
+  be iframed (WhatsApp pins `frame-ancestors`, Telegram sends `X-Frame-Options:
+  deny`) and rely on WebSockets the Tor proxy blocks, so each opens its **official
+  web client in a real top-level window**, where it's fully functional (chats,
+  calls, native uploads/downloads, QR login). **Session has no web client** (it's a
+  desktop/mobile app), so its launcher opens the official download page instead. A
+  clear **"Direct connection — NOT routed through Tor"** badge makes the privacy
+  trade-off explicit. New brand icons + Desktop/Start-Menu shortcuts.
+
+### Fixes
+- **Matrix: no more silent "Connecting over Tor…".** On open, the app now does a
+  real reachability probe of the Tor SOCKS proxy (`/api/tor-status`) and **bounds
+  the circuit warm-up with a timeout** so the state always settles instead of
+  hanging. If Tor is configured but **down**, the login screen says so and how to
+  fix it (start Tor in Tor Control) and disables sign-in, instead of spinning.
+- **Matrix: image drag-and-drop / paste.** Drop image(s)/files onto a chat — or
+  paste a screenshot into the composer — to send them (encrypted in E2EE rooms).
+- **Radio: dead servers.** Replaced the two hard-coded radio-browser mirrors with a
+  resilient rotation over several known-good mirrors that **remembers the first one
+  that answers** and times out dead hosts fast.
+- **Radio: country filter ignored the selection.** Picking a country (or genre)
+  searched the *previous* value because `search()` read stale state set in the same
+  event tick. The chosen value is now passed through explicitly. Stream `error`
+  events also surface ("This stream is offline or unsupported").
+- **VaptVupt: upload & download errors.** The privacy proxy capped generic file
+  **downloads at 25 MiB** (anything bigger truncated/failed) — attachments and
+  binary/archive content-types now get a **dedicated 256 MiB download budget** (well
+  above the 25 MiB HTML cap, below the 512 MiB media budget), so big shared files
+  download in full. **Upload cap raised 64 MiB → 256 MiB.** The app also gained a
+  toolbar (**Reload**, **Open in Tor Browser**) and an actionable slow-load hint.
+
+### Tor Browser
+- **User Bookmarks.** Save the current page (★ toggle), revisit and remove your own
+  bookmarks; persisted in localStorage alongside the built-in onion bookmarks.
+- Validated the Security Ops extension shim + the three-state NoScript control.
+
+### UI/UX
+- **Screen Capture redesign** — a cleaner "capture studio": responsive option grid,
+  prominent gradient **Screenshot** / red **Record** actions, a refined recording
+  pill and last-capture card, and a roomier default window.
+
+### Hardening
+- The privacy proxy now bounds **total in-flight buffered memory** across all
+  upstream responses (and excludes redirects + anchors the attachment check), so a
+  hostile page referencing many large "download" sub-resources can't OOM the
+  container — closing a memory-DoS amplification the larger download budget exposed.
+- Matrix swallows stray file drops window-wide (a drop with no room selected could
+  otherwise navigate the page and tear down the OS session), and file attachments
+  open via a gesture-safe window so the browser's pop-up blocker no longer eats them.
+
 ## [2.12.0] — 2026-06-19
 
 ### Fixes
