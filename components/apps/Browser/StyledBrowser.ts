@@ -188,6 +188,50 @@ const StyledBrowser = styled.div<StyledBrowserProps>`
     button:hover {
       background-color: rgb(28, 28, 28);
     }
+    .bm-star {
+      color: rgb(150, 150, 150);
+      font-size: 14px;
+      padding: 0 7px;
+    }
+    .bm-star.on {
+      color: rgb(185, 139, 224);
+    }
+    .bm-star:disabled {
+      opacity: 40%;
+    }
+    .bm-sep {
+      align-self: center;
+      background-color: rgb(40, 40, 40);
+      flex: 0 0 auto;
+      height: 16px;
+      margin: 0 2px;
+      width: 1px;
+    }
+    /* A saved user bookmark: name chip + a hover-revealed remove ×. */
+    .bm-user {
+      align-items: center;
+      display: inline-flex;
+      flex: 0 0 auto;
+    }
+    .bm-user .bm-go {
+      max-width: 140px;
+      overflow: hidden;
+      padding-right: 5px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .bm-user .bm-remove {
+      color: rgb(150, 150, 150);
+      font-size: 14px;
+      opacity: 0%;
+      padding: 0 6px 0 2px;
+    }
+    .bm-user:hover .bm-remove {
+      opacity: 100%;
+    }
+    .bm-user .bm-remove:hover {
+      color: rgb(235, 120, 120);
+    }
   }
 `;
 

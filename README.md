@@ -45,16 +45,28 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
   **Amnesic** — keys live in memory only. See [Matrix](#-matrix).
 - **🎥 SecChat** — first-party end-to-end-encrypted video chat
   (`chat.securityops.co`), embedded in-OS.
-- **📻 Radio** — listen to internet radio worldwide (radio-browser API), filter by
-  country/genre, HTTPS streams, favorites.
+- **📻 Radio** — listen to internet radio worldwide (radio-browser API). **Exact**
+  country filtering (by ISO country code, not a fuzzy name match), genre filter, and
+  **only working HTTPS stations** — offline and non-playable (http-only) ones are
+  filtered out — plus favorites and resilient mirror failover.
 - **📝 Cloudmacs** — a full **Emacs** (Spacemacs) in the browser (Gotty serving a
   terminal Emacs), with **telega** (Telegram — TDLib built into the image),
   **whatsappel** (WhatsApp), **org-mode**, and **eww**. Appears in *Open with* for
   text/code files.
 - **📺 SecTube** — the SecurityOps video frontend, embedded for playback.
-- **📁 Vaptvupt file share** — the first-party SecurityOps file share
-  (`share.securityops.co`), embedded in-OS at its real origin for full usage.
-  (Requires the site to allow framing from the SecurityOS origin.)
+- **📁 VaptVupt file share** — the first-party SecurityOps encrypted file share,
+  embedded in-OS **over Tor** (its `.onion` served through the privacy proxy in an
+  opaque-origin sandbox). Upload and download files in the window (uploads up to
+  256 MiB; downloads stream back in full); a toolbar offers **Reload** and **Open in
+  Tor Browser** for script-heavy actions. Real-time/WebSocket features aren't
+  available through the proxy by design.
+- **🟢 WhatsApp · Telegram · Session** — launchers for the official messengers.
+  These can't be embedded (anti-framing headers; WebSockets the Tor proxy blocks;
+  Session has no web client), so each opens its **official client in a real
+  top-level window** where it's fully functional (chats, calls, uploads/downloads,
+  QR login), with a clear **"Direct connection — NOT routed through Tor"** badge. To
+  use them over Tor, run SecurityOS itself in the **Tor Browser** / Tails — each app
+  explains how, and so does the **SecurityOS Handbook**.
 - **⏺️ Screen Capture** — screen recording + screenshots via `getDisplayMedia`
   (captures everything on screen, incl. cross-origin app iframes): countdown,
   microphone + system audio, quality/format/codec presets, and a max-duration. A

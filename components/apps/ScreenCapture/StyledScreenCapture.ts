@@ -1,74 +1,125 @@
 import styled from "styled-components";
 
+// Screen Capture — a compact "capture studio" panel. Theme-token driven (purple
+// accent from theme.colors.highlight) with a red record action. Top-aligned and
+// scrollable so the option grid breathes; the Screenshot / Record buttons sit in a
+// prominent action bar.
 const StyledScreenCapture = styled.div`
-  align-items: center;
-  background: ${({ theme }) => theme.colors.background};
+  background:
+    radial-gradient(
+      130% 90% at 50% -10%,
+      color-mix(in srgb, ${({ theme }) => theme.colors.highlight} 18%, transparent) 0%,
+      transparent 55%
+    ),
+    ${({ theme }) => theme.colors.background};
+  box-sizing: border-box;
   color: ${({ theme }) => theme.colors.text};
   display: flex;
   flex-direction: column;
   font-family: ${({ theme }) => theme.formats.systemFont};
-  gap: 12px;
+  gap: 14px;
   height: 100%;
-  justify-content: center;
   overflow: auto;
-  padding: 18px;
+  padding: 18px 18px 20px;
   position: relative;
-  text-align: center;
   width: 100%;
 
   h1 {
-    font-size: 17px;
-    font-weight: 600;
+    align-items: center;
+    display: flex;
+    font-size: 18px;
+    font-weight: 700;
+    gap: 8px;
+    letter-spacing: 0.2px;
     margin: 0;
+  }
+
+  h1::before {
+    content: "🎬";
+    font-size: 20px;
   }
 
   .sub {
     color: ${({ theme }) => theme.colors.titleBar.textInactive};
-    font-size: 11px;
-    margin: 0;
-    max-width: 300px;
+    font-size: 11.5px;
+    line-height: 1.5;
+    margin: -8px 0 0;
   }
 
+  .sub b {
+    color: ${({ theme }) => theme.colors.text};
+  }
+
+  /* Two-column responsive grid of option "fields". */
   .options {
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 14px;
-    justify-content: center;
-    margin-top: 2px;
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
 
   .options label {
     align-items: center;
-    color: ${({ theme }) => theme.colors.titleBar.textInactive};
+    background: color-mix(in srgb, ${({ theme }) => theme.colors.text} 5%, transparent);
+    border: 1px solid
+      color-mix(in srgb, ${({ theme }) => theme.colors.text} 10%, transparent);
+    border-radius: 8px;
+    color: ${({ theme }) => theme.colors.text};
     cursor: pointer;
-    display: inline-flex;
-    font-size: 11px;
-    gap: 5px;
+    display: flex;
+    font-size: 11.5px;
+    gap: 8px;
+    justify-content: space-between;
+    min-height: 34px;
+    padding: 6px 10px;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+
+  .options label:hover:not(:has(:disabled)) {
+    border-color: color-mix(
+      in srgb,
+      ${({ theme }) => theme.colors.highlight} 55%,
+      transparent
+    );
   }
 
   .options select {
-    background: ${({ theme }) => theme.colors.highlightBackground};
-    border: 1px solid ${({ theme }) => theme.colors.highlight};
-    border-radius: 4px;
+    background: ${({ theme }) => theme.colors.background};
+    border: 1px solid
+      color-mix(in srgb, ${({ theme }) => theme.colors.highlight} 45%, transparent);
+    border-radius: 5px;
     color: ${({ theme }) => theme.colors.text};
+    cursor: pointer;
+    flex: 0 1 auto;
     font-family: inherit;
-    font-size: 11px;
-    padding: 2px 4px;
+    font-size: 11.5px;
+    max-width: 58%;
+    padding: 3px 5px;
+  }
+
+  .options select:focus {
+    border-color: ${({ theme }) => theme.colors.highlight};
+    outline: none;
+  }
+
+  /* Checkbox fields: the box sits first, so left-align them. */
+  .options label:has(input[type="checkbox"]) {
+    color: ${({ theme }) => theme.colors.titleBar.textInactive};
+    justify-content: flex-start;
   }
 
   .options input[type="checkbox"] {
     accent-color: ${({ theme }) => theme.colors.highlight};
     cursor: pointer;
+    height: 15px;
     margin: 0;
+    width: 15px;
   }
 
-  /* Visually dim any option whose control is disabled (e.g. System audio on
-     browsers that can't capture it, or all recording options while busy). */
+  /* Dim any option whose control is disabled. */
   .options label:has(select:disabled),
   .options label:has(input:disabled) {
     cursor: default;
-    opacity: 60%;
+    opacity: 55%;
   }
 
   .options select:disabled,
@@ -78,27 +129,38 @@ const StyledScreenCapture = styled.div`
 
   .options .codec-badge {
     align-items: center;
-    background: ${({ theme }) => theme.colors.highlightBackground};
-    border: 1px solid ${({ theme }) => theme.colors.highlight};
-    border-radius: 4px;
-    color: ${({ theme }) => theme.colors.titleBar.textInactive};
+    background: color-mix(
+      in srgb,
+      ${({ theme }) => theme.colors.highlight} 22%,
+      transparent
+    );
+    border: 1px solid
+      color-mix(in srgb, ${({ theme }) => theme.colors.highlight} 50%, transparent);
+    border-radius: 8px;
+    color: ${({ theme }) => theme.colors.text};
     display: inline-flex;
-    font-size: 10px;
-    letter-spacing: 0.3px;
-    padding: 2px 6px;
+    font-size: 10.5px;
+    grid-column: 1 / -1;
+    justify-content: center;
+    letter-spacing: 0.4px;
+    min-height: 26px;
+    padding: 3px 8px;
   }
 
   .webcam-preview {
     align-items: center;
+    align-self: center;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 5px;
   }
 
   .webcam-preview canvas {
     background: #000;
-    border: 1px solid ${({ theme }) => theme.colors.highlight};
-    border-radius: 6px;
+    border: 1px solid
+      color-mix(in srgb, ${({ theme }) => theme.colors.highlight} 60%, transparent);
+    border-radius: 8px;
+    box-shadow: 0 4px 14px -6px rgb(0 0 0 / 60%);
     height: 120px;
     object-fit: cover;
     width: 160px;
@@ -109,69 +171,102 @@ const StyledScreenCapture = styled.div`
     font-size: 10px;
   }
 
+  /* Action bar — Screenshot (accent) + Record (red). */
   .actions {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    justify-content: center;
-    margin-top: 4px;
+    margin-top: 2px;
   }
 
   button {
-    background: ${({ theme }) => theme.colors.highlightBackground};
-    border: 1px solid ${({ theme }) => theme.colors.highlight};
-    border-radius: 6px;
-    color: ${({ theme }) => theme.colors.text};
+    align-items: center;
+    border: 0;
+    border-radius: 9px;
+    color: #fff;
     cursor: pointer;
+    display: inline-flex;
     font-family: inherit;
-    font-size: 13px;
-    padding: 10px 16px;
+    font-size: 13.5px;
+    font-weight: 600;
+    gap: 6px;
+    justify-content: center;
+    padding: 11px 16px;
+    transition: filter 0.15s ease, transform 0.08s ease;
   }
 
   button:hover:not(:disabled) {
-    background: ${({ theme }) => theme.colors.taskbar.activeForeground};
+    filter: brightness(1.1);
+  }
+
+  button:active:not(:disabled) {
+    transform: translateY(1px);
   }
 
   button:disabled {
     cursor: default;
-    opacity: 50%;
+    opacity: 45%;
   }
 
-  button.recording {
+  .shoot-btn {
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, ${({ theme }) => theme.colors.highlight} 92%, #fff) 0%,
+      ${({ theme }) => theme.colors.highlight} 100%
+    );
+    flex: 1 1 150px;
+  }
+
+  .rec-btn {
+    background: linear-gradient(180deg, #f0556a 0%, #d6293f 100%);
+    flex: 1 1 150px;
+  }
+
+  .rec-btn.recording {
     animation: rec-pulse 1.2s ease-in-out infinite;
-    background: ${({ theme }) => theme.colors.titleBar.closeHover};
-    border-color: ${({ theme }) => theme.colors.titleBar.closeHover};
   }
 
-  button.recording.paused {
+  .rec-btn.recording.paused {
     animation: none;
+    filter: saturate(0.6);
   }
 
-  button.pause {
-    background: ${({ theme }) => theme.colors.highlightBackground};
-    border-color: ${({ theme }) => theme.colors.highlight};
+  .pause {
+    background: color-mix(
+      in srgb,
+      ${({ theme }) => theme.colors.text} 14%,
+      transparent
+    );
+    color: ${({ theme }) => theme.colors.text};
+    flex: 0 0 auto;
   }
 
   @keyframes rec-pulse {
     50% {
-      opacity: 65%;
+      opacity: 70%;
     }
   }
 
   .rec-indicator {
     align-items: center;
-    color: ${({ theme }) => theme.colors.titleBar.closeHover};
+    align-self: center;
+    background: color-mix(in srgb, #d6293f 16%, transparent);
+    border: 1px solid color-mix(in srgb, #d6293f 45%, transparent);
+    border-radius: 999px;
+    color: #ff8593;
     display: inline-flex;
     font-size: 12px;
-    font-weight: 600;
-    gap: 6px;
-    letter-spacing: 0.5px;
+    font-weight: 700;
+    gap: 7px;
+    letter-spacing: 0.6px;
+    padding: 5px 14px;
   }
 
   .rec-indicator .dot {
     animation: rec-pulse 1.2s ease-in-out infinite;
-    background: ${({ theme }) => theme.colors.titleBar.closeHover};
+    background: #ff4d62;
     border-radius: 50%;
+    box-shadow: 0 0 8px #ff4d62;
     display: inline-block;
     height: 9px;
     width: 9px;
@@ -183,25 +278,37 @@ const StyledScreenCapture = styled.div`
   }
 
   .rec-indicator.paused {
+    background: color-mix(
+      in srgb,
+      ${({ theme }) => theme.colors.titleBar.textInactive} 16%,
+      transparent
+    );
+    border-color: color-mix(
+      in srgb,
+      ${({ theme }) => theme.colors.titleBar.textInactive} 40%,
+      transparent
+    );
     color: ${({ theme }) => theme.colors.titleBar.textInactive};
   }
 
   .rec-indicator.paused .dot {
     animation: none;
     background: ${({ theme }) => theme.colors.titleBar.textInactive};
-  }
-
-  .rec-indicator .paused-tag {
-    letter-spacing: normal;
+    box-shadow: none;
   }
 
   .countdown {
     align-items: center;
-    background: rgb(0 0 0 / 55%);
-    border-radius: 8px;
+    align-self: center;
+    background: rgb(0 0 0 / 60%);
+    border: 2px solid
+      color-mix(in srgb, ${({ theme }) => theme.colors.highlight} 60%, transparent);
+    border-radius: 14px;
+    color: #fff;
     display: flex;
-    font-size: 64px;
-    font-weight: 700;
+    font-size: 60px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
     height: 110px;
     justify-content: center;
     width: 110px;
@@ -209,34 +316,35 @@ const StyledScreenCapture = styled.div`
 
   .last-capture {
     align-items: center;
-    background: ${({ theme }) => theme.colors.highlightBackground};
-    border: 1px solid ${({ theme }) => theme.colors.highlight};
-    border-radius: 6px;
+    background: color-mix(in srgb, ${({ theme }) => theme.colors.text} 6%, transparent);
+    border: 1px solid
+      color-mix(in srgb, ${({ theme }) => theme.colors.highlight} 35%, transparent);
+    border-radius: 10px;
     display: flex;
-    gap: 10px;
-    max-width: 320px;
-    padding: 8px 10px;
+    gap: 11px;
+    padding: 9px 11px;
     text-align: left;
   }
 
   .last-capture img {
-    border: 1px solid ${({ theme }) => theme.colors.highlight};
-    border-radius: 4px;
+    border: 1px solid
+      color-mix(in srgb, ${({ theme }) => theme.colors.highlight} 50%, transparent);
+    border-radius: 6px;
     flex-shrink: 0;
-    height: 48px;
+    height: 50px;
     object-fit: cover;
-    width: 64px;
+    width: 68px;
   }
 
   .last-capture .meta {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
     min-width: 0;
   }
 
   .last-capture .name {
-    font-size: 11px;
+    font-size: 11.5px;
     font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -245,17 +353,18 @@ const StyledScreenCapture = styled.div`
 
   .last-capture .note {
     color: ${({ theme }) => theme.colors.titleBar.textInactive};
-    font-size: 10px;
+    font-size: 10.5px;
   }
 
   .status {
     color: ${({ theme }) => theme.colors.titleBar.textInactive};
-    font-size: 11px;
+    font-size: 11.5px;
     min-height: 14px;
+    text-align: center;
   }
 
   .status.warn {
-    color: ${({ theme }) => theme.colors.titleBar.closeHover};
+    color: #ff8593;
   }
 `;
 

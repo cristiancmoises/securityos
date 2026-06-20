@@ -96,7 +96,8 @@ const forwardToHomeserver = (
   targetUrl: string,
   method: string,
   headers: Record<string, string>,
-  body: Buffer | undefined
+  body: Buffer | undefined,
+  clientReq: NextApiRequest
 ): Promise<UpstreamResponse> =>
   new Promise((resolve, reject) => {
     // Fail CLOSED: when Tor is configured (TOR_PROXY set) but the agent failed to
@@ -105,6 +106,37 @@ const forwardToHomeserver = (
       reject(new Error("tor-unavailable"));
       return;
     }
+
+    let settled = false;
+    // Whether the request body has been fully flushed upstream. Until it has, the
+    // homeserver cannot have acted on it, so a failure is safe to replay; once it
+    // has, replaying could DUPLICATE a non-idempotent POST (create-room, upload).
+    let sent = false;
+
+    // Settle exactly once and detach the client-disconnect listener.
+    const finish = (run: () => void): void => {
+      if (settled) return;
+      settled = true;
+      clientReq.off("close", onClientGone);
+      run();
+    };
+
+    // If the browser aborts (the SDK aborting a /sync long-poll or an upload, or the
+    // Matrix window closing), tear the upstream Tor request down immediately instead
+    // of leaking the socket/circuit until the 90s timeout — and stop the retry loop.
+    function onClientGone(): void {
+      finish(() => {
+        request.destroy();
+        reject(new Error("client-gone"));
+      });
+    }
+
+    const fail = (error: Error): void => {
+      // Tag replay-safety so forwardWithRetry never re-sends a request whose body
+      // the homeserver may already have processed.
+      (error as Error & { replaySafe?: boolean }).replaySafe = !sent;
+      finish(() => reject(error));
+    };
 
     const request = https.request(
       targetUrl,
@@ -128,22 +160,30 @@ const forwardToHomeserver = (
         response.on("end", () => {
           const contentTypeHeader = response.headers["content-type"];
 
-          resolve({
-            body: Buffer.concat(chunks),
-            contentType: Array.isArray(contentTypeHeader)
-              ? contentTypeHeader[0]
-              : contentTypeHeader || "application/json",
-            status: response.statusCode || 502,
-          });
+          finish(() =>
+            resolve({
+              body: Buffer.concat(chunks),
+              contentType: Array.isArray(contentTypeHeader)
+                ? contentTypeHeader[0]
+                : contentTypeHeader || "application/json",
+              status: response.statusCode || 502,
+            })
+          );
         });
-        response.on("error", reject);
+        response.on("error", fail);
       }
     );
 
+    // 'finish' fires once the body is fully written to the socket — past that point
+    // the homeserver may act, so a non-idempotent request is no longer replay-safe.
+    request.on("finish", () => {
+      sent = true;
+    });
+    clientReq.on("close", onClientGone);
     request.setTimeout(REQUEST_TIMEOUT_MS, () =>
       request.destroy(new Error("timeout"))
     );
-    request.on("error", reject);
+    request.on("error", fail);
     if (body && body.length > 0) request.write(body);
     request.end();
   });
@@ -155,28 +195,53 @@ const sleep = (ms: number): Promise<void> =>
 
 // Cold/flaky Tor circuits make the FIRST requests fail (which surfaced in the
 // client as a stuck "Connecting over Tor…" — the initial /sync kept erroring).
-// Retry connection-level failures a few times: the Matrix CS-API is idempotent
-// or transaction-deduped (re-login, /sync, /keys/upload, PUT .../send/{txnId}),
-// so a retried request is safe, and a WARMING circuit then succeeds instead of
-// bubbling up an error. We do NOT retry a genuine upstream HTTP response (those
+// Retry connection-level failures a few times so a WARMING circuit succeeds instead
+// of bubbling up an error. We do NOT retry a genuine upstream HTTP response (those
 // resolve), only Tor/socket failures (those reject).
+//
+// CRUCIAL: never REPLAY a request the homeserver may already have processed. GET/
+// HEAD/PUT/DELETE/OPTIONS are idempotent (PUT .../send/{txnId} is transaction-
+// deduped server-side), so retrying is always safe. A non-idempotent POST
+// (createRoom, media upload, join-by-alias) that already reached the server would be
+// DUPLICATED by a blind retry (two rooms, two uploads, double join) — so for those
+// we only retry while the body has NOT yet been sent (forwardToHomeserver tags the
+// rejection with `replaySafe`). We also stop immediately on a fail-closed Tor
+// misconfig or a client that has disconnected.
 const MAX_FORWARD_ATTEMPTS = 3;
+const IDEMPOTENT_METHODS = new Set(["GET", "HEAD", "PUT", "DELETE", "OPTIONS"]);
 const forwardWithRetry = async (
   targetUrl: string,
   method: string,
   headers: Record<string, string>,
-  body: Buffer | undefined
+  body: Buffer | undefined,
+  clientReq: NextApiRequest
 ): Promise<UpstreamResponse> => {
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= MAX_FORWARD_ATTEMPTS; attempt += 1) {
     try {
       // eslint-disable-next-line no-await-in-loop
-      return await forwardToHomeserver(targetUrl, method, headers, body);
+      return await forwardToHomeserver(
+        targetUrl,
+        method,
+        headers,
+        body,
+        clientReq
+      );
     } catch (error) {
       lastError = error;
-      // A fail-closed Tor misconfig won't fix itself — don't waste retries.
-      if ((error as Error)?.message === "tor-unavailable") break;
+      const message = (error as Error)?.message;
+
+      // A fail-closed Tor misconfig won't fix itself, and a disconnected client
+      // wants nothing back — don't waste retries on either.
+      if (message === "tor-unavailable" || message === "client-gone") break;
+
+      const replaySafe =
+        IDEMPOTENT_METHODS.has(method.toUpperCase()) ||
+        (error as { replaySafe?: boolean })?.replaySafe === true;
+
+      if (!replaySafe) break;
+
       if (attempt < MAX_FORWARD_ATTEMPTS) {
         // eslint-disable-next-line no-await-in-loop
         await sleep(attempt * 800);
@@ -266,7 +331,8 @@ const handler = async (
       targetUrl,
       method,
       headers,
-      body
+      body,
+      req
     );
 
     res.status(upstream.status);
@@ -277,6 +343,10 @@ const handler = async (
   } catch (error) {
     // Any Tor/network failure becomes a clean 502 JSON — never an unhandled throw.
     const message = (error as Error)?.message || "upstream failure";
+
+    // The browser already disconnected (we aborted the upstream because of it) —
+    // there is nobody to send a response to, so don't write to a dead socket.
+    if (message === "client-gone" || res.writableEnded) return;
 
     sendTorError(
       res,

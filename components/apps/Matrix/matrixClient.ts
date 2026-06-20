@@ -36,16 +36,64 @@ export const HOMESERVER_LABEL = "matrix.securityops.co";
 // typed their credentials the circuit is already built, so login is ~1.5s.
 // Fire-and-forget, never throws — a failed warm-up just means login pays the cold
 // cost itself (same as before).
+// Bound the warm-up so the login screen's circuit state always SETTLES. Without a
+// timeout, a cold circuit's probe can hang on the proxy's long retry budget for
+// minutes, leaving the UI stuck on "Establishing Tor circuit…" with no feedback —
+// exactly the "I only see Tor connecting and nothing happens" symptom. After this
+// the state resolves to "cold" (slow but usable) and the user gets a clear hint.
+const PREWARM_TIMEOUT_MS = 25_000;
+
 export const prewarmCircuit = async (signal?: AbortSignal): Promise<boolean> => {
+  const controller = new AbortController();
+  const onAbort = (): void => controller.abort();
+
+  signal?.addEventListener("abort", onAbort);
+  const timer = setTimeout(() => controller.abort(), PREWARM_TIMEOUT_MS);
+
   try {
     const response = await fetch(`${matrixBaseUrl()}/_matrix/client/versions`, {
       cache: "no-store",
-      signal,
+      signal: controller.signal,
     });
 
     return response.ok;
   } catch {
     return false;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", onAbort);
+  }
+};
+
+// Whether the server-side Tor SOCKS proxy is actually reachable (real TCP connect),
+// via /api/tor-status. The Matrix login screen uses this to turn a silent, stuck
+// "connecting" state into an actionable message: if Tor is configured but DOWN, the
+// homeserver can never be reached over Tor, so we tell the user to start Tor instead
+// of spinning forever. `configured:false` (e.g. local dev / static export) returns
+// undefined → no Tor warning is shown.
+export type TorReachability = "down" | "up";
+
+export const probeTorReachability = async (
+  signal?: AbortSignal
+): Promise<TorReachability | undefined> => {
+  try {
+    const response = await fetch("/api/tor-status", {
+      cache: "no-store",
+      signal,
+    });
+
+    if (!response.ok) return undefined;
+
+    const status = (await response.json()) as {
+      configured?: boolean;
+      tor?: boolean;
+    };
+
+    if (!status.configured) return undefined;
+
+    return status.tor ? "up" : "down";
+  } catch {
+    return undefined;
   }
 };
 
@@ -123,6 +171,45 @@ export const createMatrixSession = async (
   }
 
   return { accessToken, client, cryptoReady, deviceId, userId };
+};
+
+// Upload media via a PLAIN fetch (NOT client.uploadContent). The SDK's uploadContent
+// uses an XMLHttpRequest with a HARD-CODED 30s IDLE timeout that resets only on
+// upload-progress events. Through our proxy the body flushes near-instantly to the
+// SAME-ORIGIN /api/matrix endpoint (firing the last progress event immediately),
+// after which the request waits on the SLOW buffered Tor leg to the homeserver — so
+// a perfectly healthy upload over a cold circuit hits the 30s timer and aborts with
+// "Timeout". fetch has no such idle timer, so this is reliable over Tor. The proxy
+// forwards Authorization + Content-Type and the upload returns the mxc content URI.
+export const uploadMedia = async (
+  accessToken: string,
+  body: Blob | File,
+  contentType: string,
+  filename?: string
+): Promise<string> => {
+  const query = filename ? `?filename=${encodeURIComponent(filename)}` : "";
+  const response = await fetch(
+    `${matrixBaseUrl()}/_matrix/media/v3/upload${query}`,
+    {
+      body,
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": contentType || "application/octet-stream",
+      },
+      method: "POST",
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Upload failed (${response.status}) — the file may be too large or Tor is slow.`);
+  }
+
+  const json = (await response.json()) as { content_uri?: string };
+
+  if (!json.content_uri) throw new Error("Upload returned no content URI.");
+
+  return json.content_uri;
 };
 
 // --- Encrypted-attachment decryption (AES-CTR-256), per the Matrix spec --------

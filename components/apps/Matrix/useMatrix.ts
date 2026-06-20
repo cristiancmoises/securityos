@@ -3,7 +3,11 @@ import {
   decryptAttachment,
   encryptAttachment,
   isAuthError,
+  MATRIX_API_PATH,
   prewarmCircuit,
+  probeTorReachability,
+  type TorReachability,
+  uploadMedia,
 } from "components/apps/Matrix/matrixClient";
 import type { MatrixClient, MatrixEvent, Room } from "matrix-js-sdk";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -92,6 +96,10 @@ type UseMatrix = {
   sendMessage: (text: string) => Promise<void>;
   session?: Session;
   startDm: (userId: string) => Promise<void>;
+  // Tor SOCKS proxy reachability ("down" => can't reach the homeserver at all):
+  // surfaced on the login screen so a stuck connection has an actionable cause.
+  // undefined => unknown / Tor not configured (no warning shown).
+  torReachable?: TorReachability;
   uploadImage: (file: File) => Promise<void>;
   userResults: UserResult[];
 };
@@ -194,7 +202,16 @@ const useMatrix = (): UseMatrix => {
   const tokenRef = useRef("");
   const mediaCacheRef = useRef<Map<string, string>>(new Map());
   const mountedRef = useRef(true);
+  // Number of uploads currently in flight. Multi-file send (drag-drop / paste / the
+  // `multiple` file input) fires several uploadImage() calls at once; counting them
+  // lets us keep the "working…" spinner up until the LAST one settles and stops a
+  // finished upload from clearing a still-running sibling's error.
+  const uploadsInFlightRef = useRef(0);
   const rebuildTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  // The "still syncing after 45s" notice timer. Tracked so it can be cleared on
+  // logout / a new login / unmount — otherwise a stale timer fires setError() on the
+  // login screen after the user has already signed out.
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout>>();
   // Whether the first /sync ever completed. Before it does, a transient sync
   // failure over Tor must stay "connecting" (the SDK retries) instead of a hard
   // "Connection error" that drops the user back to the login screen.
@@ -212,6 +229,7 @@ const useMatrix = (): UseMatrix => {
   const [cryptoReady, setCryptoReady] = useState(true);
   const [userResults, setUserResults] = useState<UserResult[]>([]);
   const [publicRooms, setPublicRooms] = useState<PublicRoom[]>([]);
+  const [torReachable, setTorReachable] = useState<TorReachability>();
 
   const rebuild = useCallback(() => {
     const client = clientRef.current;
@@ -270,6 +288,9 @@ const useMatrix = (): UseMatrix => {
       setError("");
       setConn("connecting");
       preparedRef.current = false;
+      // Clear any sync-notice timer left from a previous attempt so timers don't
+      // stack across repeated logins.
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
 
       try {
         const { accessToken, client, cryptoReady: ready, userId } =
@@ -340,9 +361,10 @@ const useMatrix = (): UseMatrix => {
         });
 
         // If the first sync is still not done after a while, say so (don't leave a
-        // silent spinner) — it keeps trying in the background.
-        window.setTimeout(() => {
-          if (mountedRef.current && !preparedRef.current) {
+        // silent spinner) — it keeps trying in the background. Tracked + re-checks
+        // clientRef so it can't fire after logout (no session) or unmount.
+        syncTimerRef.current = setTimeout(() => {
+          if (mountedRef.current && clientRef.current && !preparedRef.current) {
             setError(
               "Still syncing over Tor — a large account can take a minute on a slow circuit. Rooms appear as it finishes."
             );
@@ -394,8 +416,11 @@ const useMatrix = (): UseMatrix => {
 
       if (!client || !selectedRoomId) return;
 
+      // Only the first upload of a batch clears the previous error — concurrent
+      // siblings must not wipe a failed upload's message.
+      if (uploadsInFlightRef.current === 0) setError("");
+      uploadsInFlightRef.current += 1;
       setBusy(true);
-      setError("");
 
       try {
         const room = client.getRoom(selectedRoomId);
@@ -416,28 +441,32 @@ const useMatrix = (): UseMatrix => {
           const { data, file: encryptedFile } = await encryptAttachment(
             await file.arrayBuffer()
           );
-          const uploaded = await client.uploadContent(new Blob([data]), {
-            includeFilename: false,
-            type: "application/octet-stream",
-          });
+          // Encrypted: upload the ciphertext as opaque bytes, no filename (privacy).
+          const contentUri = await uploadMedia(
+            tokenRef.current,
+            new Blob([data]),
+            "application/octet-stream"
+          );
 
           await client.sendMessage(selectedRoomId, {
             body: file.name,
-            file: { ...encryptedFile, url: uploaded.content_uri },
+            file: { ...encryptedFile, url: contentUri },
             info,
             msgtype,
           } as never);
         } else {
-          const uploaded = await client.uploadContent(file, {
-            name: file.name,
-            type: file.type,
-          });
+          const contentUri = await uploadMedia(
+            tokenRef.current,
+            file,
+            file.type || "application/octet-stream",
+            file.name
+          );
 
           await client.sendMessage(selectedRoomId, {
             body: file.name,
             info,
             msgtype,
-            url: uploaded.content_uri,
+            url: contentUri,
           } as never);
         }
       } catch (caught) {
@@ -445,7 +474,11 @@ const useMatrix = (): UseMatrix => {
           caught instanceof Error ? caught.message : "Could not upload file."
         );
       } finally {
-        if (mountedRef.current) setBusy(false);
+        uploadsInFlightRef.current -= 1;
+        // Drop the spinner only once every concurrent upload has settled.
+        if (mountedRef.current && uploadsInFlightRef.current === 0) {
+          setBusy(false);
+        }
       }
     },
     [selectedRoomId]
@@ -471,7 +504,25 @@ const useMatrix = (): UseMatrix => {
 
       if (!httpUrl) return "";
 
-      const response = await fetch(httpUrl, {
+      // matrix-js-sdk builds media URLs with `new URL(absolutePath, baseUrl)`, and
+      // an absolute path REPLACES the base path — so our "/api/matrix" proxy prefix
+      // is dropped and the URL would hit a non-existent route (404), bypassing Tor.
+      // Re-insert the prefix so media is fetched through the same Tor proxy as
+      // everything else.
+      let mediaUrl = httpUrl;
+
+      try {
+        const parsed = new URL(httpUrl);
+
+        if (!parsed.pathname.startsWith(`${MATRIX_API_PATH}/`)) {
+          parsed.pathname = `${MATRIX_API_PATH}${parsed.pathname}`;
+          mediaUrl = parsed.toString();
+        }
+      } catch {
+        // Non-absolute URL (shouldn't happen with our absolute baseUrl) — use as-is.
+      }
+
+      const response = await fetch(mediaUrl, {
         headers: { Authorization: `Bearer ${tokenRef.current}` },
       });
 
@@ -659,6 +710,7 @@ const useMatrix = (): UseMatrix => {
   const logout = useCallback(() => {
     const client = clientRef.current;
 
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
     mediaCacheRef.current.forEach((url) => URL.revokeObjectURL(url));
     mediaCacheRef.current.clear();
 
@@ -700,6 +752,21 @@ const useMatrix = (): UseMatrix => {
 
     void (async () => {
       setCircuit("warming");
+
+      // First, a cheap TCP probe of the Tor proxy. If Tor is configured but DOWN,
+      // warming the circuit is pointless (every request will fail) — settle the UI
+      // immediately as "cold" with an actionable Tor warning rather than spinning.
+      const reach = await probeTorReachability(controller.signal);
+
+      if (cancelled) return;
+      setTorReachable(reach);
+
+      if (reach === "down") {
+        setCircuit("cold");
+
+        return;
+      }
+
       let ready = await prewarmCircuit(controller.signal);
 
       if (!ready && !cancelled) ready = await prewarmCircuit(controller.signal);
@@ -718,6 +785,7 @@ const useMatrix = (): UseMatrix => {
     return () => {
       mountedRef.current = false;
       if (rebuildTimerRef.current) clearTimeout(rebuildTimerRef.current);
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
       mediaCacheRef.current.forEach((url) => URL.revokeObjectURL(url));
       mediaCacheRef.current.clear();
       clientRef.current?.stopClient();
@@ -753,6 +821,7 @@ const useMatrix = (): UseMatrix => {
     sendMessage,
     session,
     startDm,
+    torReachable,
     uploadImage,
     userResults,
   };

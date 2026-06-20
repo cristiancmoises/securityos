@@ -70,6 +70,41 @@ const BOOKMARKS: { name: string; url: string }[] = [
   },
 ];
 
+type Bookmark = { name: string; url: string };
+
+// User bookmarks (the built-in BOOKMARKS above are the operator's onion services;
+// these are sites the USER saves). Persisted in localStorage so they survive
+// reopening the window. Best-effort: malformed/old storage is dropped, not thrown.
+const LS_USER_BOOKMARKS = "securityos:torbrowser:bookmarks";
+
+const readUserBookmarks = (): Bookmark[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(LS_USER_BOOKMARKS);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+
+    return Array.isArray(parsed)
+      ? parsed.filter(
+          (entry): entry is Bookmark =>
+            !!entry &&
+            typeof (entry as Bookmark).url === "string" &&
+            typeof (entry as Bookmark).name === "string"
+        )
+      : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeUserBookmarks = (bookmarks: Bookmark[]): void => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LS_USER_BOOKMARKS, JSON.stringify(bookmarks));
+  } catch {
+    // localStorage full/unavailable — bookmarks are a best-effort convenience.
+  }
+};
+
 // A dedicated anonymous browser: every site is fetched server-side through Tor
 // (the /api/proxy SOCKS5h path), rendered in an opaque-origin sandbox. JavaScript
 // is DISABLED by default ("Safest") — the proxy strips scripts + sets script-src
@@ -328,6 +363,64 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
     [tabs]
   );
 
+  // ---- User bookmarks (persisted) ----------------------------------------
+  const [userBookmarks, setUserBookmarks] = useState<Bookmark[]>(() =>
+    readUserBookmarks()
+  );
+
+  const removeBookmark = useCallback((url: string): void => {
+    setUserBookmarks((prev) => {
+      const next = prev.filter((bookmark) => bookmark.url !== url);
+
+      writeUserBookmarks(next);
+
+      return next;
+    });
+  }, []);
+
+  // Save the active tab's current address (deduped). Names default to the page
+  // title, then the hostname, then the raw address.
+  const addBookmark = useCallback((): void => {
+    const tab = tabsRef.current.find((t) => t.key === activeKey);
+    const address = tab?.address?.trim();
+
+    if (!address) return;
+    // The operator's built-in bookmarks are always shown in the bar — don't add a
+    // duplicate user chip for one.
+    if (BOOKMARKS.some((bookmark) => bookmark.url === address)) return;
+
+    setUserBookmarks((prev) => {
+      if (prev.some((bookmark) => bookmark.url === address)) return prev;
+
+      const name = (tab?.title || tabLabel(tab as Tab) || address).slice(0, 40);
+      const next = [...prev, { name, url: address }];
+
+      writeUserBookmarks(next);
+
+      return next;
+    });
+  }, [activeKey]);
+
+  const goToBookmark = useCallback(
+    (bookmarkUrl: string): void => {
+      if (inputRef.current) inputRef.current.value = bookmarkUrl;
+      void navigateTab(activeKey, bookmarkUrl, true);
+    },
+    [activeKey, navigateTab]
+  );
+
+  // A built-in operator bookmark counts as already-bookmarked too, so the star
+  // shows filled (★) on those pages and won't invite a duplicate user chip. The
+  // star's remove path filters only userBookmarks, so clicking it on a built-in is
+  // a harmless no-op (operator bookmarks aren't user-removable).
+  const activeBookmarked = useMemo(
+    () =>
+      !!activeTab?.address &&
+      (BOOKMARKS.some((bookmark) => bookmark.url === activeTab.address) ||
+        userBookmarks.some((bookmark) => bookmark.url === activeTab.address)),
+    [activeTab?.address, userBookmarks]
+  );
+
   const toggleJs = useCallback(
     (): void => setJsMode((prev) => NEXT_JS_MODE[prev]),
     []
@@ -577,17 +670,49 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
         />
       </nav>
       <nav className="bookmarks">
+        <Button
+          className={`bm-star${activeBookmarked ? " on" : ""}`}
+          disabled={!activeTab?.address}
+          onClick={() =>
+            activeBookmarked
+              ? removeBookmark(activeTab?.address || "")
+              : addBookmark()
+          }
+          {...label(
+            activeBookmarked
+              ? "Remove this page from bookmarks"
+              : "Bookmark this page"
+          )}
+        >
+          {activeBookmarked ? "★" : "☆"}
+        </Button>
         {BOOKMARKS.map(({ name, url: bookmarkUrl }) => (
           <Button
             key={name}
-            onClick={() => {
-              if (inputRef.current) inputRef.current.value = bookmarkUrl;
-              void navigateTab(activeKey, bookmarkUrl, true);
-            }}
+            onClick={() => goToBookmark(bookmarkUrl)}
             {...label(`${name}\n${bookmarkUrl}`)}
           >
             {name}
           </Button>
+        ))}
+        {userBookmarks.length > 0 && <span className="bm-sep" />}
+        {userBookmarks.map(({ name, url: bookmarkUrl }) => (
+          <span key={bookmarkUrl} className="bm-user">
+            <Button
+              className="bm-go"
+              onClick={() => goToBookmark(bookmarkUrl)}
+              {...label(`${name}\n${bookmarkUrl}`)}
+            >
+              {name}
+            </Button>
+            <Button
+              className="bm-remove"
+              onClick={() => removeBookmark(bookmarkUrl)}
+              {...label("Remove bookmark")}
+            >
+              ×
+            </Button>
+          </span>
         ))}
       </nav>
       {tabs.map((tab) => (

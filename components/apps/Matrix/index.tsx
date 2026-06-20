@@ -78,6 +78,7 @@ const Matrix: FC<ComponentProcessProps> = () => {
     sendMessage,
     session,
     startDm,
+    torReachable,
     uploadImage,
     userResults,
   } = useMatrix();
@@ -88,8 +89,18 @@ const Matrix: FC<ComponentProcessProps> = () => {
   const [peopleTerm, setPeopleTerm] = useState("");
   const [roomTerm, setRoomTerm] = useState("");
   const [joinTarget, setJoinTarget] = useState("");
+  const [dragOver, setDragOver] = useState(false);
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+
+  // Send every file dropped (or pasted) into the chat. uploadImage handles both
+  // images (m.image) and other files (m.file), encrypting them in E2EE rooms.
+  const sendFiles = (files: FileList | File[] | null | undefined): void => {
+    if (!files) return;
+    Array.from(files).forEach((file) => {
+      if (file) void uploadImage(file);
+    });
+  };
 
   useEffect(() => {
     const element = messagesRef.current;
@@ -112,7 +123,23 @@ const Matrix: FC<ComponentProcessProps> = () => {
   };
 
   return (
-    <StyledMatrix>
+    <StyledMatrix
+      // Swallow file drops ANYWHERE in the Matrix window. Matrix renders as a real
+      // top-level React component (not an iframe), so an unhandled file drop would
+      // make the browser navigate the whole page to the file — tearing down the OS
+      // session. preventDefault here makes a stray drop (e.g. on the login screen or
+      // with no room selected) a harmless no-op; the chat pane adds the upload.
+      onDragOver={(event) => {
+        if (Array.from(event.dataTransfer.types).includes("Files")) {
+          event.preventDefault();
+        }
+      }}
+      onDrop={(event) => {
+        if (Array.from(event.dataTransfer.types).includes("Files")) {
+          event.preventDefault();
+        }
+      }}
+    >
       <div className="tor-bar">
         <span className="status">
           <span className={dotClass} />
@@ -326,7 +353,35 @@ const Matrix: FC<ComponentProcessProps> = () => {
             )}
           </div>
 
-          <div className="chat">
+          <div
+            className="chat"
+            onDragLeave={(event) => {
+              // Ignore flicker from moving over child elements — only clear when the
+              // pointer actually leaves the chat pane.
+              if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+                setDragOver(false);
+              }
+            }}
+            onDragOver={(event) => {
+              if (!Array.from(event.dataTransfer.types).includes("Files")) {
+                return;
+              }
+              // preventDefault FIRST (registers the drop zone + blocks navigation),
+              // then decide whether to show the upload overlay.
+              event.preventDefault();
+              if (activeRoom) setDragOver(true);
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragOver(false);
+              if (activeRoom) sendFiles(event.dataTransfer.files);
+            }}
+          >
+            {dragOver && activeRoom && (
+              <div className="drop-overlay">
+                <div className="drop-card">📎 Drop to send to {activeRoom.name}</div>
+              </div>
+            )}
             {activeRoom ? (
               <>
                 <div className="chat-header" title={activeRoom.name}>
@@ -361,11 +416,22 @@ const Matrix: FC<ComponentProcessProps> = () => {
                         ) : message.kind === "file" ? (
                           <button
                             className="file-link"
-                            onClick={() =>
-                              void resolveMedia(message).then((url) => {
-                                if (url) window.open(url, "_blank");
-                              })
-                            }
+                            onClick={() => {
+                              // Open the viewer window SYNCHRONOUSLY inside the click
+                              // gesture (so the pop-up blocker allows it), then point
+                              // it at the resolved blob URL once the (async) fetch +
+                              // decryption finishes. Opening after the await would be
+                              // blocked and silently fail.
+                              const viewer = window.open("", "_blank");
+
+                              void resolveMedia(message)
+                                .then((url) => {
+                                  if (!viewer) return;
+                                  if (url) viewer.location.href = url;
+                                  else viewer.close();
+                                })
+                                .catch(() => viewer?.close());
+                            }}
                             type="button"
                           >
                             📎 {message.fileName || "Download file"}
@@ -383,10 +449,9 @@ const Matrix: FC<ComponentProcessProps> = () => {
                     ref={fileRef}
                     accept="image/*"
                     hidden
+                    multiple
                     onChange={(event) => {
-                      const file = event.target.files?.[0];
-
-                      if (file) void uploadImage(file);
+                      sendFiles(event.target.files);
                       event.target.value = "";
                     }}
                     type="file"
@@ -405,6 +470,15 @@ const Matrix: FC<ComponentProcessProps> = () => {
                       if (event.key === "Enter" && !event.shiftKey) {
                         event.preventDefault();
                         onSend();
+                      }
+                    }}
+                    onPaste={(event) => {
+                      // Paste an image straight into the chat (e.g. a screenshot).
+                      const { files } = event.clipboardData;
+
+                      if (files && files.length > 0) {
+                        event.preventDefault();
+                        sendFiles(files);
                       }
                     }}
                     placeholder="Message (sent over Tor)…"
@@ -456,10 +530,20 @@ const Matrix: FC<ComponentProcessProps> = () => {
               />
             </label>
             {error && <div className="error">{error}</div>}
-            <button className="primary-btn" disabled={loggingIn} type="submit">
+            <button
+              className="primary-btn"
+              disabled={loggingIn || torReachable === "down"}
+              type="submit"
+            >
               {loggingIn ? "Signing in…" : "Sign in"}
             </button>
-            {loggingIn ? (
+            {torReachable === "down" ? (
+              <p className="hint warn">
+                🧅 Tor isn&apos;t reachable, so the homeserver can&apos;t be
+                contacted. Open <b>Tor Control</b> and start Tor, then reopen
+                Matrix.
+              </p>
+            ) : loggingIn ? (
               <p className="hint">
                 Connecting over Tor… the first connection can take 15–40 seconds
                 while the circuit builds.

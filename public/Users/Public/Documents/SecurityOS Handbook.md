@@ -10,7 +10,9 @@ handbook is your starting point — everything here runs in your browser.
 | **Security Tools** | Start ▸ *Security Tools* | 10 offline tools (hashing, encoding, JWT, passwords, regex, UUID, CIDR, ciphers, hash-ID, timestamps). No network, ever. |
 | **Matrix** | Start ▸ *Matrix* | Full end-to-end-encrypted Matrix chat, every request tunneled over Tor to `matrix.securityops.co`. Keys live in memory only (amnesic). See *Private chat* below. |
 | **SecChat** | Start ▸ *SecChat* | End-to-end-encrypted video chat (`chat.securityops.co`). |
-| **Radio** | Start ▸ *Radio* | Internet radio worldwide (radio-browser API) — filter by country/genre, HTTPS streams, favorites. |
+| **Radio** | Start ▸ *Radio* | Internet radio worldwide (radio-browser API) — **exact** country filter (ISO code), genre filter, **only working HTTPS stations** (offline/non-playable ones removed), favorites. |
+| **WhatsApp / Telegram / Session** | Start ▸ each app | **Launchers** that open the official client in a real top-level window. ⚠ These connect **directly, NOT over Tor** (they need WebSockets the Tor proxy blocks; Session has no web client). To use them over Tor, route your whole browser/device through Tor — see *Messengers & Tor* below. |
+| **VaptVupt** | Start ▸ *VaptVupt* | The first-party encrypted file share, embedded **over Tor** (its `.onion` through the privacy proxy). Upload & download files in the window; for advanced/script-heavy actions use **Open in Tor Browser** from its toolbar. |
 | **Cloudmacs** | Start ▸ *Cloudmacs* | A full **Emacs** (Spacemacs) in the browser, with org-mode, eww, **telega** (Telegram) and **whatsappel** (WhatsApp). Also in *Open with* for text/code. |
 | **Screen Capture** | Start ▸ *Screen Capture* | Screen recording + screenshots (mic/system audio, presets) with an optional webcam overlay and effect themes. |
 | **Tor Control** | Start ▸ *Tor Control* | Route the emulated Linux VM through Tor. See `TOR.md`. |
@@ -54,6 +56,39 @@ leaves your machine:
   **webcam overlay** and effect themes (Matrix rain, grayscale, sepia, neon, blur,
   background blur).
 
+## Messengers & Tor (WhatsApp · Telegram · Session)
+
+SecurityOS includes **launchers** for WhatsApp, Telegram and Session. They are
+**honest launchers, not embeds** — and here's why:
+
+- **WhatsApp Web** pins `frame-ancestors` and **Telegram Web** sends
+  `X-Frame-Options: deny`, so neither can be placed in a SecurityOS window iframe.
+- All of them talk over **WebSockets**, which the SecurityOS Tor proxy
+  **deliberately blocks** (a raw WebSocket would tunnel straight out and bypass
+  Tor). So they cannot run through the in-OS proxy.
+- **Session has no web client at all** — it's a desktop/mobile app on the Oxen
+  service-node network.
+
+So each app opens its **official client in a real top-level browser window**, where
+it is *fully* functional — chats, voice/video calls, native uploads/downloads, QR
+login. The window shows a clear **"Direct connection — NOT routed through Tor"**
+badge, because that window uses your browser's normal connection.
+
+**To use them over Tor (anonymously):** route your *whole browser or device*
+through Tor first, then launch the app:
+
+1. Open **SecurityOS itself in the Tor Browser** (ideally via its `.onion`) — then
+   the launched WhatsApp/Telegram window is already over Tor.
+2. Or run SecurityOS inside **Tails**, or a system/router configured for
+   system-wide Tor.
+3. **Session** routes its *own* traffic over its onion network once installed — its
+   launcher only opens the official download page (do that step in the Tor Browser
+   to stay anonymous).
+
+> A web page cannot force a top-level window it opens onto Tor — only *you* can, by
+> putting the browser/OS on Tor. That's the honest trade-off these launchers make
+> explicit instead of pretending otherwise.
+
 ## Make it yours
 
 - **Desktop widgets** (Rainmeter-style) are draggable, toggleable, and remembered:
@@ -80,6 +115,9 @@ Three things can touch the network, and you control each:
    page cannot force its own iframes through Tor. (**Matrix** is the exception — it
    routes through the Tor proxy itself.)
 3. **The Linux VM** — has its own network; route it via **Tor Control**.
+4. **The messenger launchers** (WhatsApp / Telegram / Session) — open a **top-level
+   window on your real connection** (they can't go through the Tor proxy; see
+   *Messengers & Tor*). Anonymous only if (1) is in effect.
 
 SecurityOS ships hardened: a strict Content-Security-Policy, `no-referrer`, a
 locked-down Permissions-Policy, and **no silent third-party connections** — the

@@ -9,6 +9,9 @@ export type RawStation = {
   countrycode?: string;
   country?: string;
   favicon?: string;
+  // radio-browser's last reachability check: 1 = was online, 0 = offline. Used to
+  // drop dead stations (belt-and-suspenders alongside the API's hidebroken=true).
+  lastcheckok?: number;
   name?: string;
   stationuuid?: string;
   tags?: string;
@@ -31,8 +34,19 @@ export type Station = {
   uuid: string;
 };
 
-// A radio-browser /json/countries entry (filter dropdown).
+// A radio-browser /json/countries entry as returned by the API.
+export type RawCountry = {
+  iso_3166_1?: string;
+  name?: string;
+  stationcount?: number;
+};
+
+// A country option in the filter dropdown. `code` is the ISO 3166-1 alpha-2 code
+// used for EXACT country matching — the old free-text `country` name match was
+// unreliable (it substring-matched stations' inconsistent country labels), which
+// is why "pick a country" returned stations from the wrong place.
 export type Country = {
+  code: string;
   name: string;
   stationcount: number;
 };
