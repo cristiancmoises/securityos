@@ -4,6 +4,31 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.17.0] — 2026-06-21
+
+### CryptPad — encrypted office suite, inside the OS over Tor
+- New **CryptPad** app: the first-party `office.securityops.co` suite (docs, sheets,
+  code, drive) embedded **inside SecurityOS over Tor** (its page is fetched + rendered
+  through the privacy proxy in a sandbox). Desktop + Start-Menu shortcuts and a brand
+  icon. Toolbar: **Reload**, **Open in Tor Browser**.
+
+### WebSocket tunnel (real-time apps can run in-OS over Tor)
+- SecurityOS now runs on a **custom server (`server.js`)** = Next's production server
+  plus a same-origin **WebSocket tunnel at `/api/ws`**. Real-time web apps (CryptPad's
+  collaborative engine; Telegram/WhatsApp Web) need a `wss://` connection the plain
+  HTTP proxy can't carry — the proxy's client shim now **rewrites their WebSocket to
+  the tunnel** (over Tor by default; direct only for apps that block Tor exits),
+  gated by a server-side **host allowlist** (so general browsing still can't open an
+  unrestricted socket). The server falls back to serving without the tunnel if the
+  `ws` module is ever unavailable, so the desktop always boots.
+
+### Matrix — completed the post-login sync fix
+- v2.16.0 restored the trailing slash in the proxy handler, but Next was **308-
+  redirecting `…/pushrules/` → `…/pushrules` before the handler ran**, so the slash
+  was still lost and sync stayed stuck. Added **`skipTrailingSlashRedirect`** so Next
+  no longer strips it; the handler now forwards `…/pushrules/` intact and sync
+  reaches PREPARED. (Verified against the live homeserver over Tor.)
+
 ## [2.16.0] — 2026-06-21
 
 ### Matrix — fixed the post-login "stuck syncing" (real root cause)
