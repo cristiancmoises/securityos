@@ -4,6 +4,30 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.20.0] — 2026-06-21
+
+### CryptPad, WhatsApp & Telegram now run INSIDE the OS, over Tor
+- **CryptPad "Refused to connect" fixed.** `office.securityops.co` 301-redirects to
+  the public `pad.envs.net`, which **refuses framing**, so the direct embed failed.
+  CryptPad now loads **through the privacy proxy over Tor** — the proxy follows the
+  redirect server-side, strips the anti-framing headers, rewrites the page, and
+  tunnels its realtime WebSocket via `/api/ws`. Toolbar **Window** / **Tor Browser**
+  buttons open the full client when deep persistence is needed.
+- **WhatsApp & Telegram are now embedded** (proxy over Tor) instead of opening the
+  official links — so they work **even on networks that block them** (the page is
+  fetched server-side over Tor; your IP is never exposed), with a **Window** fallback
+  to the official client.
+- **Amnesic storage shim.** The proxy now gives proxied pages an in-memory
+  `localStorage`/`sessionStorage` (origin-independent, no sandbox escape), so apps
+  that gate on storage get past their checks in the opaque sandbox.
+
+### Honest limits
+- These are heavy multi-origin SPAs (service workers, IndexedDB, and sometimes
+  Tor-exit blocking), so the embed is **best-effort** — it loads in-OS over Tor, but
+  deep/persistent functionality can be partial. For guaranteed full use, the in-app
+  **Window** button opens the real top-level client; run SecurityOS in the **Tor
+  Browser** to keep that over Tor too.
+
 ## [2.19.0] — 2026-06-21
 
 ### Matrix — fixed "stuck on Connecting over Tor…" before login

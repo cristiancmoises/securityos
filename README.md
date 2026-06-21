@@ -60,20 +60,14 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
   256 MiB; downloads stream back in full); a toolbar offers **Reload** and **Open in
   Tor Browser** for script-heavy actions. Real-time/WebSocket features aren't
   available through the proxy by design.
-- **🔐 CryptPad (encrypted office)** — the first-party `office.securityops.co` suite
-  (docs, sheets, code, drive) embedded **on its own origin** so its required storage
-  + realtime WebSocket work (the privacy proxy's opaque sandbox has no storage by
-  design, which is why CryptPad otherwise shows a "storage disabled" alert). It's a
-  **direct** connection (cross-origin, so still isolated from the OS) — run
-  SecurityOS in the Tor Browser for Tor. A same-origin **WebSocket tunnel**
-  (`/api/ws`, custom `server.js`) is also available for proxy-embedded realtime apps.
-- **🟢 WhatsApp · Telegram · Session** — launchers for the official messengers.
-  These can't be embedded (anti-framing headers; WebSockets the Tor proxy blocks;
-  Session has no web client), so each opens its **official client in a real
-  top-level window** where it's fully functional (chats, calls, uploads/downloads,
-  QR login), with a clear **"Direct connection — NOT routed through Tor"** badge. To
-  use them over Tor, run SecurityOS itself in the **Tor Browser** / Tails — each app
-  explains how, and so does the **SecurityOS Handbook**.
+- **🔐 CryptPad · 🟢 WhatsApp · Telegram — embedded INSIDE the OS, over Tor.** These
+  run through the privacy proxy (fetched server-side over Tor, anti-framing headers
+  stripped, realtime **WebSocket tunneled** via `/api/ws`, storage shimmed), so they
+  load **in-OS and even on networks that block them** — your IP is never exposed.
+  They're heavy multi-origin SPAs, so the embed is **best-effort**; each app's
+  toolbar has a **Window** button that opens the full official client (run SecurityOS
+  in the **Tor Browser** to keep that over Tor). **Session** stays a launcher (no web
+  client; it's onion-routed once installed).
 - **⏺️ Screen Capture** — screen recording + screenshots via `getDisplayMedia`
   (captures everything on screen, incl. cross-origin app iframes): countdown,
   microphone + system audio, quality/format/codec presets, and a max-duration. A
