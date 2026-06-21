@@ -5,29 +5,27 @@ import { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
 import { SANDBOXED_IFRAME_CONFIG } from "utils/constants";
 
-// CryptPad — encrypted office suite, run INSIDE SecurityOS over Tor.
+// Shared embed for WhatsApp / Telegram — runs the official web client INSIDE
+// SecurityOS, fetched through the privacy proxy over Tor (so it works even on
+// networks that block these services, and the user's IP is never exposed). The
+// proxy strips the anti-framing headers, rewrites the page, tunnels the realtime
+// WebSocket through /api/ws over Tor, and shims storage in the opaque sandbox.
 //
-// office.securityops.co 301-redirects to the public CryptPad at pad.envs.net, which
-// refuses to be framed (frame-ancestors) — so a DIRECT embed failed with "Refused to
-// connect". We therefore load it THROUGH the privacy proxy: the proxy follows the
-// redirect server-side over Tor, strips the anti-framing headers, rewrites the page,
-// and injects a shim that tunnels CryptPad's realtime WebSocket through /api/ws (also
-// over Tor) and provides amnesic in-memory localStorage/sessionStorage so its storage
-// checks pass in the opaque sandbox. This loads CryptPad in-OS over Tor and bypasses
-// networks that block it.
-//
-// LIMITS (be honest): the privacy sandbox has no IndexedDB and CryptPad is a complex
-// multi-origin app, so deep document persistence may be limited in the embed. For
-// full, persistent use, the toolbar's **Window** (top-level, own origin) or **Tor
-// Browser** buttons open the real client — run SecurityOS in the Tor Browser to keep
-// those over Tor too.
-const CRYPTPAD_URL = "https://office.securityops.co/";
-const CRYPTPAD_SRC = `${PROXY_PATH}${encodeURIComponent(CRYPTPAD_URL)}`;
-const CRYPTPAD_ALLOW = "clipboard-read; clipboard-write; fullscreen";
-const SLOW_LOAD_MS = 35_000;
+// HONEST LIMITS: these are heavy multi-origin SPAs that also use service workers and
+// may refuse Tor exit IPs, so the embed can be partial. The toolbar's **Window**
+// button opens the official client in a real top-level window (full functionality);
+// run SecurityOS in the Tor Browser to keep that over Tor too. Session is not here —
+// it has no web client (it stays a launcher).
+export type MessengerEmbedConfig = {
+  accent: string;
+  name: string;
+  url: string;
+};
 
-const StyledCryptPad = styled.div`
-  background: #1c1340;
+const SLOW_LOAD_MS = 30_000;
+
+const StyledEmbed = styled.div<{ $accent: string }>`
+  background: #0b141a;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -36,15 +34,14 @@ const StyledCryptPad = styled.div`
 
   .toolbar {
     align-items: center;
-    background: #241a4d;
-    border-bottom: 1px solid rgba(150, 130, 220, 24%);
-    color: #d7ccf2;
+    background: #11202b;
+    border-bottom: 1px solid rgba(255, 255, 255, 10%);
+    color: #d6e3ea;
     display: flex;
     flex: 0 0 auto;
     font-family: ${({ theme }) => theme.formats.systemFont};
     font-size: 12px;
     gap: 8px;
-    letter-spacing: 0.2px;
     padding: 5px 9px;
   }
 
@@ -55,11 +52,21 @@ const StyledCryptPad = styled.div`
     white-space: nowrap;
   }
 
+  .toolbar .badge {
+    background: rgba(127, 219, 160, 14%);
+    border: 1px solid rgba(127, 219, 160, 40%);
+    border-radius: 999px;
+    color: #7fdba0;
+    flex: 0 0 auto;
+    font-size: 10.5px;
+    padding: 2px 8px;
+  }
+
   .toolbar button {
     background: transparent;
-    border: 1px solid rgba(150, 130, 220, 38%);
+    border: 1px solid rgba(255, 255, 255, 22%);
     border-radius: 5px;
-    color: #e2d8fb;
+    color: #e7eef2;
     cursor: pointer;
     flex: 0 0 auto;
     font-family: inherit;
@@ -69,7 +76,7 @@ const StyledCryptPad = styled.div`
   }
 
   .toolbar button:hover {
-    background: rgba(150, 130, 220, 16%);
+    background: rgba(255, 255, 255, 9%);
   }
 
   .frame-wrap {
@@ -88,8 +95,8 @@ const StyledCryptPad = styled.div`
 
   .overlay {
     align-items: center;
-    background: #1c1340;
-    color: #c3b6e8;
+    background: #0b141a;
+    color: #aebfc8;
     display: flex;
     flex-direction: column;
     font-family: ${({ theme }) => theme.formats.systemFont};
@@ -107,16 +114,16 @@ const StyledCryptPad = styled.div`
   }
 
   .spinner {
-    animation: cryptpad-spin 0.9s linear infinite;
-    border: 3px solid rgba(170, 150, 230, 35%);
+    animation: msgr-spin 0.9s linear infinite;
+    border: 3px solid rgba(255, 255, 255, 18%);
     border-radius: 50%;
-    border-top-color: #b9a4ef;
+    border-top-color: ${({ $accent }) => $accent};
     height: 20px;
     width: 20px;
   }
 
   .overlay .hint {
-    color: #9a8cc4;
+    color: #8197a3;
     font-size: 11.5px;
     max-width: 400px;
   }
@@ -130,40 +137,40 @@ const StyledCryptPad = styled.div`
   }
 
   .overlay button {
-    background: rgba(150, 130, 220, 18%);
-    border: 1px solid rgba(150, 130, 220, 48%);
+    background: ${({ $accent }) => $accent};
+    border: 0;
     border-radius: 6px;
-    color: #efe8ff;
+    color: #06231a;
     cursor: pointer;
     font-family: ${({ theme }) => theme.formats.systemFont};
     font-size: 12px;
+    font-weight: 600;
     padding: 7px 14px;
   }
 
-  .overlay button:hover {
-    background: rgba(150, 130, 220, 30%);
-  }
-
-  @keyframes cryptpad-spin {
+  @keyframes msgr-spin {
     to {
       transform: rotate(360deg);
     }
   }
 `;
 
-const CryptPad: FC<ComponentProcessProps> = ({ id }) => {
+const MessengerEmbed: FC<ComponentProcessProps & { config: MessengerEmbedConfig }> = ({
+  config,
+  id,
+}) => {
+  const { accent, name, url } = config;
   const { open } = useProcesses();
   const [loading, setLoading] = useState(true);
   const [slow, setSlow] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const slowTimer = useRef<ReturnType<typeof setTimeout>>();
+  const src = `${PROXY_PATH}${encodeURIComponent(url)}`;
 
   useEffect(() => {
     setSlow(false);
     if (slowTimer.current) clearTimeout(slowTimer.current);
-    if (loading) {
-      slowTimer.current = setTimeout(() => setSlow(true), SLOW_LOAD_MS);
-    }
+    if (loading) slowTimer.current = setTimeout(() => setSlow(true), SLOW_LOAD_MS);
 
     return () => {
       if (slowTimer.current) clearTimeout(slowTimer.current);
@@ -177,58 +184,46 @@ const CryptPad: FC<ComponentProcessProps> = ({ id }) => {
 
   const openInWindow = (): void => {
     try {
-      window.open(CRYPTPAD_URL, "securityos-cryptpad", "popup,width=1280,height=860");
+      window.open(url, `securityos-${name}`, "popup,width=1200,height=860");
     } catch {
-      // ignore pop-up failures
-    }
-  };
-
-  const openInTorBrowser = (): void => {
-    try {
-      open("TorBrowser", { url: CRYPTPAD_URL });
-    } catch {
-      // The embedded/window view is still available.
+      // ignore
     }
   };
 
   return (
-    <StyledCryptPad>
+    <StyledEmbed $accent={accent}>
       <div className="toolbar">
-        <span className="title">🔐 CryptPad — encrypted office, over Tor</span>
+        <span className="title">{name} — inside SecurityOS, over Tor</span>
+        <span className="badge" title="Fetched server-side over Tor — bypasses network blocks">
+          over Tor
+        </span>
         <button onClick={reload} title="Reload over Tor" type="button">
           ↻ Reload
         </button>
-        <button onClick={openInWindow} title="Open in a separate window (own origin, full storage)" type="button">
+        <button onClick={openInWindow} title="Open the official client in a window" type="button">
           ⧉ Window
-        </button>
-        <button
-          onClick={openInTorBrowser}
-          title="Open CryptPad in the in-OS Tor Browser"
-          type="button"
-        >
-          Tor Browser
         </button>
       </div>
       <div className="frame-wrap">
         <iframe
           key={reloadKey}
-          allow={CRYPTPAD_ALLOW}
+          allow="clipboard-read; clipboard-write; fullscreen"
           onLoad={() => setLoading(false)}
-          src={CRYPTPAD_SRC}
+          src={src}
           title={id}
           {...SANDBOXED_IFRAME_CONFIG}
         />
         {loading && (
           <div className={`overlay${slow ? "" : " pass"}`}>
             <span className="spinner" />
-            <span>Connecting to CryptPad over Tor…</span>
+            <span>Connecting to {name} over Tor…</span>
             {slow && (
               <>
                 <span className="hint">
-                  A cold Tor circuit plus CryptPad&apos;s encryption can take a
-                  while. If it doesn&apos;t fully load, the privacy sandbox limits
-                  deep document storage — use <b>Window</b> (own origin, full
-                  storage) or <b>Tor Browser</b> below for the complete client.
+                  {name} is a heavy app and may block Tor exit IPs or need features
+                  the privacy sandbox can&apos;t provide. If it doesn&apos;t finish,
+                  open it in a <b>Window</b> (full client) — run SecurityOS in the Tor
+                  Browser to keep that over Tor.
                 </span>
                 <div className="actions">
                   <button onClick={reload} type="button">
@@ -237,17 +232,14 @@ const CryptPad: FC<ComponentProcessProps> = ({ id }) => {
                   <button onClick={openInWindow} type="button">
                     ⧉ Open in window
                   </button>
-                  <button onClick={openInTorBrowser} type="button">
-                    Open in Tor Browser
-                  </button>
                 </div>
               </>
             )}
           </div>
         )}
       </div>
-    </StyledCryptPad>
+    </StyledEmbed>
   );
 };
 
-export default CryptPad;
+export default MessengerEmbed;
