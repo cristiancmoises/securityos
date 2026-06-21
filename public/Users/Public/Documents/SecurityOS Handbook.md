@@ -3,10 +3,26 @@
 Welcome. SecurityOS is a **privacy-first, security-education web desktop**. This
 handbook is your starting point — everything here runs in your browser.
 
+## What's new (v2.14 → v2.15)
+
+- **Start-menu search works.** Open the Start menu and type — it finds and launches
+  any app or file (it was previously a non-functional placeholder).
+- **WhatsApp, Telegram & Session** launchers (open the official clients in a real
+  window) with clear, honest **over-Tor** guidance — see *Messengers & Tor* below.
+- **Matrix fixes:** image/file attachments now display, uploads no longer time out
+  over Tor, and the Tor tunnel no longer leaks circuits or duplicates actions. (A
+  stuck "Connecting over Tor…" means Tor or the homeserver is unreachable — not a
+  bug; start Tor in *Tor Control*.)
+- **Radio:** exact country filtering and **only working stations** (offline/non-HTTPS
+  ones are filtered out).
+- **VaptVupt:** clearer file-share window (upload/download over Tor; *Open in Tor
+  Browser* for script-heavy actions).
+
 ## What's inside
 
 | Area | Where | Notes |
 | ---- | ----- | ----- |
+| **Start-menu search** | Open Start, then type | Searches every app and file and launches the match — **Enter** opens the top hit. |
 | **Security Tools** | Start ▸ *Security Tools* | 10 offline tools (hashing, encoding, JWT, passwords, regex, UUID, CIDR, ciphers, hash-ID, timestamps). No network, ever. |
 | **Matrix** | Start ▸ *Matrix* | Full end-to-end-encrypted Matrix chat, every request tunneled over Tor to `matrix.securityops.co`. Keys live in memory only (amnesic). See *Private chat* below. |
 | **SecChat** | Start ▸ *SecChat* | End-to-end-encrypted video chat (`chat.securityops.co`). |

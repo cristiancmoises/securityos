@@ -92,6 +92,10 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
 - **🧰 Security Tools** — an offline suite (hashing, encoding, entropy, UUID, …).
 - **⌨️ Expanded terminal** — UNIX-style commands plus `curl`/`wget` over Tor, `du`,
   `df`, `tree`, `stat`, and more.
+- **🔎 Start-menu search** — open the Start menu and start typing to find **any app
+  or file** and launch it (results dropdown with icons; **Enter** opens the top
+  hit). Apps are matched by name from the process directory; documents come from the
+  file index.
 - **🖼️ Custom wallpaper** — set a background from an image URL or a proxied link;
   adjustable fit. **📋 Paste** any file/image from the clipboard straight onto the Desktop.
 
@@ -145,6 +149,33 @@ talks to Matrix off-Tor.
   take ~15–40s.)
 
 ---
+
+## 🆕 New apps & how they work
+
+- **WhatsApp · Telegram · Session (messenger launchers).** One click opens the
+  *official* web client (WhatsApp Web, Telegram Web) in a real top-level browser
+  window, where everything works — chats, voice/video calls, native file
+  uploads/downloads, QR login. They are **launchers, not embeds**, on purpose:
+  WhatsApp/Telegram forbid framing (`frame-ancestors` / `X-Frame-Options`) and rely
+  on **WebSockets the Tor proxy blocks**, and **Session has no web client** (it's a
+  desktop/mobile app). The window therefore shows a clear **"Direct connection —
+  NOT routed through Tor"** badge; to use them over Tor, run SecurityOS itself in
+  the **Tor Browser** / **Tails** (an in-app "Using … over Tor" panel explains how).
+  Session's launcher opens the official download page.
+- **VaptVupt (encrypted file share).** Embeds the SecurityOps share's **`.onion`
+  over the Tor proxy** in an opaque-origin sandbox: **upload** files (forms are
+  rewritten through the proxy, up to 256 MiB) and **download** them in full
+  (attachments stream back). A toolbar adds **Reload** and **Open in Tor Browser**
+  (for script-heavy actions); a slow-load hint appears on a cold circuit.
+- **Radio (improved).** Internet radio via radio-browser with **exact country**
+  selection (ISO code, not a fuzzy name) and **only working stations** shown
+  (HTTPS-playable + last-seen-online; offline/non-playable removed), resilient mirror
+  failover, genre filter, and favorites. (Streams play direct, not over Tor.)
+- **Matrix (fixed).** Full E2EE chat tunneled over Tor; this round fixed attachment
+  **display**, **uploads** timing out over Tor, a proxy **circuit leak**, and
+  **duplicate** actions on retry. A persistent "Connecting over Tor…" indicates Tor
+  or the homeserver is unreachable (start Tor in **Tor Control**), not an app bug.
+- **Start-menu search.** Type in the Start menu to find and launch any app or file.
 
 ## 🛡️ Security model
 
