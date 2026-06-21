@@ -39,10 +39,11 @@ export const config = {
 
 const HOMESERVER = "https://matrix.securityops.co";
 
-// /sync long-polls up to ~30s; give it a comfortable ceiling so a healthy
-// long-poll (or a slow initial sync / key upload over Tor) is never killed
-// mid-flight.
-const REQUEST_TIMEOUT_MS = 90_000;
+// /sync long-polls up to ~30s, but matrix-js-sdk's own client-side abort is
+// pollTimeout(30s) + BUFFER_PERIOD(80s) = ~110s for steady-state syncs. Keep our
+// ceiling ABOVE that so the proxy never kills a healthy long-poll (or a slow
+// initial sync / key upload over Tor) before the SDK would.
+const REQUEST_TIMEOUT_MS = 120_000;
 // Sized for chat media: the E2EE client uploads (POST _matrix/media/v3/upload)
 // and downloads (GET _matrix/client/v1/media/download) attachments through here.
 const MAX_RESPONSE_BYTES = 50 * 1024 * 1024;
@@ -174,17 +175,19 @@ const forwardToHomeserver = (
       }
     );
 
-    // 'finish' fires once the body is fully written to the socket — past that point
-    // the homeserver may act, so a non-idempotent request is no longer replay-safe.
-    request.on("finish", () => {
-      sent = true;
-    });
     clientReq.on("close", onClientGone);
     request.setTimeout(REQUEST_TIMEOUT_MS, () =>
       request.destroy(new Error("timeout"))
     );
     request.on("error", fail);
-    if (body && body.length > 0) request.write(body);
+    if (body && body.length > 0) {
+      // Mark as sent BEFORE the async write resolves: once any body byte is on its
+      // way the homeserver may act on it, so a non-idempotent request must never be
+      // replayed. (Closes the race where the 'finish' event lagged a fast post-write
+      // error and left a sent POST wrongly marked replay-safe.)
+      sent = true;
+      request.write(body);
+    }
     request.end();
   });
 
@@ -236,8 +239,16 @@ const forwardWithRetry = async (
       // wants nothing back — don't waste retries on either.
       if (message === "tor-unavailable" || message === "client-gone") break;
 
+      // Creating a sync FILTER (POST /user/{id}/filter) is idempotent in effect —
+      // an identical filter just returns the same filter_id — and it GATES the first
+      // /sync, so it must survive a cold-circuit hiccup. Treat it as replay-safe even
+      // though it's a POST, while create-room / media-upload / join stay gated.
+      const isSafePost =
+        method.toUpperCase() === "POST" &&
+        /\/user\/[^/]+\/filter(?:\?|$)/.test(targetUrl);
       const replaySafe =
         IDEMPOTENT_METHODS.has(method.toUpperCase()) ||
+        isSafePost ||
         (error as { replaySafe?: boolean })?.replaySafe === true;
 
       if (!replaySafe) break;
@@ -293,7 +304,16 @@ const handler = async (
   const rawUrl = req.url || "";
   const queryIndex = rawUrl.indexOf("?");
   const queryString = queryIndex === -1 ? "" : rawUrl.slice(queryIndex);
-  const targetUrl = `${HOMESERVER}/${joinedPath}${queryString}`;
+  // CRITICAL: Next's catch-all matcher DROPS a trailing-slash empty segment, so
+  // joinedPath loses it — but Synapse REQUIRES the slash on some endpoints, notably
+  // GET /_matrix/client/v3/pushrules/ (the global ruleset). matrix-js-sdk calls that
+  // BEFORE the first /sync; without the slash Synapse 400s, the SDK retries forever,
+  // and the client is stuck "syncing" after a successful login. Restore the slash
+  // from req.url's path portion. (SSRF guard is unaffected — joinedPath is still the
+  // allow-listed `_matrix/`-prefixed value; a lone trailing "/" can't escape it.)
+  const pathPortion = queryIndex === -1 ? rawUrl : rawUrl.slice(0, queryIndex);
+  const trailingSlash = pathPortion.endsWith("/") ? "/" : "";
+  const targetUrl = `${HOMESERVER}/${joinedPath}${trailingSlash}${queryString}`;
 
   // Allowlist the forwarded headers — Authorization (Bearer token), Content-Type,
   // Accept only. No cookies, no client IP, no anything else.

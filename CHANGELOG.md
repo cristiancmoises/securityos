@@ -4,6 +4,39 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.16.0] — 2026-06-21
+
+### Matrix — fixed the post-login "stuck syncing" (real root cause)
+- The Matrix Tor proxy **dropped the trailing slash** on `GET /_matrix/client/v3/
+  pushrules/` — Next's catch-all matcher strips the empty trailing segment. The SDK
+  calls that endpoint (slash required) BEFORE the first /sync; Synapse 400s the
+  slash-less form, the SDK retries it forever, and /sync is never sent — so the app
+  hung on "syncing" after a **successful** login. The proxy now restores the trailing
+  slash from the original URL. (Earlier notes misattributed this to infrastructure;
+  it was a deterministic code bug — found by reading the installed SDK source.)
+- Hardening: raised the proxy long-poll ceiling 90 s → 120 s (above the SDK's ~110 s
+  client abort) so healthy /sync long-polls aren't killed; the sync-gating filter
+  `POST /user/{id}/filter` is now retry-safe over a cold Tor circuit.
+
+### Security — formal audit fixes
+- **WebRTC real-IP leak (high).** With scripts enabled, a malicious proxied page
+  could open an `RTCPeerConnection` to a STUN server and exfiltrate the user's real
+  IP, fully bypassing Tor. The proxy shim now neutralizes RTCPeerConnection
+  (+ webkit/moz) and `getUserMedia` (as it already did WebSocket), and the JS-mode
+  CSP now pins `connect/img/media/font` sinks to `'self' data: blob:` so un-shimmed
+  sinks can't reach a remote host either.
+- **Encrypted-attachment integrity (medium).** AES-CTR is malleable, so the event's
+  SHA-256 is the only integrity check — and it was **skipped when absent**. A
+  missing/empty hash is now a hard failure, so a hostile homeserver can't strip it
+  and serve tampered/substituted ciphertext.
+- **SSRF (low).** The private-IP guard now also blocks NAT64 (`64:ff9b::` hex form)
+  and 6to4 (`2002::`) IPv6 embeddings of private IPv4.
+- **Radio favicon leak (low).** Station logos now load **through the Tor proxy**
+  instead of firing a direct (real-IP) request to an attacker-controllable URL on
+  every list render.
+- **Matrix retry race (low).** A body-bearing request is marked "sent" synchronously
+  at write, so a non-idempotent POST can't be duplicated on a fast post-write error.
+
 ## [2.15.0] — 2026-06-21
 
 ### Start Menu — search now works
