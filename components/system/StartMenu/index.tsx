@@ -1,4 +1,5 @@
 import FileManager from "components/system/Files/FileManager";
+import StartMenuSearch from "components/system/StartMenu/Search";
 import Sidebar from "components/system/StartMenu/Sidebar";
 import { Power } from "components/system/StartMenu/Sidebar/SidebarIcons";
 import StyledKickoffBody from "components/system/StartMenu/StyledKickoffBody";
@@ -78,12 +79,7 @@ const StartMenu: FC<StartMenuProps> = ({ toggleStartMenu }) => {
     >
       <StyledStartMenuBackground $height={height} />
       <StyledKickoffHeader onContextMenu={haltEvent}>
-        <div className="search">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 5 1.49-1.5-5-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z" />
-          </svg>
-          <span className="placeholder">Search…</span>
-        </div>
+        <StartMenuSearch toggleStartMenu={toggleStartMenu} />
       </StyledKickoffHeader>
       <StyledKickoffBody>
         <Sidebar />

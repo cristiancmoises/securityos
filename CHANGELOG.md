@@ -4,6 +4,23 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.15.0] — 2026-06-21
+
+### Start Menu — search now works
+- The Start Menu's **"Search…"** box was a **non-functional placeholder** (a static
+  span — no input, no handler), so nothing happened when you used it. It's now a
+  real search with a **results dropdown** (icons + **Enter** opens the top hit):
+  **apps** are matched against the process directory by name — so every app,
+  including the new **WhatsApp/Telegram/Session**, is found instantly with its real
+  icon, independent of the file index (which ignores `.url` shortcuts) — and
+  **files/documents** come from the lunr index. Click a result to launch it.
+
+### Docs
+- README, the in-desktop **Handbook**, and the desktop **Welcome** doc now document
+  the new messenger apps and their over-Tor trade-off, the Radio/VaptVupt/Matrix
+  changes, and the Start-Menu search — with a **"What's new"** summary surfaced on
+  the desktop.
+
 ## [2.14.0] — 2026-06-20
 
 ### Matrix — works end-to-end (real bug fixes)

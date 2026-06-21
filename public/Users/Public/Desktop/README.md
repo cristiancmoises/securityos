@@ -28,6 +28,16 @@ that runs entirely in your browser. No install, no tracking, no logs.
   client with every request tunneled over Tor to `matrix.securityops.co` — it
   decrypts encrypted rooms, joins federated rooms, and keeps your keys **in memory
   only** (amnesic). **SecChat** is end-to-end-encrypted video chat.
+- 🟢 **Your everyday messengers.** **WhatsApp**, **Telegram** and **Session**
+  launchers open the official clients (full chats, calls, file sharing). They run
+  in a real window (a ⚠ *direct, not-over-Tor* badge is shown) because they need
+  WebSockets the Tor proxy blocks — to use them over Tor, run SecurityOS in the Tor
+  Browser/Tails (each app and the Handbook explain how).
+- 🔎 **Instant search.** Open the **Start menu** and just start typing — it searches
+  every app and file and launches the match (Enter opens the top hit).
+- 📁 **Encrypted file sharing over Tor.** **VaptVupt** opens the SecurityOps file
+  share's `.onion` through the privacy proxy — upload and download files in the
+  window (with an *Open in Tor Browser* fallback for script-heavy actions).
 - 📝 **A real Emacs, in the browser.** **Cloudmacs** runs a full Spacemacs (with
   org-mode, eww, **telega** for Telegram, and **whatsappel** for WhatsApp) — and
   shows up in *Open with* for text/code.
@@ -46,8 +56,11 @@ that runs entirely in your browser. No install, no tracking, no logs.
 
 | Want to… | Open |
 | --- | --- |
+| Find & launch any app | **Start menu** → start typing |
 | Browse anonymously | **Tor Browser** (Start menu) |
 | Chat end-to-end encrypted (over Tor) | **Matrix** |
+| Message on WhatsApp / Telegram / Session | **WhatsApp** · **Telegram** · **Session** |
+| Share files (encrypted, over Tor) | **VaptVupt** |
 | Encrypted video chat | **SecChat** |
 | Listen to internet radio | **Radio** |
 | Edit code/text in real Emacs | **Cloudmacs** |
