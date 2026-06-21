@@ -3,8 +3,15 @@
 Welcome. SecurityOS is a **privacy-first, security-education web desktop**. This
 handbook is your starting point — everything here runs in your browser.
 
-## What's new (v2.14 → v2.15)
+## What's new (v2.14 → v2.17)
 
+- **CryptPad** — the encrypted office suite (`office.securityops.co`) now runs
+  **inside the OS over Tor**, via a new same-origin **WebSocket tunnel** that also
+  lets other real-time apps work through the proxy.
+- **Matrix sign-in fix.** The post-login "stuck on syncing" was a real proxy bug
+  (a dropped trailing slash on `/pushrules/`) — now fixed; sign-in completes.
+- **Security hardening.** Closed a WebRTC real-IP leak (scripts mode), made encrypted
+  Matrix attachments verify their hash, and tightened the SSRF + Radio-favicon paths.
 - **Start-menu search works.** Open the Start menu and type — it finds and launches
   any app or file (it was previously a non-functional placeholder).
 - **WhatsApp, Telegram & Session** launchers (open the official clients in a real
@@ -29,6 +36,7 @@ handbook is your starting point — everything here runs in your browser.
 | **Radio** | Start ▸ *Radio* | Internet radio worldwide (radio-browser API) — **exact** country filter (ISO code), genre filter, **only working HTTPS stations** (offline/non-playable ones removed), favorites. |
 | **WhatsApp / Telegram / Session** | Start ▸ each app | **Launchers** that open the official client in a real top-level window. ⚠ These connect **directly, NOT over Tor** (they need WebSockets the Tor proxy blocks; Session has no web client). To use them over Tor, route your whole browser/device through Tor — see *Messengers & Tor* below. |
 | **VaptVupt** | Start ▸ *VaptVupt* | The first-party encrypted file share, embedded **over Tor** (its `.onion` through the privacy proxy). Upload & download files in the window; for advanced/script-heavy actions use **Open in Tor Browser** from its toolbar. |
+| **CryptPad** | Start ▸ *CryptPad* | The first-party **encrypted office suite** (`office.securityops.co` — docs, sheets, code, drive), embedded **inside the OS over Tor**. Its real-time collaboration rides a built-in WebSocket tunnel; upload/download work in the window. *Open in Tor Browser* from the toolbar for anything script-heavy. |
 | **Cloudmacs** | Start ▸ *Cloudmacs* | A full **Emacs** (Spacemacs) in the browser, with org-mode, eww, **telega** (Telegram) and **whatsappel** (WhatsApp). Also in *Open with* for text/code. |
 | **Screen Capture** | Start ▸ *Screen Capture* | Screen recording + screenshots (mic/system audio, presets) with an optional webcam overlay and effect themes. |
 | **Tor Control** | Start ▸ *Tor Control* | Route the emulated Linux VM through Tor. See `TOR.md`. |

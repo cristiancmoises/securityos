@@ -364,6 +364,17 @@ const directory: Processes = {
     singleton: true,
     title: "Session",
   },
+  CryptPad: {
+    Component: dynamic(() => import("components/apps/CryptPad")),
+    backgroundColor: "#1c1340",
+    defaultSize: {
+      height: 680,
+      width: 1000,
+    },
+    icon: "/System/Icons/cryptpad.webp",
+    singleton: true,
+    title: "CryptPad",
+  },
   TorBrowser: {
     Component: dynamic(() => import("components/apps/TorBrowser")),
     backgroundColor: "#000",

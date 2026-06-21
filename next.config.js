@@ -49,6 +49,12 @@ const nextConfig = {
   typescript: { ignoreBuildErrors: true },
   productionBrowserSourceMaps: false,
   reactStrictMode: true,
+  // Do NOT auto-redirect "/path/" -> "/path". The Matrix homeserver REQUIRES the
+  // trailing slash on some endpoints (e.g. GET /_matrix/client/v3/pushrules/); the
+  // default 308 redirect stripped it before our /api/matrix proxy could forward it,
+  // which 404'd at Synapse and hung the client on "syncing". With this off, the
+  // proxy receives the exact path (the handler reconstructs the slash from req.url).
+  skipTrailingSlashRedirect: true,
   webpack: (config) => {
     config.plugins.push(
       new webpack.NormalModuleReplacementPlugin(/node:/, (resource) => {

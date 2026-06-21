@@ -33,6 +33,7 @@ RUN yarn
 # install step run under node's OpenSSL 3.
 RUN npm install --no-save --no-package-lock --no-audit --no-fund \
     socks-proxy-agent@^8.0.4 \
+    ws@^8.18.0 \
     matrix-js-sdk@41.7.0 \
     @matrix-org/matrix-sdk-crypto-wasm@18.3.1
 
@@ -51,4 +52,8 @@ EXPOSE 3000
 # every container start. -H 0.0.0.0 makes it reachable via the published port.
 # Invoke the next binary directly (not via `yarn next`): under the read-only root
 # filesystem (deploy/docker-compose) yarn would fail trying to write yarn-error.log.
-CMD ["node_modules/.bin/next", "start", "-H", "0.0.0.0"]
+# Custom server (server.js) = Next's production server + a same-origin WebSocket
+# tunnel at /api/ws (for the embedded CryptPad/Telegram/WhatsApp realtime sockets).
+# It falls back to serving without the tunnel if the ws module is unavailable, so
+# the desktop always boots.
+CMD ["node", "server.js"]
