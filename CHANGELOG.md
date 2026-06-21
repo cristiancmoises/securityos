@@ -4,6 +4,32 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.19.0] — 2026-06-21
+
+### Matrix — fixed "stuck on Connecting over Tor…" before login
+- Sign-in could hang on "Connecting over Tor…" because the Rust-crypto (E2EE) WASM
+  init was `await`ed with **no timeout** — a stalled WASM load froze login forever
+  (the login request itself succeeds; the freeze is after it). It's now **bounded
+  (20 s)**: if crypto can't initialise in time, sign-in completes WITHOUT E2EE
+  (unencrypted rooms work; encrypted show as locked) instead of hanging.
+
+### CryptPad — now actually works (storage fix)
+- CryptPad needs persistent **storage** (localStorage/IndexedDB) and refuses to run
+  without it (the "storage disabled" alert in Chrome/Chromium). The privacy proxy's
+  opaque-origin sandbox has no storage *by design*, so CryptPad now embeds **on its
+  own origin** — `office.securityops.co` directly, cross-origin to the OS (so still
+  isolated, no `allow-top-navigation`) but with `allow-same-origin` so its storage
+  and realtime WebSocket work. This is a **direct** connection (badge shown); run
+  SecurityOS in the Tor Browser for Tor. office.securityops.co must allow framing
+  from the OS — a **Window** / **Tor Browser** fallback is in the toolbar otherwise.
+
+### Messengers — why they stay launchers
+- WhatsApp/Telegram **can't** be embedded over the Tor proxy: they send anti-framing
+  headers (a direct embed can't strip them), need storage + service workers the
+  privacy sandbox can't provide, and block Tor exit IPs. They remain **launchers**
+  (full chats/calls/file sharing in a real window); for Tor, run SecurityOS in the
+  Tor Browser / Tails.
+
 ## [2.18.0] — 2026-06-21
 
 ### Lockscreen fixes
