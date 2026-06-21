@@ -283,6 +283,25 @@ const isPrivateIp = (ipRaw: string): boolean => {
 
       return isPrivateV4((hi >> 8) & 255, hi & 255);
     }
+
+    // NAT64 hex form (64:ff9b::WWXX:YYZZ) and 6to4 (2002:WWXX:YYZZ::) both embed an
+    // IPv4 (WW.XX.YY.ZZ) in hextets — block when that IPv4 is private, so neither can
+    // be used to smuggle a request to localhost/internal hosts past the guard.
+    const nat64 = ip.match(/^64:ff9b::([0-9a-f]{1,4}):[0-9a-f]{1,4}$/);
+
+    if (nat64) {
+      const hi = Number.parseInt(nat64[1], 16);
+
+      return isPrivateV4((hi >> 8) & 255, hi & 255);
+    }
+
+    const sixToFour = ip.match(/^2002:([0-9a-f]{1,4}):/);
+
+    if (sixToFour) {
+      const hi = Number.parseInt(sixToFour[1], 16);
+
+      if (isPrivateV4((hi >> 8) & 255, hi & 255)) return true;
+    }
   }
 
   return false;
@@ -665,10 +684,14 @@ const SKIP_URL =
 // real IP and defeat Tor).
 //
 // JS mode is the Clearnet Browser's "usability first" mode: the page's own scripts
-// run and lazy-load images/embeds/resources at runtime, which a strict CSP would
-// break ("refused to connect", broken images). So we only block plugins; the
-// rewriter (static URLs) + clientShim (re-proxies fetch/XHR/beacon, blocks
-// WebSocket) still reduce leaks. Full anonymity is the no-JS / Tor Browser path.
+// run and lazy-load resources at runtime. We let scripts run (no script-src/
+// default-src restriction) but STILL pin every network sink that could leak the
+// real IP — connect-src/img-src/media-src/font-src to 'self' (our /api/proxy) +
+// data:/blob:. The clientShim re-proxies fetch/XHR/beacon/EventSource to 'self', so
+// legit traffic keeps working; this stops the UN-shimmed leak channels (dynamic
+// <img>, <link rel=preload>, CSS url()) from reaching a remote host directly.
+// WebRTC isn't covered by CSP, so the clientShim neutralizes RTCPeerConnection
+// (and WebSocket) outright. Full anonymity remains the no-JS / Tor Browser path.
 const proxiedCsp = (noJs: boolean): string =>
   noJs
     ? [
@@ -683,7 +706,16 @@ const proxiedCsp = (noJs: boolean): string =>
         "object-src 'none'",
         "form-action 'self'",
       ].join("; ")
-    : "object-src 'none'";
+    : [
+        "connect-src 'self'",
+        "img-src 'self' data: blob:",
+        "media-src 'self' data: blob:",
+        "font-src 'self' data:",
+        "style-src 'self' 'unsafe-inline'",
+        "frame-src 'self'",
+        "object-src 'none'",
+        "form-action 'self'",
+      ].join("; ");
 
 // Mode flags carried on every rewritten URL so that navigating a link/resource
 // keeps the exact same proxy mode (no-JS, extension, adblock, LibreJS, direct/Tor).
@@ -735,7 +767,7 @@ const proxify = (
 const clientShim = (proxyPrefix: string, base: string): string =>
   `<script>(function(){var P=${JSON.stringify(proxyPrefix)},B=${JSON.stringify(
     base
-  )};function abs(u){try{return new URL(u,B).href}catch(e){return u}}function px(u){if(u==null)return u;var s=String(u);if(/^(data:|blob:|javascript:|about:|#|mailto:|tel:)/i.test(s))return u;if(s.indexOf(P)===0)return u;var a=abs(s);if(!/^https?:/i.test(a))return u;return P+encodeURIComponent(a)}try{var of=window.fetch;if(of)window.fetch=function(i,init){try{if(typeof i==="string")i=px(i);else if(i&&i.url)i=new Request(px(i.url),i)}catch(e){}return of.call(this,i,init)};var xo=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u){var a=[].slice.call(arguments);try{a[1]=px(u)}catch(e){}return xo.apply(this,a)};if(navigator.sendBeacon){var sb=navigator.sendBeacon.bind(navigator);navigator.sendBeacon=function(u,d){try{u=px(u)}catch(e){}return sb(u,d)}}var ES=window.EventSource;if(ES){window.EventSource=function(u,c){try{u=px(u)}catch(e){}return new ES(u,c)};window.EventSource.prototype=ES.prototype}window.open=function(u){try{if(u)parent.postMessage({__sosNewTab:px(String(u))},"*")}catch(e){}return null};document.addEventListener("click",function(e){var t=e.target;while(t&&t.tagName!=="A")t=t.parentNode;if(t&&t.href&&(e.ctrlKey||e.metaKey||e.button===1)){e.preventDefault();try{parent.postMessage({__sosNewTab:t.href},"*")}catch(x){}}},true);function _pt(){try{parent.postMessage({__sosTitle:document.title||"",__sosHref:location.href},"*")}catch(e){}}document.addEventListener("DOMContentLoaded",_pt);addEventListener("load",_pt);setTimeout(_pt,1200);window.WebSocket=function(){throw new Error("WebSocket blocked by SecurityOS privacy proxy (would bypass Tor)")}}catch(e){}})();</script>`;
+  )};function abs(u){try{return new URL(u,B).href}catch(e){return u}}function px(u){if(u==null)return u;var s=String(u);if(/^(data:|blob:|javascript:|about:|#|mailto:|tel:)/i.test(s))return u;if(s.indexOf(P)===0)return u;var a=abs(s);if(!/^https?:/i.test(a))return u;return P+encodeURIComponent(a)}try{var of=window.fetch;if(of)window.fetch=function(i,init){try{if(typeof i==="string")i=px(i);else if(i&&i.url)i=new Request(px(i.url),i)}catch(e){}return of.call(this,i,init)};var xo=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u){var a=[].slice.call(arguments);try{a[1]=px(u)}catch(e){}return xo.apply(this,a)};if(navigator.sendBeacon){var sb=navigator.sendBeacon.bind(navigator);navigator.sendBeacon=function(u,d){try{u=px(u)}catch(e){}return sb(u,d)}}var ES=window.EventSource;if(ES){window.EventSource=function(u,c){try{u=px(u)}catch(e){}return new ES(u,c)};window.EventSource.prototype=ES.prototype}window.open=function(u){try{if(u)parent.postMessage({__sosNewTab:px(String(u))},"*")}catch(e){}return null};document.addEventListener("click",function(e){var t=e.target;while(t&&t.tagName!=="A")t=t.parentNode;if(t&&t.href&&(e.ctrlKey||e.metaKey||e.button===1)){e.preventDefault();try{parent.postMessage({__sosNewTab:t.href},"*")}catch(x){}}},true);function _pt(){try{parent.postMessage({__sosTitle:document.title||"",__sosHref:location.href},"*")}catch(e){}}document.addEventListener("DOMContentLoaded",_pt);addEventListener("load",_pt);setTimeout(_pt,1200);window.WebSocket=function(){throw new Error("WebSocket blocked by SecurityOS privacy proxy (would bypass Tor)")};var _rtc=function(){throw new Error("WebRTC blocked by SecurityOS privacy proxy (would leak your real IP, bypassing Tor)")};try{window.RTCPeerConnection=_rtc;window.webkitRTCPeerConnection=_rtc;window.mozRTCPeerConnection=_rtc;window.RTCDataChannel=_rtc;if(navigator.mediaDevices){navigator.mediaDevices.getUserMedia=function(){return Promise.reject(new Error("blocked"))}}}catch(e){}}catch(e){}})();</script>`;
 
 // LibreJS-style "good JavaScript only" filter. GNU LibreJS lets a script run only
 // when it is either trivial or carries a recognized free-software license. We apply

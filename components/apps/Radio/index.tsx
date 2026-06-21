@@ -1,8 +1,16 @@
+import { PROXY_PATH } from "components/apps/Browser/config";
 import StyledRadio from "components/apps/Radio/StyledRadio";
 import type { Favorite, Station } from "components/apps/Radio/types";
 import useRadio from "components/apps/Radio/useRadio";
 import type { ComponentProcessProps } from "components/system/Apps/RenderComponent";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+// Load station logos THROUGH the Tor proxy, never directly: a station record's
+// favicon URL is attacker-controllable, and fetching it on list render would fire a
+// direct (non-Tor) request to a third party for every result — a tracking pixel /
+// real-IP leak just from browsing. Routing via /api/proxy keeps the logo over Tor.
+const proxiedFavicon = (url: string): string =>
+  url ? `${PROXY_PATH}${encodeURIComponent(url)}` : "";
 
 // Radio — listen to internet radio worldwide, searchable by name/country/genre.
 // Stations + filters come from the free, no-key radio-browser https API; playback
@@ -229,7 +237,7 @@ const Radio: FC<ComponentProcessProps> = ({ id }) => {
                     onError={(event) => {
                       event.currentTarget.style.visibility = "hidden";
                     }}
-                    src={station.favicon}
+                    src={proxiedFavicon(station.favicon)}
                   />
                 ) : (
                   <span className="favicon placeholder">📻</span>
@@ -295,7 +303,7 @@ const Radio: FC<ComponentProcessProps> = ({ id }) => {
                     onError={(event) => {
                       event.currentTarget.style.visibility = "hidden";
                     }}
-                    src={favorite.favicon}
+                    src={proxiedFavicon(favorite.favicon)}
                   />
                 ) : (
                   <span className="favicon placeholder">📻</span>

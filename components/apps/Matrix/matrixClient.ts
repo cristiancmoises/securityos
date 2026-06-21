@@ -257,15 +257,24 @@ export const decryptAttachment = async (
   ciphertext: ArrayBuffer,
   info: EncryptedFileInfo
 ): Promise<ArrayBuffer> => {
-  // Integrity: the ciphertext SHA-256 must match the hash in the event.
-  if (info.hashes?.sha256) {
-    const digest = new Uint8Array(
-      await crypto.subtle.digest("SHA-256", ciphertext)
-    );
+  // Integrity: AES-CTR is unauthenticated and fully malleable, so the ciphertext
+  // SHA-256 carried in the (Megolm-authenticated) event is the ONLY thing binding
+  // the bytes we downloaded to what the sender encrypted. The Matrix spec marks it
+  // REQUIRED — treat a missing/empty hash as a HARD failure so a hostile or
+  // compromised homeserver can't strip it and serve tampered/substituted ciphertext
+  // that we'd otherwise decrypt and render unchecked.
+  const expectedHash = info.hashes?.sha256;
 
-    if (!bytesEqual(digest, base64ToBytes(info.hashes.sha256))) {
-      throw new Error("Attachment hash mismatch (tampered or corrupt).");
-    }
+  if (!expectedHash) {
+    throw new Error("Encrypted attachment is missing its required SHA-256 hash.");
+  }
+
+  const digest = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", ciphertext)
+  );
+
+  if (!bytesEqual(digest, base64ToBytes(expectedHash))) {
+    throw new Error("Attachment hash mismatch (tampered or corrupt).");
   }
 
   const keyBytes = base64ToBytes(info.key.k);
