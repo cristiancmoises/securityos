@@ -4,6 +4,22 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.18.0] — 2026-06-21
+
+### Lockscreen fixes
+- **A PIN set on the lock screen now takes effect immediately (no refresh).**
+  `pinRequired` was memoized on the locked state alone, so after you set a PIN from
+  the lock screen the UI stayed in passwordless "swipe/click to unlock" mode — with
+  no PIN field to type into — until a reload. It now re-reads the stored PIN when the
+  settings panel closes, and **every passwordless unlock (click / Enter / swipe) is
+  re-checked LIVE against the stored PIN**, so it can never bypass a freshly-set PIN.
+- **Swipe-up works on the desktop too.** The gesture was touch-only (a mouse drag did
+  nothing); it now uses Pointer events, covering mouse, touch and pen.
+- **Honest PIN-save errors.** PIN hashing needs a secure context (HTTPS or
+  localhost); over plain `http://<ip>` `crypto.subtle` is unavailable and the save
+  silently no-op'd, leaving the lock passwordless. Saving a PIN that didn't persist
+  now shows a clear message instead.
+
 ## [2.17.0] — 2026-06-21
 
 ### CryptPad — encrypted office suite, inside the OS over Tor

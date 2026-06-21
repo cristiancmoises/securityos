@@ -106,7 +106,11 @@ const Lockscreen: FC = () => {
   const [error, setError] = useState("");
   const [shake, setShake] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const pinRequired = useMemo(() => hasPinStored(), [isLocked]);
+  // Re-read the stored PIN whenever we (re)lock OR return from the settings panel,
+  // so setting/removing a PIN ON the lock screen takes effect immediately (no
+  // refresh). Memoizing on [isLocked] alone left the UI in passwordless "swipe to
+  // unlock" mode — with no PIN field to type into — right after a PIN was set.
+  const pinRequired = useMemo(() => hasPinStored(), [isLocked, showSettings]);
 
   const pinInputRef = useRef<HTMLInputElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -149,8 +153,17 @@ const Lockscreen: FC = () => {
 
   // Swipe-up / click / Enter to unlock when no PIN is set.
   const onSimpleUnlock = useCallback(() => {
-    if (!pinRequired && !showSettings) attemptUnlock();
-  }, [attemptUnlock, pinRequired, showSettings]);
+    if (showSettings) return;
+    // Re-read the stored PIN LIVE (not the render flag): a passwordless unlock must
+    // NEVER fire when a PIN exists, even if the render state is briefly stale — focus
+    // the PIN field instead so the user types it.
+    if (hasPinStored()) {
+      pinInputRef.current?.focus(PREVENT_SCROLL);
+
+      return;
+    }
+    attemptUnlock();
+  }, [attemptUnlock, showSettings]);
 
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
@@ -164,20 +177,21 @@ const Lockscreen: FC = () => {
     [attemptUnlock, pin, pinRequired, showSettings]
   );
 
-  const onTouchStart = useCallback((event: React.TouchEvent) => {
-    touchStartY.current = event.touches[0]?.clientY ?? null;
+  // Swipe-up via POINTER events so it works for mouse-drag (desktop) AND touch —
+  // the old touch-only handlers did nothing when dragging with a mouse, so "swipe
+  // up" appeared broken on the desktop.
+  const onPointerDown = useCallback((event: React.PointerEvent) => {
+    touchStartY.current = event.clientY;
   }, []);
 
-  const onTouchEnd = useCallback(
-    (event: React.TouchEvent) => {
-      if (touchStartY.current === null) return;
-
-      const endY = event.changedTouches[0]?.clientY ?? touchStartY.current;
-      const delta = touchStartY.current - endY;
+  const onPointerUp = useCallback(
+    (event: React.PointerEvent) => {
+      const startY = touchStartY.current;
 
       touchStartY.current = null;
+      if (startY === null) return;
 
-      if (delta > SWIPE_THRESHOLD) onSimpleUnlock();
+      if (startY - event.clientY > SWIPE_THRESHOLD) onSimpleUnlock();
     },
     [onSimpleUnlock]
   );
@@ -189,8 +203,8 @@ const Lockscreen: FC = () => {
       ref={overlayRef}
       onContextMenu={haltEvent}
       onKeyDown={onKeyDown}
-      onTouchEnd={onTouchEnd}
-      onTouchStart={onTouchStart}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
       role="dialog"
       style={background ? { background } : undefined}
       tabIndex={-1}
@@ -296,6 +310,15 @@ const PinSettings: FC<PinSettingsProps> = ({ onClose }) => {
     }
 
     await setPin(pin1);
+    // Confirm it actually persisted. PIN hashing needs crypto.subtle, which is only
+    // available in a SECURE context (HTTPS or localhost); over plain http://<ip> it
+    // silently no-ops, which would leave the lock passwordless without the user
+    // knowing. Surface that instead of pretending the PIN was set.
+    if (pin1 && !hasPinStored()) {
+      setMessage("Couldn't save PIN — open SecurityOS over HTTPS (or localhost).");
+
+      return;
+    }
     setIdleMinutes(idle);
     onClose();
   }, [idle, onClose, pin1, pin2]);
