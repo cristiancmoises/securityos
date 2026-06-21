@@ -106,6 +106,22 @@ type UseMatrix = {
 
 const MESSAGE_TYPE = "m.room.message";
 
+// After this many CONSECUTIVE failed initial syncs (before the first one ever
+// completes), stop pretending we're still "Syncing over Tor…" and show a truthful,
+// actionable "Connection error" — the SDK keeps retrying in the background, so a
+// later successful sync flips the UI back to "online" automatically. ~6 errors with
+// the SDK's backoff ≈ tens of seconds of trying before we admit something is wrong.
+const MAX_SYNC_ERRORS = 6;
+// Hard ceiling on client.startClient() itself (crypto start + first sync-filter
+// POST) so a stalled Tor leg can't hang sign-in forever BEFORE any Sync event can
+// fire. On timeout we surface a clear error instead of a silent frozen spinner; the
+// client keeps trying, so it can still self-heal to "online" via the Sync handler.
+const SYNC_START_TIMEOUT_MS = 60_000;
+// Hard ceiling on the login phase (POST /login over Tor + Rust-crypto init). Fires
+// before the proxy's own long upstream hold so a stuck socket can't leave the UI on
+// "Connecting over Tor…" forever; returns to the login screen with a retry hint.
+const LOGIN_TIMEOUT_MS = 90_000;
+
 const buildMessage = (
   event: MatrixEvent,
   myUserId: string,
@@ -213,9 +229,13 @@ const useMatrix = (): UseMatrix => {
   // login screen after the user has already signed out.
   const syncTimerRef = useRef<ReturnType<typeof setTimeout>>();
   // Whether the first /sync ever completed. Before it does, a transient sync
-  // failure over Tor must stay "connecting" (the SDK retries) instead of a hard
-  // "Connection error" that drops the user back to the login screen.
+  // failure over Tor must NOT drop the user back to the login screen (the SDK
+  // retries) — but it also must not silently revert the label to "Connecting".
   const preparedRef = useRef(false);
+  // Count of CONSECUTIVE failed initial syncs (reset on success / new login). Drives
+  // the give-up threshold so a permanently-broken circuit surfaces as a truthful
+  // error instead of an endless "Syncing over Tor…" spinner.
+  const syncErrorsRef = useRef(0);
 
   const [session, setSession] = useState<Session>();
   const [circuit, setCircuit] = useState<CircuitState>("warming");
@@ -288,13 +308,31 @@ const useMatrix = (): UseMatrix => {
       setError("");
       setConn("connecting");
       preparedRef.current = false;
+      syncErrorsRef.current = 0;
       // Clear any sync-notice timer left from a previous attempt so timers don't
       // stack across repeated logins.
       if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
 
+      // Bound the login phase (the POST /login over Tor + crypto init) so a stalled
+      // Tor socket can't pin the UI on "Connecting over Tor…" indefinitely. The
+      // server proxy can hold a hung upstream up to ~120s (× retries); this fires
+      // first and returns the user to the login screen with a clear, retryable
+      // message — the pre-warmed circuit makes the next attempt fast.
+      let loginGuard: ReturnType<typeof setTimeout> | undefined;
+
       try {
         const { accessToken, client, cryptoReady: ready, userId } =
-          await createMatrixSession(username.trim(), password);
+          await Promise.race([
+            createMatrixSession(username.trim(), password),
+            new Promise<never>((_resolve, reject) => {
+              loginGuard = setTimeout(
+                () => reject(new Error("login-timeout")),
+                LOGIN_TIMEOUT_MS
+              );
+            }),
+          ]);
+
+        if (loginGuard) clearTimeout(loginGuard);
 
         if (!mountedRef.current) {
           client.stopClient();
@@ -314,22 +352,41 @@ const useMatrix = (): UseMatrix => {
           (state: string, _prev: unknown, data?: { error?: { message?: string } }) => {
             if (!mountedRef.current) return;
             if (state === "PREPARED" || state === "SYNCING") {
+              // We're live (first sync done, or an ongoing one). Clear the
+              // consecutive-error counter and self-heal out of any "error" state we
+              // may have shown — so a recovered Tor circuit silently flips back to
+              // "online" without the user doing anything.
               preparedRef.current = true;
+              syncErrorsRef.current = 0;
               setConn("online");
               setError("");
             } else if (state === "ERROR") {
-              // The SDK auto-retries failed syncs. A transient Tor hiccup during
-              // the initial sync should NOT become a hard "Connection error" that
-              // bounces back to login — stay "connecting" (session is kept) and
-              // surface the reason. Once we've synced, keep showing "online".
-              setConn(preparedRef.current ? "online" : "connecting");
               const reason = data?.error?.message;
 
-              if (!preparedRef.current && reason) {
-                setError(`Still connecting over Tor… ${reason}`);
+              if (preparedRef.current) {
+                // Already synced once — the SDK is just reconnecting in the
+                // background; we still have data, so keep showing "online".
+                setConn("online");
+              } else {
+                // Initial sync is failing over Tor. The SDK auto-retries, so do NOT
+                // revert the label to "Connecting over Tor…" (login ALREADY
+                // succeeded — that misleading revert was the reported "stuck on
+                // connecting" symptom). Stay on "Syncing…" and surface the reason.
+                // After several consecutive failures, admit a truthful, recoverable
+                // "Connection error" instead of an endless spinner.
+                syncErrorsRef.current += 1;
+                if (syncErrorsRef.current >= MAX_SYNC_ERRORS) {
+                  setConn("error");
+                  setError(
+                    "Couldn't sync over Tor after several tries — the circuit may be cold or down. Check Tor Control, or sign out and back in. It keeps retrying in the background, so it'll connect on its own if Tor recovers."
+                  );
+                } else {
+                  setConn("syncing");
+                  if (reason) setError(`Still syncing over Tor… ${reason}`);
+                }
               }
             } else if (state === "RECONNECTING" || state === "CATCHUP") {
-              setConn(preparedRef.current ? "online" : "connecting");
+              setConn(preparedRef.current ? "online" : "syncing");
             }
             scheduleRebuild();
           }
@@ -355,16 +412,38 @@ const useMatrix = (): UseMatrix => {
             timeline: { lazy_load_members: true, limit: 10 },
           },
         });
-        await client.startClient({
-          disablePresence: true,
-          filter: syncFilter,
-        });
+        // Bound startClient() (crypto start + the first sync-filter POST) so a
+        // stalled Tor leg can't freeze sign-in BEFORE any Sync event fires. On
+        // timeout we reject into the catch below (clear "error" + message); the
+        // client keeps running, so a later sync still self-heals the UI to "online".
+        let startGuard: ReturnType<typeof setTimeout> | undefined;
+
+        try {
+          await Promise.race([
+            client.startClient({ disablePresence: true, filter: syncFilter }),
+            new Promise<never>((_resolve, reject) => {
+              startGuard = setTimeout(
+                () => reject(new Error("sync-start-timeout")),
+                SYNC_START_TIMEOUT_MS
+              );
+            }),
+          ]);
+        } finally {
+          if (startGuard) clearTimeout(startGuard);
+        }
 
         // If the first sync is still not done after a while, say so (don't leave a
         // silent spinner) — it keeps trying in the background. Tracked + re-checks
-        // clientRef so it can't fire after logout (no session) or unmount.
+        // clientRef so it can't fire after logout (no session) or unmount. Also
+        // suppressed once we've hit the give-up threshold, so this reassuring notice
+        // never overwrites the truthful "Couldn't sync after several tries" error.
         syncTimerRef.current = setTimeout(() => {
-          if (mountedRef.current && clientRef.current && !preparedRef.current) {
+          if (
+            mountedRef.current &&
+            clientRef.current &&
+            !preparedRef.current &&
+            syncErrorsRef.current < MAX_SYNC_ERRORS
+          ) {
             setError(
               "Still syncing over Tor — a large account can take a minute on a slow circuit. Rooms appear as it finishes."
             );
@@ -378,14 +457,21 @@ const useMatrix = (): UseMatrix => {
           setConn("offline");
           setError("Invalid username or password.");
         } else {
+          const reason = (caught as Error)?.message;
+
           setConn("error");
           setError(
-            caught instanceof Error
+            reason === "login-timeout"
+              ? "Couldn't reach the homeserver over Tor in time — the circuit may be cold. Tap Sign in to try again (the pre-warmed circuit makes the retry faster)."
+              : reason === "sync-start-timeout"
+              ? "Couldn't start syncing over Tor — the circuit may be cold. It keeps trying; sign out and back in if it doesn't connect shortly."
+              : caught instanceof Error
               ? caught.message
               : "Could not reach the homeserver over Tor."
           );
         }
       } finally {
+        if (loginGuard) clearTimeout(loginGuard);
         if (mountedRef.current) setLoggingIn(false);
       }
     },
@@ -737,6 +823,7 @@ const useMatrix = (): UseMatrix => {
     setCryptoReady(true);
     setError("");
     preparedRef.current = false;
+    syncErrorsRef.current = 0;
   }, []);
 
   useEffect(() => {

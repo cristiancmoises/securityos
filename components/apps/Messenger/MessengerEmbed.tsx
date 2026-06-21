@@ -165,7 +165,11 @@ const MessengerEmbed: FC<ComponentProcessProps & { config: MessengerEmbedConfig 
   const [slow, setSlow] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const slowTimer = useRef<ReturnType<typeof setTimeout>>();
-  const src = `${PROXY_PATH}${encodeURIComponent(url)}`;
+  // &app=1 = "embedded app mode": forces the proxy's Node clientShim path (the Rust
+  // sidecar injects none), so the messenger gets the in-memory storage + IndexedDB
+  // shim on the opaque-origin sandbox and the /api/ws WebSocket tunnel. Without it
+  // the page loads shim-less and crashes on first storage access.
+  const src = `${PROXY_PATH}${encodeURIComponent(url)}&app=1`;
 
   useEffect(() => {
     setSlow(false);

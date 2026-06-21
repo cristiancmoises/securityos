@@ -4,6 +4,69 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.21.0] — 2026-06-21
+
+### The embedded apps actually load now — the production sidecar was stripping their runtime shim
+- **Root cause (CryptPad / WhatsApp / Telegram all loaded blank/broken in prod).**
+  In the Docker deployment the privacy proxy delegates plain `/api/proxy?url=…`
+  GETs to the memory-safe **Rust sidecar** (`PROXY_SIDECAR_URL`). The sidecar only
+  rewrites URLs — it injects **none** of the Node `clientShim`. So in production the
+  embeds were served with **no storage shim, no `/api/ws` WebSocket tunnel, and no
+  `fetch`/XHR re-proxy**; on the opaque-origin sandbox the very first `localStorage`
+  access threw and the apps died before painting. (Locally, with the sidecar unset,
+  they worked — which is why this hid.)
+- **Fix — new `&app=1` "embedded-app mode".** CryptPad/WhatsApp/Telegram now request
+  the proxy with `&app=1`, which **forces the Node `clientShim` path** (skips the
+  sidecar), and the flag is carried onto every rewritten sub-resource so the whole
+  app tree stays on the shimmed path. It changes **only** sidecar-bypass + shim
+  injection — Tor stays fail-closed, the SSRF guard, IP-pinning and redirect
+  re-validation are untouched, and normal browsing still uses the fast Rust sidecar.
+- **In-memory IndexedDB shim (amnesic).** Opaque-origin iframes have no IndexedDB,
+  which hard-crashed apps that call `indexedDB.open()` at boot. `&app=1` pages now
+  get a small in-session IndexedDB stand-in (open/transaction/objectStore/get/put/
+  getAll/openCursor→empty/IDBKeyRange…), turning a white-screen crash into a
+  loading shell. It is **non-persistent by design** (a `console.warn` says so) — it
+  is not a substitute for real storage; for durable use, the toolbar **Window** /
+  **Tor Browser** buttons open the full client.
+- **CryptPad realtime over Tor.** `office.securityops.co` 301-redirects to the public
+  CryptPad on `pad.envs.net`, whose realtime WebSocket host was **not** in the
+  `/api/ws` tunnel allowlist — so collaboration sockets were rejected even on the
+  Node path. Added `pad.envs.net` (anchored suffix match, so `pad.envs.net.evil.com`
+  is still rejected).
+
+### Matrix — the real "stuck on Connecting over Tor…" fix
+- **The label was lying and the state never recovered.** After a *successful* login,
+  any transient `/sync` error over Tor made the sync handler **revert the status to
+  "Connecting over Tor…"** — so a flaky circuit pinned the UI on "connecting"
+  forever even though the session was live. It now **stays "Syncing over Tor…"**
+  (truthful — login already succeeded) and surfaces the underlying reason.
+- **Give up honestly, then self-heal.** After several consecutive failed initial
+  syncs it shows a clear, actionable **"Couldn't sync over Tor after several tries"**
+  instead of an endless spinner — and because the SDK keeps retrying, a later
+  successful sync **automatically flips back to "online"** with no user action.
+- **Bounded connect + start.** The login phase (POST `/login` + Rust-crypto init)
+  and `startClient()` (crypto start + the first sync-filter POST) are each wrapped in
+  a timeout, so a stalled Tor socket can no longer freeze sign-in before any sync
+  event fires — you get a retryable message instead of a frozen screen.
+- All timers are cleaned up on unmount/logout; the error counter resets on each new
+  login.
+
+### Security & review
+- The whole change set was put through a **multi-agent adversarial review** (security
+  / Matrix-correctness / shim edge-cases, each finding independently verified): no
+  must-fix issues; one cosmetic message-ordering nit was fixed. The opaque-origin
+  sandbox is **unchanged** — we deliberately did **not** add `allow-same-origin`
+  (which would let a third-party embed touch the OS origin); the degraded-but-safe
+  embed is the accepted trade-off.
+
+### Honest limits (unchanged ceiling)
+- These remain heavy, multi-origin SPAs. **Service Workers cannot register** on an
+  opaque origin and the **IndexedDB shim is amnesic**, so offline mode, persistent
+  history and (for WhatsApp) multi-device crypto/WebRTC calls **cannot** fully work
+  in-OS — and some services block Tor exit IPs. The embed is **best-effort**; the
+  **Window** / **Tor Browser** buttons open the real client for full, persistent use
+  (run SecurityOS in the Tor Browser to keep that over Tor).
+
 ## [2.20.0] — 2026-06-21
 
 ### CryptPad, WhatsApp & Telegram now run INSIDE the OS, over Tor

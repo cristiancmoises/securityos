@@ -43,6 +43,10 @@ try {
 // tunnel from being abused as an open WebSocket relay to arbitrary/internal hosts.
 const WS_ALLOW = [
   /(^|\.)securityops\.co$/i, // office.securityops.co (CryptPad) + first-party
+  // office.securityops.co 301-redirects to the public CryptPad (pad.envs.net), so
+  // CryptPad's realtime WebSocket targets that host after the redirect. Anchored
+  // suffix match (NOT a loose substring) so it can't match pad.envs.net.evil.com.
+  /(^|\.)envs\.net$/i,
   /(^|\.)whatsapp\.com$/i,
   /(^|\.)whatsapp\.net$/i,
   /(^|\.)telegram\.org$/i,
