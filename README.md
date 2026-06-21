@@ -62,12 +62,18 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
   available through the proxy by design.
 - **🔐 CryptPad · 🟢 WhatsApp · Telegram — embedded INSIDE the OS, over Tor.** These
   run through the privacy proxy (fetched server-side over Tor, anti-framing headers
-  stripped, realtime **WebSocket tunneled** via `/api/ws`, storage shimmed), so they
-  load **in-OS and even on networks that block them** — your IP is never exposed.
-  They're heavy multi-origin SPAs, so the embed is **best-effort**; each app's
-  toolbar has a **Window** button that opens the full official client (run SecurityOS
-  in the **Tor Browser** to keep that over Tor). **Session** stays a launcher (no web
-  client; it's onion-routed once installed).
+  stripped, realtime **WebSocket tunneled** via `/api/ws`, storage + an amnesic
+  in-memory **IndexedDB shim** injected), so they load **in-OS and even on networks
+  that block them** — your IP is never exposed. The embeds request the proxy with
+  **`&app=1`** ("embedded-app mode"), which forces the full **Node `clientShim`**
+  path so the runtime shim is always present — even in the production deployment that
+  delegates ordinary browsing to the memory-safe Rust sidecar (the sidecar injects no
+  shim, which is why the embeds previously loaded blank in prod). They're heavy
+  multi-origin SPAs, so the embed is still **best-effort** (no Service Workers or
+  persistent storage on an opaque origin); each app's toolbar has a **Window** button
+  that opens the full official client (run SecurityOS in the **Tor Browser** to keep
+  that over Tor). **Session** stays a launcher (no web client; it's onion-routed once
+  installed).
 - **⏺️ Screen Capture** — screen recording + screenshots via `getDisplayMedia`
   (captures everything on screen, incl. cross-origin app iframes): countdown,
   microphone + system audio, quality/format/codec presets, and a max-duration. A
@@ -148,6 +154,11 @@ talks to Matrix off-Tor.
 - **Fast first login** — the client **pre-warms the Tor circuit the moment you open
   it**, so login is quick. (A cold Tor circuit otherwise makes the first request
   take ~15–40s.)
+- **Truthful, recoverable connection state** — a flaky `/sync` over Tor no longer
+  pins the UI on "Connecting over Tor…" after a successful login; it shows
+  "Syncing…", gives an honest "couldn't sync after several tries" if the circuit is
+  down, and **flips back to "online" on its own** once Tor recovers. The login and
+  first-sync phases are time-bounded so a stalled socket can't freeze sign-in.
 
 ---
 

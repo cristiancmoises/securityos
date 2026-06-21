@@ -22,7 +22,12 @@ import { SANDBOXED_IFRAME_CONFIG } from "utils/constants";
 // Browser** buttons open the real client — run SecurityOS in the Tor Browser to keep
 // those over Tor too.
 const CRYPTPAD_URL = "https://office.securityops.co/";
-const CRYPTPAD_SRC = `${PROXY_PATH}${encodeURIComponent(CRYPTPAD_URL)}`;
+// &app=1 = "embedded app mode": forces the proxy's Node clientShim path (the Rust
+// sidecar injects none), giving CryptPad the in-memory localStorage/sessionStorage +
+// IndexedDB shim it needs on the opaque-origin sandbox, plus the /api/ws WebSocket
+// tunnel for its realtime engine. Without it (sidecar path) the page loads shim-less
+// and CryptPad's storage check fails immediately.
+const CRYPTPAD_SRC = `${PROXY_PATH}${encodeURIComponent(CRYPTPAD_URL)}&app=1`;
 const CRYPTPAD_ALLOW = "clipboard-read; clipboard-write; fullscreen";
 const SLOW_LOAD_MS = 35_000;
 

@@ -715,6 +715,12 @@ type ProxyFlags = {
   adblock: boolean;
   libreJs: boolean;
   isDirect: boolean;
+  // Embedded-app mode (&app=1, set by CryptPad/WhatsApp/Telegram): forces the Node
+  // path so the clientShim is injected (the Rust sidecar injects none), and turns on
+  // the extra in-memory IndexedDB shim. Carried on every rewritten URL so the app's
+  // own sub-resources/sub-iframes stay on the shimmed Node path too. Does NOT change
+  // circuit selection / SSRF / fail-closed — only sidecar-bypass + shim injection.
+  app: boolean;
   // Per-tab Tor stream-isolation token: carried on every rewritten URL so links,
   // sub-resources and GET-form submits stay on the SAME tab circuit. Empty -> none.
   iso: string;
@@ -724,8 +730,8 @@ const flagQuery = (f: ProxyFlags): string =>
   `${f.noJs ? "&nojs=1" : ""}${f.injectExt ? "&ext=1" : ""}${
     f.adblock ? "&adblock=1" : ""
   }${f.libreJs ? "&librejs=1" : ""}${f.isDirect ? "&direct=1" : ""}${
-    f.iso ? `&iso=${f.iso}` : ""
-  }`;
+    f.app ? "&app=1" : ""
+  }${f.iso ? `&iso=${f.iso}` : ""}`;
 
 const proxify = (
   rawUrl: string,
@@ -757,11 +763,16 @@ const proxify = (
 const clientShim = (
   proxyPrefix: string,
   base: string,
-  isDirect: boolean
+  isDirect: boolean,
+  isApp: boolean
 ): string =>
-  `<script>(function(){var P=${JSON.stringify(proxyPrefix)},B=${JSON.stringify(
-    base
-  )};function abs(u){try{return new URL(u,B).href}catch(e){return u}}function px(u){if(u==null)return u;var s=String(u);if(/^(data:|blob:|javascript:|about:|#|mailto:|tel:)/i.test(s))return u;if(s.indexOf(P)===0)return u;var a=abs(s);if(!/^https?:/i.test(a))return u;return P+encodeURIComponent(a)}try{var of=window.fetch;if(of)window.fetch=function(i,init){try{if(typeof i==="string")i=px(i);else if(i&&i.url)i=new Request(px(i.url),i)}catch(e){}return of.call(this,i,init)};var xo=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u){var a=[].slice.call(arguments);try{a[1]=px(u)}catch(e){}return xo.apply(this,a)};if(navigator.sendBeacon){var sb=navigator.sendBeacon.bind(navigator);navigator.sendBeacon=function(u,d){try{u=px(u)}catch(e){}return sb(u,d)}}var ES=window.EventSource;if(ES){window.EventSource=function(u,c){try{u=px(u)}catch(e){}return new ES(u,c)};window.EventSource.prototype=ES.prototype}window.open=function(u){try{if(u)parent.postMessage({__sosNewTab:px(String(u))},"*")}catch(e){}return null};document.addEventListener("click",function(e){var t=e.target;while(t&&t.tagName!=="A")t=t.parentNode;if(t&&t.href&&(e.ctrlKey||e.metaKey||e.button===1)){e.preventDefault();try{parent.postMessage({__sosNewTab:t.href},"*")}catch(x){}}},true);function _pt(){try{parent.postMessage({__sosTitle:document.title||"",__sosHref:location.href},"*")}catch(e){}}document.addEventListener("DOMContentLoaded",_pt);addEventListener("load",_pt);setTimeout(_pt,1200);var _D=${isDirect ? "1" : "0"};var _OWS=window.WebSocket;var _WSP=(location.protocol==="https:"?"wss://":"ws://")+location.host+"/api/ws?url=";function _SWS(u,p){try{var s=String(u);if(/^wss?:/i.test(s)){var t=_WSP+encodeURIComponent(s)+(_D?"&direct=1":"");return p!==undefined?new _OWS(t,p):new _OWS(t)}}catch(e){}return p!==undefined?new _OWS(u,p):new _OWS(u)}try{_SWS.prototype=_OWS.prototype;_SWS.CONNECTING=0;_SWS.OPEN=1;_SWS.CLOSING=2;_SWS.CLOSED=3;window.WebSocket=_SWS}catch(e){}var _rtc=function(){throw new Error("WebRTC blocked by SecurityOS privacy proxy (would leak your real IP, bypassing Tor)")};try{window.RTCPeerConnection=_rtc;window.webkitRTCPeerConnection=_rtc;window.mozRTCPeerConnection=_rtc;window.RTCDataChannel=_rtc;if(navigator.mediaDevices){navigator.mediaDevices.getUserMedia=function(){return Promise.reject(new Error("blocked"))}}}catch(e){}var _MEM=function(){var d={};var o={getItem:function(k){return Object.prototype.hasOwnProperty.call(d,k)?d[k]:null},setItem:function(k,v){d[k]=String(v)},removeItem:function(k){delete d[k]},clear:function(){for(var k in d){delete d[k]}},key:function(i){return Object.keys(d)[i]||null}};try{Object.defineProperty(o,"length",{get:function(){return Object.keys(d).length}})}catch(e){}return o};function _shimStore(n){try{void window[n].length}catch(e){try{Object.defineProperty(window,n,{configurable:true,value:_MEM()})}catch(e2){}}}_shimStore("localStorage");_shimStore("sessionStorage");}catch(e){}})();</script>`;
+  `<script>(function(){if(window.__sosShimmed)return;window.__sosShimmed=1;var P=${JSON.stringify(
+    proxyPrefix
+  )},B=${JSON.stringify(base)};function abs(u){try{return new URL(u,B).href}catch(e){return u}}function px(u){if(u==null)return u;var s=String(u);if(/^(data:|blob:|javascript:|about:|#|mailto:|tel:)/i.test(s))return u;if(s.indexOf(P)===0)return u;var a=abs(s);if(!/^https?:/i.test(a))return u;return P+encodeURIComponent(a)}try{var of=window.fetch;if(of)window.fetch=function(i,init){try{if(typeof i==="string")i=px(i);else if(i&&i.url)i=new Request(px(i.url),i)}catch(e){}return of.call(this,i,init)};var xo=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u){var a=[].slice.call(arguments);try{a[1]=px(u)}catch(e){}return xo.apply(this,a)};if(navigator.sendBeacon){var sb=navigator.sendBeacon.bind(navigator);navigator.sendBeacon=function(u,d){try{u=px(u)}catch(e){}return sb(u,d)}}var ES=window.EventSource;if(ES){window.EventSource=function(u,c){try{u=px(u)}catch(e){}return new ES(u,c)};window.EventSource.prototype=ES.prototype}window.open=function(u){try{if(u)parent.postMessage({__sosNewTab:px(String(u))},"*")}catch(e){}return null};document.addEventListener("click",function(e){var t=e.target;while(t&&t.tagName!=="A")t=t.parentNode;if(t&&t.href&&(e.ctrlKey||e.metaKey||e.button===1)){e.preventDefault();try{parent.postMessage({__sosNewTab:t.href},"*")}catch(x){}}},true);function _pt(){try{parent.postMessage({__sosTitle:document.title||"",__sosHref:location.href},"*")}catch(e){}}document.addEventListener("DOMContentLoaded",_pt);addEventListener("load",_pt);setTimeout(_pt,1200);var _D=${isDirect ? "1" : "0"};var _OWS=window.WebSocket;var _WSP=(location.protocol==="https:"?"wss://":"ws://")+location.host+"/api/ws?url=";function _SWS(u,p){try{var s=String(u);if(/^wss?:/i.test(s)){var t=_WSP+encodeURIComponent(s)+(_D?"&direct=1":"");return p!==undefined?new _OWS(t,p):new _OWS(t)}}catch(e){}return p!==undefined?new _OWS(u,p):new _OWS(u)}try{_SWS.prototype=_OWS.prototype;_SWS.CONNECTING=0;_SWS.OPEN=1;_SWS.CLOSING=2;_SWS.CLOSED=3;window.WebSocket=_SWS}catch(e){}var _rtc=function(){throw new Error("WebRTC blocked by SecurityOS privacy proxy (would leak your real IP, bypassing Tor)")};try{window.RTCPeerConnection=_rtc;window.webkitRTCPeerConnection=_rtc;window.mozRTCPeerConnection=_rtc;window.RTCDataChannel=_rtc;if(navigator.mediaDevices){navigator.mediaDevices.getUserMedia=function(){return Promise.reject(new Error("blocked"))}}}catch(e){}var _MEM=function(){var d={};var o={getItem:function(k){return Object.prototype.hasOwnProperty.call(d,k)?d[k]:null},setItem:function(k,v){d[k]=String(v)},removeItem:function(k){delete d[k]},clear:function(){for(var k in d){delete d[k]}},key:function(i){return Object.keys(d)[i]||null}};try{Object.defineProperty(o,"length",{get:function(){return Object.keys(d).length}})}catch(e){}return o};function _shimStore(n){try{void window[n].length}catch(e){try{Object.defineProperty(window,n,{configurable:true,value:_MEM()})}catch(e2){}}}_shimStore("localStorage");_shimStore("sessionStorage");${
+    isApp
+      ? 'function _idbShim(){var S={};function dsl(a){a.contains=function(x){return a.indexOf(x)>-1};a.item=function(i){return a[i]};return a}function rq(v){return{result:v,error:null,onsuccess:null,onerror:null,onupgradeneeded:null,readyState:"pending",addEventListener:function(t,f){this["on"+t]=f},removeEventListener:function(){}}}function done(r,e){setTimeout(function(){r.readyState="done";var h=r["on"+e];if(h){try{h.call(r,{target:r,type:e})}catch(x){}}},0);return r}function res(v){return done(rq(v),"success")}function idx(){return{get:function(){return res(undefined)},getAll:function(){return res([])},getAllKeys:function(){return res([])},count:function(){return res(0)},openCursor:function(){return res(null)},openKeyCursor:function(){return res(null)}}}function st(n){if(!S[n])S[n]=new Map();var m=S[n];var s={name:n,keyPath:null,autoIncrement:false,indexNames:dsl([]),get:function(k){return res(m.has(k)?m.get(k):undefined)},getAll:function(){return res(Array.from(m.values()))},getAllKeys:function(){return res(Array.from(m.keys()))},put:function(v,k){var key=k!==undefined?k:v&&v.key;m.set(key,v);return res(key)},add:function(v,k){var key=k!==undefined?k:v&&v.key;m.set(key,v);return res(key)},delete:function(k){m.delete(k);return res(undefined)},clear:function(){m.clear();return res(undefined)},count:function(){return res(m.size)},openCursor:function(){return res(null)},openKeyCursor:function(){return res(null)},index:function(){return idx()},createIndex:function(){return idx()},deleteIndex:function(){}};return s}function tx(){var t={objectStore:function(n){return st(n)},abort:function(){},oncomplete:null,onerror:null,onabort:null,addEventListener:function(e,f){this["on"+e]=f},removeEventListener:function(){}};setTimeout(function(){if(t.oncomplete){try{t.oncomplete({target:t,type:"complete"})}catch(x){}}},0);return t}function db(n){var d={name:n,version:1,objectStoreNames:dsl(Object.keys(S)),createObjectStore:function(nm){var s=st(nm);d.objectStoreNames=dsl(Object.keys(S));return s},deleteObjectStore:function(nm){delete S[nm];d.objectStoreNames=dsl(Object.keys(S))},transaction:function(){return tx()},close:function(){},addEventListener:function(){},removeEventListener:function(){},onversionchange:null,onerror:null,onabort:null,onclose:null};return d}var F={open:function(n,v){var r=rq(null);setTimeout(function(){var d=db(n);r.result=d;if(r.onupgradeneeded){r.transaction=tx();try{r.onupgradeneeded({target:r,type:"upgradeneeded",oldVersion:0,newVersion:v||1})}catch(x){}}r.readyState="done";if(r.onsuccess){try{r.onsuccess({target:r,type:"success"})}catch(x){}}},0);return r},deleteDatabase:function(){return res(undefined)},databases:function(){return Promise.resolve([])},cmp:function(a,b){return a<b?-1:a>b?1:0}};try{Object.defineProperty(window,"indexedDB",{configurable:true,value:F})}catch(x){try{window.indexedDB=F}catch(y){}}var KR={bound:function(){return{}},lowerBound:function(){return{}},upperBound:function(){return{}},only:function(){return{}}};try{if(!window.IDBKeyRange)window.IDBKeyRange=KR}catch(x){}try{console.warn("SecurityOS: in-memory IndexedDB shim active (amnesic) - non-persistent in this sandbox.")}catch(x){}}try{var _ni=false;try{if(!window.indexedDB)_ni=true;else void window.indexedDB.cmp}catch(x){_ni=true}if(_ni)_idbShim()}catch(x){}'
+      : ""
+  }}catch(e){}})();</script>`;
 
 // LibreJS-style "good JavaScript only" filter. GNU LibreJS lets a script run only
 // when it is either trivial or carries a recognized free-software license. We apply
@@ -871,6 +882,7 @@ const rewriteHtml = (
   libreJs: boolean,
   adblock: boolean,
   isDirect: boolean,
+  app: boolean,
   iso: string
 ): string => {
   const proxyPrefix = `${origin}/api/proxy?url=`;
@@ -880,6 +892,7 @@ const rewriteHtml = (
     adblock,
     libreJs,
     isDirect,
+    app,
     iso,
   };
   const px = (u: string): string => proxify(u, base, origin, flags);
@@ -1019,6 +1032,7 @@ const rewriteHtml = (
       (libreJs ? `<input type="hidden" name="librejs" value="1">` : "") +
       (adblock ? `<input type="hidden" name="adblock" value="1">` : "") +
       (isDirect ? `<input type="hidden" name="direct" value="1">` : "") +
+      (app ? `<input type="hidden" name="app" value="1">` : "") +
       (iso ? `<input type="hidden" name="iso" value="${esc(iso)}">` : "");
 
     return `<form${newAttrs}>${hidden}`;
@@ -1110,7 +1124,7 @@ const rewriteHtml = (
   const adblockStyle = adblock ? `<style>${ADBLOCK_COSMETIC_CSS}</style>` : "";
 
   const head = `${
-    noJs ? "" : clientShim(proxyPrefix, base, isDirect)
+    noJs ? "" : clientShim(proxyPrefix, base, isDirect, app)
   }<base href="${base.replace(
     /"/g,
     "&quot;"
@@ -1204,6 +1218,12 @@ const handler = async (
   const adblock =
     req.query.adblock === "1" ||
     (Array.isArray(req.query.adblock) && req.query.adblock.includes("1"));
+  // Embedded-app mode (CryptPad/WhatsApp/Telegram): force the Node clientShim path
+  // (the Rust sidecar injects none) and enable the in-memory IndexedDB shim. Strict
+  // "1" equality like every other flag — never a truthy coercion.
+  const isApp =
+    req.query.app === "1" ||
+    (Array.isArray(req.query.app) && req.query.app.includes("1"));
   // Tor stream isolation: an opaque per-tab token (&iso=<token>) routes this fetch
   // through its own Tor circuit (separate exit IP), so different tabs can't be
   // correlated by a shared exit and "New Tor circuit" rotates a tab's token for a
@@ -1234,6 +1254,7 @@ const handler = async (
         "bin",
         "librejs",
         "adblock",
+        "app",
         "iso",
       ]);
 
@@ -1314,6 +1335,10 @@ const handler = async (
     !isDirect &&
     !libreJs &&
     !adblock &&
+    // Embedded apps (CryptPad/WhatsApp/Telegram, &app=1) need the Node clientShim —
+    // the in-memory storage + IndexedDB shim and the fetch/XHR/WebSocket re-proxy —
+    // which the Rust sidecar does NOT inject. Keep them on the Node path.
+    !isApp &&
     // Stream-isolation requests must use the Node path so they route through the
     // per-token Tor circuit (the sidecar has its own non-isolated circuit).
     !isoToken &&
@@ -1458,6 +1483,7 @@ const handler = async (
           libreJs,
           adblock,
           isDirect,
+          isApp,
           isoToken
         )
       );
