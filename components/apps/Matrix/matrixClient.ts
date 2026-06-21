@@ -42,6 +42,9 @@ export const HOMESERVER_LABEL = "matrix.securityops.co";
 // exactly the "I only see Tor connecting and nothing happens" symptom. After this
 // the state resolves to "cold" (slow but usable) and the user gets a clear hint.
 const PREWARM_TIMEOUT_MS = 25_000;
+// Bound Rust-crypto (E2EE) initialisation so a stalled WASM load can't hang sign-in
+// on "Connecting over Tor…". On timeout we connect without E2EE rather than freeze.
+const CRYPTO_INIT_TIMEOUT_MS = 20_000;
 
 export const prewarmCircuit = async (signal?: AbortSignal): Promise<boolean> => {
   const controller = new AbortController();
@@ -157,7 +160,21 @@ export const createMatrixSession = async (
   let cryptoReady = false;
 
   try {
-    await client.initRustCrypto({ useIndexedDB: false });
+    // BOUND the crypto init. initRustCrypto loads the Rust crypto WASM; if that load
+    // ever stalls (blocked/slow over a constrained context) the bare `await` would
+    // HANG sign-in forever on "Connecting over Tor…" — the reported stuck-before-
+    // login symptom. Race it against a timeout and, on failure/timeout, connect
+    // WITHOUT E2EE (unencrypted rooms work; encrypted rooms show as locked) instead
+    // of freezing.
+    await Promise.race([
+      client.initRustCrypto({ useIndexedDB: false }),
+      new Promise<never>((_resolve, reject) => {
+        setTimeout(
+          () => reject(new Error("crypto-init-timeout")),
+          CRYPTO_INIT_TIMEOUT_MS
+        );
+      }),
+    ]);
 
     // Still send to / receive from devices we have not verified — without this
     // the client would refuse to encrypt to unverified devices and drop them.
@@ -167,7 +184,10 @@ export const createMatrixSession = async (
     cryptoReady = true;
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.error("SecurityOS Matrix: end-to-end encryption failed to initialise", error);
+    console.error(
+      "SecurityOS Matrix: E2EE init failed or timed out — connecting without it",
+      error
+    );
   }
 
   return { accessToken, client, cryptoReady, deviceId, userId };

@@ -60,11 +60,13 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
   256 MiB; downloads stream back in full); a toolbar offers **Reload** and **Open in
   Tor Browser** for script-heavy actions. Real-time/WebSocket features aren't
   available through the proxy by design.
-- **🔐 CryptPad (encrypted office, over Tor)** — the first-party
-  `office.securityops.co` suite (docs, sheets, code, drive) embedded **inside the OS
-  over Tor**. Its real-time collaboration runs through a new same-origin **WebSocket
-  tunnel** (`/api/ws`, served by the custom `server.js`) that carries `wss://` over
-  Tor where the plain HTTP proxy can't; upload/download work in the window.
+- **🔐 CryptPad (encrypted office)** — the first-party `office.securityops.co` suite
+  (docs, sheets, code, drive) embedded **on its own origin** so its required storage
+  + realtime WebSocket work (the privacy proxy's opaque sandbox has no storage by
+  design, which is why CryptPad otherwise shows a "storage disabled" alert). It's a
+  **direct** connection (cross-origin, so still isolated from the OS) — run
+  SecurityOS in the Tor Browser for Tor. A same-origin **WebSocket tunnel**
+  (`/api/ws`, custom `server.js`) is also available for proxy-embedded realtime apps.
 - **🟢 WhatsApp · Telegram · Session** — launchers for the official messengers.
   These can't be embedded (anti-framing headers; WebSockets the Tor proxy blocks;
   Session has no web client), so each opens its **official client in a real

@@ -1,30 +1,36 @@
-import { PROXY_PATH } from "components/apps/Browser/config";
 import type { ComponentProcessProps } from "components/system/Apps/RenderComponent";
 import { useProcesses } from "contexts/process";
 import { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
-import { SANDBOXED_IFRAME_CONFIG } from "utils/constants";
 
 // CryptPad — the first-party SecurityOps office suite (end-to-end-encrypted docs,
-// sheets, code, drive) at office.securityops.co, embedded INSIDE the OS over Tor.
+// sheets, code, drive) at office.securityops.co.
 //
-// HOW IT RUNS IN-OS: the page is fetched + rewritten by the privacy proxy
-// (/api/proxy, SOCKS5h over Tor) and rendered in an opaque-origin sandbox. CryptPad
-// is a REAL-TIME app — its collaborative engine needs a WebSocket
-// (wss://office.securityops.co/cryptpad_websocket), which a plain HTTP proxy can't
-// carry. SecurityOS's custom server exposes a same-origin WebSocket TUNNEL at
-// /api/ws; the proxy's client shim rewrites the page's WebSocket to that tunnel, so
-// the realtime connection rides through SecurityOS over Tor. Uploads/downloads work
-// through the proxy (allow-downloads + forwarded POST bodies). office.securityops.co
-// is first-party and does not block Tor, so this is the in-OS, over-Tor path the
-// messenger clients can't take.
+// WHY A DIRECT EMBED (NOT THE TOR PROXY): CryptPad needs persistent STORAGE
+// (localStorage / IndexedDB) and Web Workers — it shows a hard "storage disabled"
+// alert and refuses to run without them. The privacy proxy renders pages in an
+// OPAQUE-ORIGIN sandbox with NO storage (that isolation is exactly what makes
+// proxying untrusted content safe), so CryptPad cannot function there. The only way
+// to give it real storage SAFELY is its OWN origin — so we embed office.securityops.co
+// directly, cross-origin from the OS. The sandbox grants `allow-same-origin` (so its
+// storage works) but the cross-origin boundary still prevents it from touching the
+// SecurityOS desktop, and we withhold `allow-top-navigation` so it can't redirect us.
+//
+// TOR: this is a DIRECT connection to office.securityops.co (a real WebSocket for
+// realtime collaboration). To use CryptPad anonymously, run SecurityOS itself in the
+// Tor Browser / Tails — then this connection is over Tor too. (The same trade-off the
+// messenger launchers make.) office.securityops.co must allow framing from the
+// SecurityOS origin; if the panel stays blank, use "Open in window".
 const CRYPTPAD_URL = "https://office.securityops.co/";
-const CRYPTPAD_SRC = `${PROXY_PATH}${encodeURIComponent(CRYPTPAD_URL)}`;
-const CRYPTPAD_ALLOW = "clipboard-read; clipboard-write; fullscreen";
+const CRYPTPAD_ALLOW =
+  "clipboard-read; clipboard-write; fullscreen; autoplay; camera; microphone";
+// allow-same-origin => real storage on CryptPad's own origin; cross-origin to the OS
+// keeps it isolated. No allow-top-navigation (can't redirect the desktop).
+const CRYPTPAD_SANDBOX =
+  "allow-same-origin allow-scripts allow-forms allow-modals allow-popups allow-downloads allow-popups-to-escape-sandbox allow-storage-access-by-user-activation";
 
-// CryptPad over a cold Tor circuit + its WASM/crypto can take a while; after this,
-// offer Reload / open-in-Tor-Browser instead of a silent spinner.
-const SLOW_LOAD_MS = 35_000;
+// If it hasn't loaded by now, surface the fallback (framing blocked / slow).
+const SLOW_LOAD_MS = 18_000;
 
 const StyledCryptPad = styled.div`
   background: #1c1340;
@@ -55,12 +61,23 @@ const StyledCryptPad = styled.div`
     white-space: nowrap;
   }
 
+  .toolbar .badge {
+    background: rgba(255, 176, 32, 14%);
+    border: 1px solid rgba(255, 176, 32, 40%);
+    border-radius: 999px;
+    color: #ffcd6b;
+    flex: 0 0 auto;
+    font-size: 10.5px;
+    padding: 2px 8px;
+  }
+
   .toolbar button {
     background: transparent;
     border: 1px solid rgba(150, 130, 220, 38%);
     border-radius: 5px;
     color: #e2d8fb;
     cursor: pointer;
+    flex: 0 0 auto;
     font-family: inherit;
     font-size: 11.5px;
     padding: 4px 10px;
@@ -117,12 +134,14 @@ const StyledCryptPad = styled.div`
   .overlay .hint {
     color: #9a8cc4;
     font-size: 11.5px;
-    max-width: 380px;
+    max-width: 400px;
   }
 
   .overlay .actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 10px;
+    justify-content: center;
     margin-top: 4px;
   }
 
@@ -172,29 +191,41 @@ const CryptPad: FC<ComponentProcessProps> = ({ id }) => {
     setReloadKey((key) => key + 1);
   };
 
+  const openInWindow = (): void => {
+    try {
+      window.open(CRYPTPAD_URL, "securityos-cryptpad", "popup,width=1280,height=860");
+    } catch {
+      // ignore pop-up failures
+    }
+  };
+
   const openInTorBrowser = (): void => {
     try {
       open("TorBrowser", { url: CRYPTPAD_URL });
     } catch {
-      // The embedded view is still available.
+      // The embedded/window view is still available.
     }
   };
 
   return (
     <StyledCryptPad>
       <div className="toolbar">
-        <span className="title">
-          🔐 CryptPad — encrypted office suite, over Tor
+        <span className="title">🔐 CryptPad — encrypted office suite</span>
+        <span className="badge" title="Direct connection — run SecurityOS in the Tor Browser for Tor">
+          direct (not via Tor proxy)
         </span>
-        <button onClick={reload} title="Reload over Tor" type="button">
+        <button onClick={reload} title="Reload" type="button">
           ↻ Reload
+        </button>
+        <button onClick={openInWindow} title="Open in a separate window" type="button">
+          ⧉ Window
         </button>
         <button
           onClick={openInTorBrowser}
-          title="Open CryptPad in the Tor Browser (toggle scripts if a page needs them)"
+          title="Open CryptPad in the in-OS Tor Browser"
           type="button"
         >
-          Open in Tor Browser
+          Tor Browser
         </button>
       </div>
       <div className="frame-wrap">
@@ -202,24 +233,27 @@ const CryptPad: FC<ComponentProcessProps> = ({ id }) => {
           key={reloadKey}
           allow={CRYPTPAD_ALLOW}
           onLoad={() => setLoading(false)}
-          src={CRYPTPAD_SRC}
+          sandbox={CRYPTPAD_SANDBOX}
+          src={CRYPTPAD_URL}
           title={id}
-          {...SANDBOXED_IFRAME_CONFIG}
         />
         {loading && (
           <div className={`overlay${slow ? "" : " pass"}`}>
             <span className="spinner" />
-            <span>Connecting to CryptPad over Tor…</span>
+            <span>Loading CryptPad…</span>
             {slow && (
               <>
                 <span className="hint">
-                  A cold Tor circuit plus CryptPad&apos;s encryption can take a
-                  while. If it doesn&apos;t appear, reload, or open it in the Tor
-                  Browser where you can retry and toggle scripts.
+                  Still blank? CryptPad needs storage (its own origin) and permission
+                  to be framed. Make sure office.securityops.co allows framing from
+                  SecurityOS, or use <b>Window</b> / <b>Tor Browser</b> below.
                 </span>
                 <div className="actions">
                   <button onClick={reload} type="button">
                     ↻ Reload
+                  </button>
+                  <button onClick={openInWindow} type="button">
+                    ⧉ Open in window
                   </button>
                   <button onClick={openInTorBrowser} type="button">
                     Open in Tor Browser
