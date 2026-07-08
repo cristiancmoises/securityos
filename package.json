@@ -67,7 +67,7 @@
     "butterchurn-presets": "^3.0.0-beta.4",
     "cjs": "^0.0.11",
     "fflate": "^0.8.3",
-    "file-type": "^21.3.2",
+    "file-type": "^22.0.1",
     "fix-webm-duration": "^1.0.6",
     "framer-motion": "^12.40.0",
     "fs": "^0.0.1-security",
