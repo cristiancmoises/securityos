@@ -76,7 +76,7 @@
     "ini": "^3.0.1",
     "isomorphic-git": "^1.38.4",
     "minimist": "^1.2.8",
-    "multiformats": "^11.0.2",
+    "multiformats": "^14.0.4",
     "music-metadata": "^11.12.3",
     "next": "^16.2.9",
     "node": "^22.0.0",
