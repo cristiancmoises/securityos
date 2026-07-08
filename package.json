@@ -111,7 +111,7 @@
     "@types/video.js": "^7.3.58",
     "@types/wicg-file-system-access": "^2020.9.5",
     "@typescript-eslint/eslint-plugin": "^5.54.1",
-    "@typescript-eslint/parser": "^5.54.1",
+    "@typescript-eslint/parser": "^8.63.0",
     "7z-wasm": "^1.2.0",
     "emulators": "^0.73.8",
     "emulators-ui": "^0.73.9",
