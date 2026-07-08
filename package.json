@@ -143,7 +143,7 @@
     "postcss-styled-syntax": "^0.7.1",
     "postcss-syntax": "^0.36.2",
     "stylelint": "^15.2.0",
-    "stylelint-config-standard": "^30.0.1",
+    "stylelint-config-standard": "^40.0.0",
     "stylelint-order": "^6.0.3",
     "terser": "^5.48.0",
     "tinymce": "^8.6.0",
