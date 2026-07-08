@@ -1274,12 +1274,12 @@
   resolved "https://registry.npmjs.org/@types/minimist/-/minimist-1.2.5.tgz"
   integrity sha512-hov8bUuiLiyFPGyFPE1lwWhmzYbirOXQNNo40+y3zow8aFVTeyn3VWL0VFFfdNddA8S4Vf0Tc062rzyNr7Paag==
 
-"@types/node@*", "@types/node@^18.15.0":
-  version "18.19.31"
-  resolved "https://registry.npmjs.org/@types/node/-/node-18.19.31.tgz"
-  integrity sha512-ArgCD39YpyyrtFKIqMDvjz79jto5fcI/SVUs2HwB+f0dAzq68yqOdyaSivLiLugSziTpNXLQrVb7RZFmdZzbhA==
+"@types/node@*", "@types/node@^26.1.1":
+  version "26.1.1"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-26.1.1.tgz#bad758d601e97d6cf457d204ee76a35fce7bd119"
+  integrity sha512-nxAkRSVkN1Y0JC1W8ky/fTfkGsMmcrRsbx+3XoZE+rMOX71kLYTV7fLXpqud1GpbpP5TuffXFqfX7fH2GgZREw==
   dependencies:
-    undici-types "~5.26.4"
+    undici-types "~8.3.0"
 
 "@types/normalize-package-data@^2.4.0":
   version "2.4.1"
@@ -5736,10 +5736,10 @@ node-releases@^2.0.8:
   resolved "https://registry.npmjs.org/node-releases/-/node-releases-2.0.10.tgz"
   integrity sha512-5GFldHPXVG/YZmFzJvKK2zDSzPKhEp0+ZR5SVaoSag9fsL5YgHbUHDfnG5494ISANDcK4KwPXAx2xqVEydmd7w==
 
-node@^22.0.0:
-  version "22.0.0"
-  resolved "https://registry.npmjs.org/node/-/node-22.0.0.tgz"
-  integrity sha512-erpiz5vVgqdPOUo/1+xQLlSeqf95EgVVHkQ/b1eHq1VGEJYJSjgitYoYWtH85U1qF9polkt8TdrNEjtAQ38jEw==
+node@^26.4.0:
+  version "26.4.0"
+  resolved "https://registry.yarnpkg.com/node/-/node-26.4.0.tgz#42336febb9df7ac9a8cd1c5ad067ed60887ae4e7"
+  integrity sha512-KKcRArAcg4P/lFP1z2iHPeFQfW/7yPwWz37BLQsnfzU8kyBArVavBbFK1y+O4OSsEHv4xe836eGkLP5O1oyJQw==
   dependencies:
     node-bin-setup "^1.0.0"
 
@@ -7799,10 +7799,10 @@ unbox-primitive@^1.1.0:
     has-symbols "^1.1.0"
     which-boxed-primitive "^1.1.1"
 
-undici-types@~5.26.4:
-  version "5.26.5"
-  resolved "https://registry.npmjs.org/undici-types/-/undici-types-5.26.5.tgz"
-  integrity sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA==
+undici-types@~8.3.0:
+  version "8.3.0"
+  resolved "https://registry.yarnpkg.com/undici-types/-/undici-types-8.3.0.tgz#44e9fc9f3244648cdea35e4f9bb2d681e9410809"
+  integrity sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==
 
 universalify@^0.2.0:
   version "0.2.0"
