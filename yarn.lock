@@ -5642,10 +5642,10 @@ ms@^2.1.3:
   resolved "https://registry.yarnpkg.com/ms/-/ms-2.1.3.tgz#574c8138ce1d2b5861f0b44579dbadd60c6615b2"
   integrity sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==
 
-multiformats@^11.0.2:
-  version "11.0.2"
-  resolved "https://registry.npmjs.org/multiformats/-/multiformats-11.0.2.tgz"
-  integrity sha512-b5mYMkOkARIuVZCpvijFj9a6m5wMVLC7cf/jIPd5D/ARDOfLC5+IFkbgDXQgcU2goIsTD/O9NY4DI/Mt4OGvlg==
+multiformats@^14.0.4:
+  version "14.0.4"
+  resolved "https://registry.yarnpkg.com/multiformats/-/multiformats-14.0.4.tgz#ac45c4a75db7f757d416aa3e991ff54e2de86324"
+  integrity sha512-+SXItmOUWzT0kjlIfkZ4NawJaC9jW/mPlyn902V9Qgpc7YDwdEiwqbiZxTyvC0XWh1jZguXca3A/WQ+UOPRLUA==
 
 music-metadata-browser@^0.6.1:
   version "0.6.6"
