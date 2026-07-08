@@ -232,6 +232,19 @@ export const uploadMedia = async (
   return json.content_uri;
 };
 
+// crypto.subtle (WebCrypto Subtle) is only defined in a SECURE CONTEXT — HTTPS or
+// http://localhost. Served over a plain http://<LAN-IP> origin, window.isSecureContext
+// is false and crypto.subtle is undefined, so the encrypted-attachment AES-CTR/SHA-256
+// below can't run at all. TEXT E2EE is unaffected (the Rust crypto WASM uses only
+// crypto.getRandomValues, which works in insecure contexts) — only attachments need
+// Subtle. We surface a clear, actionable error instead of the cryptic native
+// "Cannot read properties of undefined (reading 'digest')".
+export const isSecureCryptoContext = (): boolean =>
+  typeof globalThis.crypto?.subtle !== "undefined";
+
+const SECURE_CONTEXT_ERROR =
+  "Encrypted attachments need a secure context — open SecurityOS over HTTPS or http://localhost (text messages still work).";
+
 // --- Encrypted-attachment decryption (AES-CTR-256), per the Matrix spec --------
 // matrix-js-sdk no longer re-exports a decryptAttachment helper, so we implement
 // the documented scheme with WebCrypto: JWK key (base64url "k"), 16-byte IV that
@@ -277,6 +290,7 @@ export const decryptAttachment = async (
   ciphertext: ArrayBuffer,
   info: EncryptedFileInfo
 ): Promise<ArrayBuffer> => {
+  if (!isSecureCryptoContext()) throw new Error(SECURE_CONTEXT_ERROR);
   // Integrity: AES-CTR is unauthenticated and fully malleable, so the ciphertext
   // SHA-256 carried in the (Megolm-authenticated) event is the ONLY thing binding
   // the bytes we downloaded to what the sender encrypted. The Matrix spec marks it
@@ -333,6 +347,7 @@ export type EncryptedFileOut = {
 export const encryptAttachment = async (
   plaintext: ArrayBuffer
 ): Promise<{ data: ArrayBuffer; file: Omit<EncryptedFileOut, "url"> }> => {
+  if (!isSecureCryptoContext()) throw new Error(SECURE_CONTEXT_ERROR);
   const keyBytes = crypto.getRandomValues(new Uint8Array(32));
   const counter = new Uint8Array(16);
 

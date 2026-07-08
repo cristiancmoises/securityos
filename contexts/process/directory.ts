@@ -150,6 +150,17 @@ const directory: Processes = {
     ],
     title: "Marked",
   },
+  IRC: {
+    Component: dynamic(() => import("components/apps/IRC")),
+    backgroundColor: "#150f1b",
+    defaultSize: {
+      height: 600,
+      width: 920,
+    },
+    icon: "/System/Icons/irc.webp",
+    singleton: true,
+    title: "IRC",
+  },
   Matrix: {
     Component: dynamic(() => import("components/apps/Matrix")),
     backgroundColor: "#0a1420",

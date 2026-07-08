@@ -1,4 +1,7 @@
-import { HOMESERVER_LABEL } from "components/apps/Matrix/matrixClient";
+import {
+  HOMESERVER_LABEL,
+  isSecureCryptoContext,
+} from "components/apps/Matrix/matrixClient";
 import StyledMatrix from "components/apps/Matrix/StyledMatrix";
 import useMatrix, {
   type ConnState,
@@ -92,6 +95,10 @@ const Matrix: FC<ComponentProcessProps> = () => {
   const [dragOver, setDragOver] = useState(false);
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  // Encrypted-room attachments need crypto.subtle, which only exists in a secure
+  // context (HTTPS / http://localhost). On a plain-http LAN origin we disable the
+  // attach control for encrypted rooms and say why, instead of failing after the pick.
+  const secureCrypto = isSecureCryptoContext();
 
   // Send every file dropped (or pasted) into the chat. uploadImage handles both
   // images (m.image) and other files (m.file), encrypting them in E2EE rooms.
@@ -458,8 +465,13 @@ const Matrix: FC<ComponentProcessProps> = () => {
                   />
                   <button
                     className="attach-btn"
+                    disabled={activeRoom.encrypted && !secureCrypto}
                     onClick={() => fileRef.current?.click()}
-                    title="Send an image"
+                    title={
+                      activeRoom.encrypted && !secureCrypto
+                        ? "Encrypted-room attachments need HTTPS or http://localhost — text messages still work"
+                        : "Send an image"
+                    }
                     type="button"
                   >
                     📎

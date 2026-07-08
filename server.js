@@ -52,6 +52,9 @@ const WS_ALLOW = [
   /(^|\.)telegram\.org$/i,
   /(^|\.)t\.me$/i,
   /(^|\.)web\.telegram\.org$/i,
+  // The IRC app tunnels IRC-over-WebSocket to Libera.Chat's KiwiIRC gateway
+  // (web.libera.chat/webirc/websocket/). Anchored suffix covers web./irc.libera.chat.
+  /(^|\.)libera\.chat$/i,
 ];
 
 const hostAllowed = (host) => WS_ALLOW.some((re) => re.test(host));
@@ -89,6 +92,16 @@ app
             (u.protocol !== "wss:" && u.protocol !== "ws:") ||
             !hostAllowed(u.hostname)
           ) {
+            clientSocket.destroy();
+
+            return;
+          }
+          // Fail CLOSED, mirroring proxy.ts's httpRequest guard: if Tor is configured
+          // (TOR_PROXY set) but the SOCKS agent didn't build (missing socks-proxy-agent
+          // module, or a malformed TOR_PROXY), NEVER open a non-direct tunnel — it
+          // would connect over a direct clearnet socket and leak the real IP while the
+          // user believes they're on Tor. direct=1 (Tor-blocked messengers) is exempt.
+          if (!direct && TOR_PROXY && !socksAgent) {
             clientSocket.destroy();
 
             return;

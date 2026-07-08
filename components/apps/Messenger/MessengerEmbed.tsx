@@ -24,6 +24,18 @@ export type MessengerEmbedConfig = {
 
 const SLOW_LOAD_MS = 30_000;
 
+// A fresh 128-bit hex Tor stream-isolation token. Carried as &iso= so the proxy
+// routes this embed through its OWN Tor circuit (separate exit IP); rotating it on
+// Reload gives each retry a NEW exit — the fix for WhatsApp/Telegram's per-exit
+// intermittent block, where reloading onto the SAME blocked exit never recovers.
+const newIsoToken = (): string => {
+  const bytes = new Uint8Array(16);
+
+  (globalThis.crypto || window.crypto).getRandomValues(bytes);
+
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+};
+
 const StyledEmbed = styled.div<{ $accent: string }>`
   background: #0b141a;
   display: flex;
@@ -164,12 +176,14 @@ const MessengerEmbed: FC<ComponentProcessProps & { config: MessengerEmbedConfig 
   const [loading, setLoading] = useState(true);
   const [slow, setSlow] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [iso, setIso] = useState(newIsoToken);
   const slowTimer = useRef<ReturnType<typeof setTimeout>>();
   // &app=1 = "embedded app mode": forces the proxy's Node clientShim path (the Rust
   // sidecar injects none), so the messenger gets the in-memory storage + IndexedDB
   // shim on the opaque-origin sandbox and the /api/ws WebSocket tunnel. Without it
-  // the page loads shim-less and crashes on first storage access.
-  const src = `${PROXY_PATH}${encodeURIComponent(url)}&app=1`;
+  // the page loads shim-less and crashes on first storage access. &iso pins a per-tab
+  // Tor circuit so Reload can rotate to a fresh exit IP (see newIsoToken).
+  const src = `${PROXY_PATH}${encodeURIComponent(url)}&app=1&iso=${iso}`;
 
   useEffect(() => {
     setSlow(false);
@@ -183,6 +197,8 @@ const MessengerEmbed: FC<ComponentProcessProps & { config: MessengerEmbedConfig 
 
   const reload = (): void => {
     setLoading(true);
+    // Rotate the Tor circuit so a blocked/slow exit is swapped for a fresh one.
+    setIso(newIsoToken());
     setReloadKey((key) => key + 1);
   };
 

@@ -202,11 +202,13 @@ const PROXY_SIDECAR_URL = process.env.PROXY_SIDECAR_URL || "";
 const BROWSER_HEADERS: Record<string, string> = {
   Accept:
     "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,video/*,audio/*,*/*;q=0.8",
-  // Ask upstream for an UNCOMPRESSED body. Node's http/https (unlike fetch) do not
-  // auto-decompress, so a gzip/br response would otherwise reach us as raw bytes —
-  // garbled HTML (blank/broken .onion pages) or mislabeled assets. We also gunzip
-  // defensively below for servers that compress regardless of this hint.
-  "Accept-Encoding": "identity",
+  // Request COMPRESSION. Bytes-over-Tor is the dominant cost (a cold circuit plus
+  // CryptPad's multi-MB JS/CSS is the "too slow" complaint), and text assets shrink
+  // ~3-5x with gzip/br. Node's http/https don't auto-decompress, but decodeBody()
+  // below gunzip/inflate/brotli-decodes every response (size-capped anti-bomb, raw
+  // fallback on error) BEFORE the HTML rewriter / asset passthrough see the bytes.
+  // Advertise ONLY the three encodings decodeBody actually handles (no zstd).
+  "Accept-Encoding": "gzip, deflate, br",
   "Accept-Language": "en-US,en;q=0.9",
   "User-Agent":
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -610,13 +612,15 @@ const httpRequest = (
 // treat as a decode failure below — i.e. serve raw bytes, never the unbounded blob).
 const gunzipAsync = promisify(zlib.gunzip);
 const inflateAsync = promisify(zlib.inflate);
+const inflateRawAsync = promisify(zlib.inflateRaw);
 const brotliDecompressAsync = promisify(zlib.brotliDecompress);
 
-// Node's http/https never auto-decompress. We request `identity`, but some servers
-// gzip/deflate/brotli regardless — decode here so the HTML rewriter and the asset
-// passthrough see real bytes (otherwise the page is blank/garbled). A 206 partial
-// is never decoded (a sliced compressed stream can't stand alone) and any decode
-// error falls back to the raw body rather than failing the whole page.
+// Node's http/https never auto-decompress. We request gzip/deflate/br (bytes over Tor
+// are the dominant cost), so servers now actually send compressed bodies — decode here
+// so the HTML rewriter and the asset passthrough see real bytes (otherwise the page is
+// blank/garbled). A 206 partial is never decoded (a sliced compressed stream can't
+// stand alone) and any decode error falls back to the raw body rather than failing the
+// whole page.
 const decodeBody = async (response: ProxyResponse): Promise<Buffer> => {
   const encodingHeader = response.headers["content-encoding"];
   const encoding = (
@@ -640,9 +644,18 @@ const decodeBody = async (response: ProxyResponse): Promise<Buffer> => {
       });
     }
     if (encoding === "deflate") {
-      return await inflateAsync(response.body, {
-        maxOutputLength: MAX_RESPONSE_BYTES,
-      });
+      // "deflate" may be zlib-wrapped (RFC 1950) OR raw (RFC 1951) in the wild.
+      // zlib.inflate handles the former; fall back to inflateRaw for the latter so a
+      // raw-deflate response isn't served as garbled, still-compressed bytes.
+      try {
+        return await inflateAsync(response.body, {
+          maxOutputLength: MAX_RESPONSE_BYTES,
+        });
+      } catch {
+        return await inflateRawAsync(response.body, {
+          maxOutputLength: MAX_RESPONSE_BYTES,
+        });
+      }
     }
     if (encoding === "br") {
       return await brotliDecompressAsync(response.body, {
@@ -691,7 +704,11 @@ const SKIP_URL =
 // The real deanonymization vector, WebRTC (not covered by CSP at all), is
 // neutralized in the clientShim alongside WebSocket. Full anonymity remains the
 // no-JS / Tor Browser path (the strict policy below).
-const proxiedCsp = (noJs: boolean): string =>
+const proxiedCsp = (
+  noJs: boolean,
+  app = false,
+  origin = "'self'"
+): string =>
   noJs
     ? [
         "default-src 'self' data: blob:",
@@ -705,6 +722,18 @@ const proxiedCsp = (noJs: boolean): string =>
         "object-src 'none'",
         "form-action 'self'",
       ].join("; ")
+    : app
+    ? // Embedded-app mode (&app=1): the page renders in an OPAQUE-origin sandbox and
+      // CAN still load a CROSS-ORIGIN child frame or worker. The clientShim rewrites
+      // fetch/XHR/WS but NOT a dynamically-set iframe.src, so an app that injects its
+      // own sandbox subframe on another origin (CryptPad) would otherwise fetch it
+      // DIRECTLY — off Tor — leaking the real IP. Pin frames/workers to our OWN proxy
+      // origin (which routes back through /api/proxy over Tor), so any such request
+      // FAILS CLOSED instead of leaking. `origin` is the concrete scheme://host (NOT
+      // 'self', which would mean the opaque origin and match nothing), so our own
+      // statically-rewritten same-origin frames still load. connect-src stays open for
+      // the shim's fetch/XHR/WebSocket re-proxy (WebRTC is blocked in the shim).
+      `frame-src ${origin} blob: data:; child-src ${origin} blob:; worker-src ${origin} blob:; object-src 'none'`
     : "object-src 'none'";
 
 // Mode flags carried on every rewritten URL so that navigating a link/resource
@@ -770,7 +799,7 @@ const clientShim = (
     proxyPrefix
   )},B=${JSON.stringify(base)};function abs(u){try{return new URL(u,B).href}catch(e){return u}}function px(u){if(u==null)return u;var s=String(u);if(/^(data:|blob:|javascript:|about:|#|mailto:|tel:)/i.test(s))return u;if(s.indexOf(P)===0)return u;var a=abs(s);if(!/^https?:/i.test(a))return u;return P+encodeURIComponent(a)}try{var of=window.fetch;if(of)window.fetch=function(i,init){try{if(typeof i==="string")i=px(i);else if(i&&i.url)i=new Request(px(i.url),i)}catch(e){}return of.call(this,i,init)};var xo=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u){var a=[].slice.call(arguments);try{a[1]=px(u)}catch(e){}return xo.apply(this,a)};if(navigator.sendBeacon){var sb=navigator.sendBeacon.bind(navigator);navigator.sendBeacon=function(u,d){try{u=px(u)}catch(e){}return sb(u,d)}}var ES=window.EventSource;if(ES){window.EventSource=function(u,c){try{u=px(u)}catch(e){}return new ES(u,c)};window.EventSource.prototype=ES.prototype}window.open=function(u){try{if(u)parent.postMessage({__sosNewTab:px(String(u))},"*")}catch(e){}return null};document.addEventListener("click",function(e){var t=e.target;while(t&&t.tagName!=="A")t=t.parentNode;if(t&&t.href&&(e.ctrlKey||e.metaKey||e.button===1)){e.preventDefault();try{parent.postMessage({__sosNewTab:t.href},"*")}catch(x){}}},true);function _pt(){try{parent.postMessage({__sosTitle:document.title||"",__sosHref:location.href},"*")}catch(e){}}document.addEventListener("DOMContentLoaded",_pt);addEventListener("load",_pt);setTimeout(_pt,1200);var _D=${isDirect ? "1" : "0"};var _OWS=window.WebSocket;var _WSP=(location.protocol==="https:"?"wss://":"ws://")+location.host+"/api/ws?url=";function _SWS(u,p){try{var s=String(u);if(/^wss?:/i.test(s)){var t=_WSP+encodeURIComponent(s)+(_D?"&direct=1":"");return p!==undefined?new _OWS(t,p):new _OWS(t)}}catch(e){}return p!==undefined?new _OWS(u,p):new _OWS(u)}try{_SWS.prototype=_OWS.prototype;_SWS.CONNECTING=0;_SWS.OPEN=1;_SWS.CLOSING=2;_SWS.CLOSED=3;window.WebSocket=_SWS}catch(e){}var _rtc=function(){throw new Error("WebRTC blocked by SecurityOS privacy proxy (would leak your real IP, bypassing Tor)")};try{window.RTCPeerConnection=_rtc;window.webkitRTCPeerConnection=_rtc;window.mozRTCPeerConnection=_rtc;window.RTCDataChannel=_rtc;if(navigator.mediaDevices){navigator.mediaDevices.getUserMedia=function(){return Promise.reject(new Error("blocked"))}}}catch(e){}var _MEM=function(){var d={};var o={getItem:function(k){return Object.prototype.hasOwnProperty.call(d,k)?d[k]:null},setItem:function(k,v){d[k]=String(v)},removeItem:function(k){delete d[k]},clear:function(){for(var k in d){delete d[k]}},key:function(i){return Object.keys(d)[i]||null}};try{Object.defineProperty(o,"length",{get:function(){return Object.keys(d).length}})}catch(e){}return o};function _shimStore(n){try{void window[n].length}catch(e){try{Object.defineProperty(window,n,{configurable:true,value:_MEM()})}catch(e2){}}}_shimStore("localStorage");_shimStore("sessionStorage");${
     isApp
-      ? 'function _idbShim(){var S={};function dsl(a){a.contains=function(x){return a.indexOf(x)>-1};a.item=function(i){return a[i]};return a}function rq(v){return{result:v,error:null,onsuccess:null,onerror:null,onupgradeneeded:null,readyState:"pending",addEventListener:function(t,f){this["on"+t]=f},removeEventListener:function(){}}}function done(r,e){setTimeout(function(){r.readyState="done";var h=r["on"+e];if(h){try{h.call(r,{target:r,type:e})}catch(x){}}},0);return r}function res(v){return done(rq(v),"success")}function idx(){return{get:function(){return res(undefined)},getAll:function(){return res([])},getAllKeys:function(){return res([])},count:function(){return res(0)},openCursor:function(){return res(null)},openKeyCursor:function(){return res(null)}}}function st(n){if(!S[n])S[n]=new Map();var m=S[n];var s={name:n,keyPath:null,autoIncrement:false,indexNames:dsl([]),get:function(k){return res(m.has(k)?m.get(k):undefined)},getAll:function(){return res(Array.from(m.values()))},getAllKeys:function(){return res(Array.from(m.keys()))},put:function(v,k){var key=k!==undefined?k:v&&v.key;m.set(key,v);return res(key)},add:function(v,k){var key=k!==undefined?k:v&&v.key;m.set(key,v);return res(key)},delete:function(k){m.delete(k);return res(undefined)},clear:function(){m.clear();return res(undefined)},count:function(){return res(m.size)},openCursor:function(){return res(null)},openKeyCursor:function(){return res(null)},index:function(){return idx()},createIndex:function(){return idx()},deleteIndex:function(){}};return s}function tx(){var t={objectStore:function(n){return st(n)},abort:function(){},oncomplete:null,onerror:null,onabort:null,addEventListener:function(e,f){this["on"+e]=f},removeEventListener:function(){}};setTimeout(function(){if(t.oncomplete){try{t.oncomplete({target:t,type:"complete"})}catch(x){}}},0);return t}function db(n){var d={name:n,version:1,objectStoreNames:dsl(Object.keys(S)),createObjectStore:function(nm){var s=st(nm);d.objectStoreNames=dsl(Object.keys(S));return s},deleteObjectStore:function(nm){delete S[nm];d.objectStoreNames=dsl(Object.keys(S))},transaction:function(){return tx()},close:function(){},addEventListener:function(){},removeEventListener:function(){},onversionchange:null,onerror:null,onabort:null,onclose:null};return d}var F={open:function(n,v){var r=rq(null);setTimeout(function(){var d=db(n);r.result=d;if(r.onupgradeneeded){r.transaction=tx();try{r.onupgradeneeded({target:r,type:"upgradeneeded",oldVersion:0,newVersion:v||1})}catch(x){}}r.readyState="done";if(r.onsuccess){try{r.onsuccess({target:r,type:"success"})}catch(x){}}},0);return r},deleteDatabase:function(){return res(undefined)},databases:function(){return Promise.resolve([])},cmp:function(a,b){return a<b?-1:a>b?1:0}};try{Object.defineProperty(window,"indexedDB",{configurable:true,value:F})}catch(x){try{window.indexedDB=F}catch(y){}}var KR={bound:function(){return{}},lowerBound:function(){return{}},upperBound:function(){return{}},only:function(){return{}}};try{if(!window.IDBKeyRange)window.IDBKeyRange=KR}catch(x){}try{console.warn("SecurityOS: in-memory IndexedDB shim active (amnesic) - non-persistent in this sandbox.")}catch(x){}}try{var _ni=false;try{if(!window.indexedDB)_ni=true;else void window.indexedDB.cmp}catch(x){_ni=true}if(_ni)_idbShim()}catch(x){}'
+      ? 'try{try{void navigator.serviceWorker}catch(e){try{Object.defineProperty(navigator,"serviceWorker",{configurable:true,value:{controller:null,oncontrollerchange:null,onmessage:null,ready:new Promise(function(){}),register:function(){return Promise.reject(new Error("SecurityOS: service workers are disabled in the privacy sandbox"))},getRegistration:function(){return Promise.resolve(undefined)},getRegistrations:function(){return Promise.resolve([])},startMessages:function(){},addEventListener:function(){},removeEventListener:function(){}}})}catch(e2){}}}catch(x){}try{try{void window.caches}catch(e){try{var _nc={match:function(){return Promise.resolve(undefined)},add:function(){return Promise.resolve()},addAll:function(){return Promise.resolve()},put:function(){return Promise.resolve()},"delete":function(){return Promise.resolve(false)},keys:function(){return Promise.resolve([])}};Object.defineProperty(window,"caches",{configurable:true,value:{open:function(){return Promise.resolve(_nc)},match:function(){return Promise.resolve(undefined)},has:function(){return Promise.resolve(false)},"delete":function(){return Promise.resolve(false)},keys:function(){return Promise.resolve([])}}})}catch(e2){}}}catch(x){}function _idbShim(){var S={};function dsl(a){a.contains=function(x){return a.indexOf(x)>-1};a.item=function(i){return a[i]};return a}function rq(v){return{result:v,error:null,onsuccess:null,onerror:null,onupgradeneeded:null,readyState:"pending",addEventListener:function(t,f){this["on"+t]=f},removeEventListener:function(){}}}function done(r,e){setTimeout(function(){r.readyState="done";var h=r["on"+e];if(h){try{h.call(r,{target:r,type:e})}catch(x){}}},0);return r}function res(v){return done(rq(v),"success")}function idx(){return{get:function(){return res(undefined)},getAll:function(){return res([])},getAllKeys:function(){return res([])},count:function(){return res(0)},openCursor:function(){return res(null)},openKeyCursor:function(){return res(null)}}}function st(n){if(!S[n])S[n]=new Map();var m=S[n];var s={name:n,keyPath:null,autoIncrement:false,indexNames:dsl([]),get:function(k){return res(m.has(k)?m.get(k):undefined)},getAll:function(){return res(Array.from(m.values()))},getAllKeys:function(){return res(Array.from(m.keys()))},put:function(v,k){var key=k!==undefined?k:v&&v.key;m.set(key,v);return res(key)},add:function(v,k){var key=k!==undefined?k:v&&v.key;m.set(key,v);return res(key)},delete:function(k){m.delete(k);return res(undefined)},clear:function(){m.clear();return res(undefined)},count:function(){return res(m.size)},openCursor:function(){return res(null)},openKeyCursor:function(){return res(null)},index:function(){return idx()},createIndex:function(){return idx()},deleteIndex:function(){}};return s}function tx(){var t={objectStore:function(n){return st(n)},abort:function(){},oncomplete:null,onerror:null,onabort:null,addEventListener:function(e,f){this["on"+e]=f},removeEventListener:function(){}};setTimeout(function(){if(t.oncomplete){try{t.oncomplete({target:t,type:"complete"})}catch(x){}}},0);return t}function db(n){var d={name:n,version:1,objectStoreNames:dsl(Object.keys(S)),createObjectStore:function(nm){var s=st(nm);d.objectStoreNames=dsl(Object.keys(S));return s},deleteObjectStore:function(nm){delete S[nm];d.objectStoreNames=dsl(Object.keys(S))},transaction:function(){return tx()},close:function(){},addEventListener:function(){},removeEventListener:function(){},onversionchange:null,onerror:null,onabort:null,onclose:null};return d}var F={open:function(n,v){var r=rq(null);setTimeout(function(){var d=db(n);r.result=d;if(r.onupgradeneeded){r.transaction=tx();try{r.onupgradeneeded({target:r,type:"upgradeneeded",oldVersion:0,newVersion:v||1})}catch(x){}}r.readyState="done";if(r.onsuccess){try{r.onsuccess({target:r,type:"success"})}catch(x){}}},0);return r},deleteDatabase:function(){return res(undefined)},databases:function(){return Promise.resolve([])},cmp:function(a,b){return a<b?-1:a>b?1:0}};try{Object.defineProperty(window,"indexedDB",{configurable:true,value:F})}catch(x){try{window.indexedDB=F}catch(y){}}var KR={bound:function(){return{}},lowerBound:function(){return{}},upperBound:function(){return{}},only:function(){return{}}};try{if(!window.IDBKeyRange)window.IDBKeyRange=KR}catch(x){}try{console.warn("SecurityOS: in-memory IndexedDB shim active (amnesic) - non-persistent in this sandbox.")}catch(x){}}try{var _ni=false;try{if(!window.indexedDB)_ni=true;else void window.indexedDB.cmp}catch(x){_ni=true}if(_ni)_idbShim()}catch(x){}'
       : ""
   }}catch(e){}})();</script>`;
 
@@ -1471,8 +1500,13 @@ const handler = async (
     if (/\b(text\/html|application\/xhtml\+xml)\b/i.test(contentType)) {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       // Same-origin CSP so anything the rewriter missed still can't reach a remote
-      // host (no-JS also gets script-src 'none'; the iframe drops allow-scripts).
-      res.setHeader("Content-Security-Policy", proxiedCsp(noJs));
+      // host (no-JS also gets script-src 'none'; the iframe drops allow-scripts). In
+      // &app=1 mode we also pin frame/worker-src to our concrete origin so a
+      // dynamically-injected cross-origin subframe fails closed instead of leaking.
+      res.setHeader(
+        "Content-Security-Policy",
+        proxiedCsp(noJs, isApp, ourOrigin(req))
+      );
       res.end(
         rewriteHtml(
           body.toString("utf8"),
@@ -1503,7 +1537,7 @@ const handler = async (
       // scoped to a full (200, non-Range) success so partial/seekable media, HTML and
       // anything credentialed keep the no-store default set above.
       const isCacheableType =
-        /^(?:image\/|font\/|text\/css\b|application\/javascript\b)/i.test(
+        /^(?:image\/|font\/|text\/css\b|text\/javascript\b|application\/(?:javascript|x-javascript|ecmascript|wasm)\b)/i.test(
           contentType
         );
 
