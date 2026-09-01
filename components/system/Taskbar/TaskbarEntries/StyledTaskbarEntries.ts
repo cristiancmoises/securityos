@@ -5,8 +5,7 @@ const StyledTaskbarEntries = styled.ol`
   display: flex;
   height: 100%;
 
-  /* Windows 11 centers its taskbar icons — Undercover does too; everything else
-     stays left-aligned. */
+  /* Undercover centers its taskbar icons; every other theme stays left-aligned. */
   justify-content: ${({ theme }) =>
     theme.name === "Undercover" ? "center" : "flex-start"};
   left: ${({ theme }) => theme.sizes.startButton.width};
@@ -16,7 +15,7 @@ const StyledTaskbarEntries = styled.ol`
   right: ${({ theme }) =>
     `calc(${theme.sizes.clock.width} + ${theme.sizes.volume.width})`};
 
-  /* Win11 gives each taskbar button a softly rounded hover/active pill. The
+  /* Undercover gives each taskbar button a softly rounded hover/active pill. The
      per-entry highlight is a ::before on the child <li> (StyledTaskbarEntry);
      reach into it from here so Undercover rounds the corners. Default (Emacs)
      keeps its square, full-height fill untouched. */

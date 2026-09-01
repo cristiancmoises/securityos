@@ -76,7 +76,7 @@ const RecoveryScreen: FC = () => {
         display: "flex",
         flexDirection: "column",
         fontFamily:
-          "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
+          "system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif",
         height: "100vh",
         justifyContent: "center",
         left: 0,

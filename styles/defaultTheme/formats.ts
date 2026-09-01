@@ -5,7 +5,7 @@ const formats = {
     minute: "2-digit",
   } as Intl.DateTimeFormatOptions,
   // Emacs look: the WHOLE UI is monospace (JetBrains Mono, self-hosted). The
-  // Undercover (Windows 11) theme overrides these back to a Segoe UI sans stack.
+  // Undercover overrides these with a neutral system sans stack.
   systemFont:
     "'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace",
   // Mode-line / display text — also monospace for the Emacs aesthetic.

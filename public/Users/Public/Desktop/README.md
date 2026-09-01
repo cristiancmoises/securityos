@@ -1,7 +1,7 @@
 # 🔐 Welcome to SecurityOS
 
 **A private, Tor-first, security-focused web operating system** — a full desktop
-that runs entirely in your browser. No install, no tracking, no logs.
+that runs entirely in your browser. No install and no app telemetry.
 
 > Double-click any app on the desktop or open the **Start menu**. New here? Read
 > the **SecurityOS Handbook** in *Documents*.
@@ -12,12 +12,23 @@ that runs entirely in your browser. No install, no tracking, no logs.
 
 - 🧅 **Tor by default.** The **Tor Browser** app routes every site through Tor
   (SOCKS5h), loads `.onion` services, and runs with **JavaScript off by default**
-  ("Safest"). A built-in proxy even unblocks sites that normally refuse to embed.
+  ("Safest"). Tabs have independent circuits, real stop/reload/home controls, and
+  a built-in proxy that can render many sites that normally refuse to embed.
+- 🌐 **Full clearnet browsing.** **Clearnet Browser** starts at and searches through
+  `securityops.co`, enables all scripts by default, and exposes a clearly marked
+  native-window fallback for sites that need capabilities unavailable in the
+  SecurityOS sandbox. It is direct and **not anonymous**.
 - 🛡️ **Hardened & audited.** Strict Content-Security-Policy, no `unsafe-eval`,
   locked-down `Permissions-Policy`, `no-referrer`, anti-clickjacking, and a
   privacy proxy with an SSRF guard + response-header allowlist — adversarially
   reviewed.
-- 🤫 **No logs, no telemetry.** Nothing you browse or type is recorded. Hitting
+- 🎟️ **Scoped network access.** Sandboxed apps receive short-lived capabilities
+  bound to one app, route, isolation session, and script policy. A Tor token cannot
+  be reused for direct access or another app. Public operators should still put
+  SecurityOS behind authentication and keep capability-bearing URLs out of access
+  logs.
+- 🤫 **No app telemetry.** SecurityOS does not add browsing-history or analytics
+  logging. The hosting provider's reverse-proxy policy is separate. Hitting
   **Shutdown** securely **overwrites your session with random data** before wiping.
 - 🔒 **Real encryption, built in.** Encrypt/decrypt files & folders with
   **AES-256-GCM** straight from the **Terminal** (`encrypt <file> <password>`).
@@ -29,30 +40,32 @@ that runs entirely in your browser. No install, no tracking, no logs.
   decrypts encrypted rooms, joins federated rooms, and keeps your keys **in memory
   only** (amnesic). **Keywave** offers a Tor-safe landing/control view and an explicit
   direct full client for end-to-end-encrypted text and video calls.
-- 🟢 **Private messaging.** **Session** stays on the desktop; WhatsApp and Telegram
-  remain available from the Start menu. Their official clients need a real window;
-  use Tor Browser or Tails for anonymous access.
+- 🧹 **Cleaner app catalog.** **WhatsApp**, **Telegram**, **Session**, and
+  **CryptPad** have been completely removed. They have no desktop or Start-menu
+  launchers and no supported in-OS launch path.
 - 🔎 **Instant search.** Open the **Start menu** and just start typing — it searches
   every app and file and launches the match (Enter opens the top hit).
-- 📁 **ZUPT compression and encryption.** **VaptVupt** supports key generation,
+- 📁 **Zupt compression and encryption.** **Zupt** supports key generation,
   uploads and downloads with an explicit **Tor** or **Clearnet** route. Tor is the
   fail-closed default; Clearnet and the native full-client fallback are visibly
   marked as not anonymous. Web operations run on the ZUPT server (which receives
-  uploaded plaintext/passwords/keys); use local Vaptvupt for on-device-only secrets.
-- 🔐 **Encrypted office suite, over Tor.** **CryptPad** (`office.securityops.co` —
-  docs, sheets, code, drive) runs **inside the OS over Tor**, with real-time
-  collaboration carried by a built-in WebSocket tunnel; upload/download in the window.
+  uploaded plaintext/passwords/keys); use the local Vaptvupt engine for
+  on-device-only secrets.
+- 👁️ **First-party routed apps.** **GODS EYE**, **IRC**, and **Wiki** display
+  `eye.securityops.co`, `irc.securityops.com.br`, and `wiki.securityops.co`. Each
+  has the same explicit **Tor / Clearnet** switch as Zupt. IRC/GODS EYE Tor views
+  are best-effort; their Clearnet views connect natively to the service origin and
+  are direct/not anonymous.
 - 📝 **A real Emacs, in the browser.** **Cloudmacs** runs a full Spacemacs (with
-  org-mode, eww, **telega** for Telegram, and **whatsappel** for WhatsApp) — and
-  shows up in *Open with* for text/code.
+  org-mode and eww) — and shows up in *Open with* for text/code.
 - ⏺️ **Capture your screen.** **Screen Capture** records or screenshots everything
   on screen (countdown, mic + system audio, quality/format presets) with an
   optional **webcam overlay** and fun effect themes (Matrix rain, sepia, blur…).
 - 🧩 **Make it yours.** Draggable **desktop widgets** (clock, weather, RSS news over
   Tor, calendar, memory gauge, sticky note), a **lock screen** with an optional PIN
   and idle auto-lock, **internet Radio**, bundled music + the **Webamp** player,
-  and an **Undercover mode** that makes the desktop look like Windows 11 for
-  blending in.
+  and a polished **Undercover mode** with a familiar enterprise-workspace layout,
+  neutral SecurityOS branding, and no proprietary names, logos, or artwork.
 - 🖥️ **A genuine desktop.** Files, windows, a UNIX-like Terminal (50+ commands),
   editors, media, emulators, and more.
 
@@ -63,12 +76,11 @@ that runs entirely in your browser. No install, no tracking, no logs.
 | Find & launch any app | **Start menu** → start typing |
 | Browse anonymously | **Tor Browser** (Start menu) |
 | Browse public sites (not anonymous) | **Clearnet Browser** |
-| Open the observability dashboard | **GODS EYE** |
-| Join SecurityOps IRC over Tor | **IRC** |
+| Open the observability dashboard | **GODS EYE** (Tor / Clearnet selector) |
+| Join SecurityOps IRC | **IRC** (Tor / Clearnet selector) |
+| Read the SecurityOps knowledge base | **Wiki** (Tor / Clearnet selector) |
 | Chat end-to-end encrypted (over Tor) | **Matrix** |
-| Message privately | **Session** (desktop) · WhatsApp / Telegram (Start menu) |
-| Compress, encrypt or recover files | **VaptVupt** (Tor / Clearnet selector) |
-| Edit docs/sheets (encrypted, over Tor) | **CryptPad** |
+| Compress, encrypt or recover files | **Zupt** (Tor / Clearnet selector) |
 | Encrypted video chat | **Keywave** (full client is direct, not anonymous) |
 | Listen to internet radio | **Radio** |
 | Edit code/text in real Emacs | **Cloudmacs** |

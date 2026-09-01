@@ -4,6 +4,7 @@ import { useProcesses } from "contexts/process";
 import { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
 import { SANDBOXED_IFRAME_CONFIG } from "utils/constants";
+import useProxyCapability from "utils/useProxyCapability";
 
 // Keywave requires an own-origin, top-level browsing context for its complete
 // camera/microphone + WebRTC client. The live service deliberately sends
@@ -288,9 +289,18 @@ const Keywave: FC<ComponentProcessProps> = ({ id }) => {
   const slowTimer = useRef<ReturnType<typeof setTimeout>>();
   const roomFragment = getRoomFragment(process?.url);
   const clearnetTarget = `${KEYWAVE_URL}${roomFragment}`;
-  const torSrc = `${PROXY_PATH}${encodeURIComponent(
-    KEYWAVE_URL
-  )}&keywave=1&iso=${iso}${roomFragment}`;
+  const {
+    capability: routeCapability,
+    error: capabilityError,
+    retry: retryCapability,
+  } = useProxyCapability("tor", "keywave", iso);
+  const torSrc = routeCapability
+    ? `${PROXY_PATH}${encodeURIComponent(
+        KEYWAVE_URL
+      )}&keywave=1&profile=keywave&iso=${iso}&cap=${encodeURIComponent(
+        routeCapability
+      )}${roomFragment}`
+    : "";
 
   useEffect(() => {
     setSlow(false);
@@ -343,21 +353,35 @@ const Keywave: FC<ComponentProcessProps> = ({ id }) => {
             key={reloadKey}
             allow="clipboard-read; clipboard-write; fullscreen"
             onLoad={() => setLoading(false)}
-            src={torSrc}
+            src={torSrc || undefined}
             title={`${id} Tor landing/control view`}
             {...SANDBOXED_IFRAME_CONFIG}
           />
           {loading && (
             <div className={`notice${slow ? "" : " pass"}`}>
               <span className="spinner" />
-              <span>Connecting to Keywave signaling over Tor…</span>
-              {slow && (
+              <span>
+                {routeCapability
+                  ? "Connecting to Keywave signaling over Tor…"
+                  : "Authorizing the Tor route…"}
+              </span>
+              {capabilityError ? (
+                <div className="actions">
+                  <button
+                    className="action"
+                    onClick={retryCapability}
+                    type="button"
+                  >
+                    Retry route authorization
+                  </button>
+                </div>
+              ) : slow ? (
                 <div className="actions">
                   <button className="action" onClick={reloadTor} type="button">
                     New Tor circuit
                   </button>
                 </div>
-              )}
+              ) : undefined}
             </div>
           )}
         </div>

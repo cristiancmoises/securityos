@@ -3,8 +3,8 @@ import styled from "styled-components";
 /**
  * KDE Plasma "Kickoff" leave/power footer row: a thin strip pinned to the bottom of
  * the launcher, separated from the app list by an accent.edge top border. Token-driven
- * (titleBar.background / accent.edge / text / highlight) so the Undercover (Windows 11
- * light) theme recolors it. The "Restart session" action mirrors the existing sidebar
+ * (titleBar.background / accent.edge / text / highlight) so the light Undercover
+ * theme recolors it. The "Restart session" action mirrors the existing sidebar
  * Power button so the row is functional rather than purely decorative.
  */
 const StyledKickoffFooter = styled.div`

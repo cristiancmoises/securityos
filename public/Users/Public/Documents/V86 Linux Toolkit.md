@@ -5,11 +5,12 @@ usable security lab and route it through Tor.
 
 ## Boot a VM
 Open an `.img` / `.iso` Linux disk image with the V86 app. Your changes are saved
-as a state snapshot on close, so setup persists. **Networking is off by default**
-— enable it in the **Tor Control** app (then reboot the VM).
+as a state snapshot on close, so setup persists. The local Tor relay is selected
+by default and the VM stays offline if its bridge is unavailable. Change the
+route in **Tor Control**, then reboot the VM.
 
 ## Add tools — install inside the VM (easiest)
-1. Boot Linux, open **Tor Control** → **Tor** (or **Clearnet**), reboot the VM.
+1. Start the local Tor bridge, keep **Tor Control** on **Tor**, and reboot the VM.
 2. Install over the network:
    - Alpine: `apk update && apk add nmap tcpdump curl bind-tools openssl jq git`
    - Debian: `apt-get update && apt-get install -y nmap tcpdump curl dnsutils john`

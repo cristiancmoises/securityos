@@ -2,15 +2,21 @@ import styled from "styled-components";
 
 type StyledBrowserProps = {
   $hasSrcDoc: boolean;
+  $hasTorPolicyWarning?: boolean;
 };
 
 const StyledBrowser = styled.div<StyledBrowserProps>`
   background-color: #000;
+  height: 100%;
+  position: relative;
 
   iframe {
     background-color: ${({ $hasSrcDoc }) => ($hasSrcDoc ? "#fff" : "#000")};
     border: 0;
-    height: calc(100% - 32px - 40px - 33px);
+    height: ${({ $hasTorPolicyWarning }) =>
+      `calc(100% - 32px - 40px - 33px - ${
+        $hasTorPolicyWarning ? "38px" : "0px"
+      })`};
     width: 100%;
   }
 
@@ -48,8 +54,10 @@ const StyledBrowser = styled.div<StyledBrowserProps>`
       color: #fff;
     }
     .tab .tab-select {
+      align-items: center;
       background-color: transparent;
       color: inherit;
+      display: inline-flex;
       flex: 1;
       font-size: 12px;
       letter-spacing: 0.1px;
@@ -59,6 +67,22 @@ const StyledBrowser = styled.div<StyledBrowserProps>`
       text-align: left;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .tab .tab-title {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tab .tab-spinner {
+      animation: browser-tab-spin 0.8s linear infinite;
+      border: 1.5px solid rgba(255, 255, 255, 30%);
+      border-radius: 50%;
+      border-top-color: #6ce5ff;
+      flex: 0 0 auto;
+      height: 10px;
+      margin-right: 5px;
+      width: 10px;
     }
     .tab .tab-close {
       align-items: center;
@@ -178,8 +202,20 @@ const StyledBrowser = styled.div<StyledBrowserProps>`
       border-color: rgba(225, 168, 92, 75%);
       color: #f0bd78;
     }
+    .native-window {
+      border: 1px solid rgba(225, 168, 92, 45%);
+      border-radius: 999px;
+      color: #f0bd78;
+      font-size: 10px;
+      gap: 4px;
+      padding: 0 8px;
+      white-space: nowrap;
+      width: auto;
+    }
   }
 
+  /* stylelint-disable no-descending-specificity -- Controls and bookmarks are
+     disjoint navigation regions with intentionally independent button states. */
   nav.bookmarks {
     align-items: center;
     background-color: #000;
@@ -225,6 +261,7 @@ const StyledBrowser = styled.div<StyledBrowserProps>`
       margin: 0 2px;
       width: 1px;
     }
+
     /* A saved user bookmark: name chip + a hover-revealed remove ×. */
     .bm-user {
       align-items: center;
@@ -249,6 +286,68 @@ const StyledBrowser = styled.div<StyledBrowserProps>`
     }
     .bm-user .bm-remove:hover {
       color: rgb(235, 120, 120);
+    }
+  }
+  /* stylelint-enable no-descending-specificity */
+
+  .tor-policy-warning {
+    align-items: center;
+    background: #25170a;
+    border-bottom: 1px solid rgba(240, 178, 82, 45%);
+    color: #f2c98d;
+    display: flex;
+    font-family: ${({ theme }) => theme.formats.systemFont};
+    font-size: 10.5px;
+    height: 38px;
+    line-height: 1.35;
+    padding: 4px 10px;
+  }
+
+  .tor-policy-warning button {
+    background: transparent;
+    border: 1px solid currentcolor;
+    border-radius: 4px;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    margin-left: 8px;
+    padding: 2px 8px;
+  }
+
+  .loading-track {
+    background-color: rgba(108, 229, 255, 14%);
+    height: 2px;
+    left: 0;
+    overflow: hidden;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
+    top: 103px;
+    z-index: 2;
+  }
+  .loading-track span {
+    animation: browser-loading 1.35s ease-in-out infinite;
+    background: linear-gradient(90deg, transparent, #6ce5ff, transparent);
+    display: block;
+    height: 100%;
+    width: 52%;
+  }
+
+  @keyframes browser-tab-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes browser-loading {
+    0% {
+      transform: translateX(-105%);
+    }
+    60% {
+      transform: translateX(95%);
+    }
+    100% {
+      transform: translateX(205%);
     }
   }
 `;

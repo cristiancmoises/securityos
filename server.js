@@ -2,32 +2,34 @@
 //
 // WHY: the HTTP privacy proxy (pages/api/proxy.ts) can fetch+rewrite a site over
 // Tor and render it sandboxed, but it CANNOT carry the WebSocket connections that
-// real-time web apps (CryptPad's collaborative engine, Telegram/WhatsApp Web) need.
-// This tunnel lets an embedded app's `wss://` connect THROUGH SecurityOS — over Tor
-// when TOR_PROXY is set (e.g. CryptPad/office.securityops.co), or direct when the
-// app blocks Tor exits (the messengers, which already carry a "not over Tor" badge).
+// real-time web apps (SecurityOps IRC and Keywave) need. This
+// tunnel lets an embedded app's `wss://` connect THROUGH SecurityOS — over Tor by
+// default, or direct only when an app explicitly selects its labelled direct mode.
 //
-// SAFETY: everything except the /api/ws upgrade is handled by Next exactly as
-// `next start` would. The WS bits are wrapped so that if the `ws`/`socks-proxy-agent`
+// SAFETY: everything except the /api/ws upgrade is delegated to Next's request
+// handler. The WS bits are wrapped so that if the `ws`/`socks-proxy-agent`
 // modules are missing the server STILL boots and serves the OS (the tunnel is simply
 // unavailable) — a WS dependency hiccup must never take the whole desktop down.
 
 const { createServer } = require("http");
 const { parse } = require("url");
 const next = require("next");
+const { readProxyCapability } = require("./utils/proxyCapability");
 
 const port = Number(process.env.PORT) || 3000;
 const hostname = process.env.HOSTNAME || "0.0.0.0";
 const TOR_PROXY = process.env.TOR_PROXY || "";
-const KEYWAVE_CLEARNET_HOST = "chat.securityops.co";
 // Match the HTTP and Matrix proxy ceilings. Cold, stream-isolated Tor circuits
 // can legitimately take more than 30 seconds to establish; aborting the SOCKS or
 // WebSocket handshake earlier made otherwise healthy Keywave/IRC realtime routes
 // fail while their HTTP landing pages succeeded.
 const WS_CONNECT_TIMEOUT_MS = 120_000;
 const MAX_WS_ISO_AGENTS = 256;
-const MAX_WS_QUEUE_BYTES = 8 * 1024 * 1024;
-const MAX_WS_QUEUE_MESSAGES = 256;
+const MAX_WS_QUEUE_BYTES = 2 * 1024 * 1024;
+const MAX_WS_QUEUE_MESSAGES = 128;
+const MAX_WS_PAYLOAD_BYTES = 8 * 1024 * 1024;
+const MAX_WS_CONNECTIONS = 128;
+const MAX_WS_CONNECTIONS_PER_CLIENT = 12;
 const WS_AGENT_OPTS = {
   keepAlive: true,
   maxSockets: 64,
@@ -56,6 +58,32 @@ try {
   socksAgent = undefined;
 }
 const wsIsoAgents = new Map();
+const wsConnectionsByClient = new Map();
+let activeWsConnections = 0;
+
+const reserveWsConnection = (clientKey) => {
+  const current = wsConnectionsByClient.get(clientKey) || 0;
+
+  if (
+    activeWsConnections >= MAX_WS_CONNECTIONS ||
+    current >= MAX_WS_CONNECTIONS_PER_CLIENT
+  ) {
+    return false;
+  }
+
+  activeWsConnections += 1;
+  wsConnectionsByClient.set(clientKey, current + 1);
+
+  return true;
+};
+
+const releaseWsConnection = (clientKey) => {
+  const current = wsConnectionsByClient.get(clientKey) || 0;
+
+  if (current <= 1) wsConnectionsByClient.delete(clientKey);
+  else wsConnectionsByClient.set(clientKey, current - 1);
+  activeWsConnections = Math.max(0, activeWsConnections - 1);
+};
 
 const sanitizeIsoToken = (raw) =>
   typeof raw === "string" && /^[\da-f]{32}$/.test(raw) ? raw : "";
@@ -97,40 +125,31 @@ const agentForIso = (iso) => {
 // only. This is the WS analogue of the HTTP proxy's SSRF allowlist: it stops the
 // tunnel from being abused as an open WebSocket relay to arbitrary/internal hosts.
 const WS_ALLOW = [
-  /(^|\.)securityops\.co$/i, // office.securityops.co (CryptPad) + first-party
-  // office.securityops.co 301-redirects to the public CryptPad (pad.envs.net), so
-  // CryptPad's realtime WebSocket targets that host after the redirect. Anchored
-  // suffix match (NOT a loose substring) so it can't match pad.envs.net.evil.com.
-  /(^|\.)envs\.net$/i,
-  /(^|\.)whatsapp\.com$/i,
-  /(^|\.)whatsapp\.net$/i,
-  /(^|\.)telegram\.org$/i,
-  /(^|\.)t\.me$/i,
-  /(^|\.)web\.telegram\.org$/i,
-  // The IRC app tunnels IRC-over-WebSocket to Libera.Chat's KiwiIRC gateway
-  // (web.libera.chat/webirc/websocket/). Anchored suffix covers web./irc.libera.chat.
-  /(^|\.)libera\.chat$/i,
+  /(^|\.)securityops\.co$/i, // First-party .co services.
   // First-party IRC-over-WebSocket gateway used by the SecurityOps IRC app.
   /^irc\.securityops\.com\.br$/i,
 ];
 
 const hostAllowed = (host) => WS_ALLOW.some((re) => re.test(host));
 
-// Keywave only needs Engine.IO v4's WebSocket transport at the canonical
-// Socket.IO path. Its direct full client connects to chat.securityops.co itself;
-// this same-origin tunnel is Tor-only and must never honor `direct=1`.
-const keywaveRouteAllowed = (url, direct) => {
+const isEngineIoWebSocket = (url) =>
+  url.pathname === "/socket.io/" &&
+  url.searchParams.get("EIO") === "4" &&
+  url.searchParams.get("transport") === "websocket";
+
+const wsTargetAllowed = (url, profile, direct) => {
   const host = url.hostname.toLowerCase();
 
-  if (host !== KEYWAVE_CLEARNET_HOST) return true;
-
-  return (
-    !direct &&
-    url.protocol === "wss:" &&
-    url.pathname === "/socket.io/" &&
-    url.searchParams.get("EIO") === "4" &&
-    url.searchParams.get("transport") === "websocket"
-  );
+  if (profile === "browser") return hostAllowed(host);
+  if (profile === "irc") {
+    return host === "irc.securityops.com.br" && isEngineIoWebSocket(url);
+  }
+  if (profile === "keywave") {
+    return (
+      !direct && host === "chat.securityops.co" && isEngineIoWebSocket(url)
+    );
+  }
+  return false;
 };
 
 const app = next({ dev: false });
@@ -146,7 +165,7 @@ app
     if (WebSocketServer && WebSocket) {
       const wss = new WebSocketServer({
         noServer: true,
-        maxPayload: 64 * 1024 * 1024,
+        maxPayload: MAX_WS_PAYLOAD_BYTES,
       });
 
       server.on("upgrade", (req, clientSocket, head) => {
@@ -164,24 +183,21 @@ app
 
           const raw = reqUrl.searchParams.get("url") || "";
           direct = reqUrl.searchParams.get("direct") === "1";
+          const capability = reqUrl.searchParams.get("cap") || "";
           const iso = sanitizeIsoToken(reqUrl.searchParams.get("iso"));
+          const profile = reqUrl.searchParams.get("profile") || "";
           const u = new URL(raw);
+          const route = direct ? "direct" : "tor";
+          const claims = readProxyCapability(capability);
 
           if (
-            (u.protocol !== "wss:" && u.protocol !== "ws:") ||
-            !hostAllowed(u.hostname) ||
-            !keywaveRouteAllowed(u, direct)
-          ) {
-            clientSocket.destroy();
-
-            return;
-          }
-          // The first-party IRC integration is The Lounge/Socket.IO. Narrow this
-          // host to its TLS Engine.IO endpoint so the generic tunnel cannot reach
-          // unrelated paths or downgrade it to plaintext WebSocket.
-          if (
-            u.hostname.toLowerCase() === "irc.securityops.com.br" &&
-            (u.protocol !== "wss:" || u.pathname !== "/socket.io/")
+            u.protocol !== "wss:" ||
+            u.port !== "" ||
+            !claims ||
+            claims.route !== route ||
+            claims.profile !== profile ||
+            claims.iso !== iso ||
+            !wsTargetAllowed(u, profile, direct)
           ) {
             clientSocket.destroy();
 
@@ -191,7 +207,8 @@ app
           // (TOR_PROXY set) but the SOCKS agent didn't build (missing socks-proxy-agent
           // module, or a malformed TOR_PROXY), NEVER open a non-direct tunnel — it
           // would connect over a direct clearnet socket and leak the real IP while the
-          // user believes they're on Tor. direct=1 (Tor-blocked messengers) is exempt.
+          // user believes they're on Tor. An explicitly capability-authorized
+          // direct browser route is exempt.
           upstreamAgent = direct ? undefined : agentForIso(iso);
           if (!direct && !upstreamAgent) {
             clientSocket.destroy();
@@ -205,7 +222,25 @@ app
           return;
         }
 
+        const clientKey = req.socket.remoteAddress || "unknown";
+
+        if (!reserveWsConnection(clientKey)) {
+          clientSocket.destroy();
+
+          return;
+        }
+
+        let reservationReleased = false;
+        const releaseReservation = () => {
+          if (reservationReleased) return;
+          reservationReleased = true;
+          releaseWsConnection(clientKey);
+        };
+
+        clientSocket.once("close", releaseReservation);
+
         wss.handleUpgrade(req, clientSocket, head, (client) => {
+          client.once("close", releaseReservation);
           const protocols = (req.headers["sec-websocket-protocol"] || "")
             .split(",")
             .map((s) => s.trim())
@@ -214,7 +249,7 @@ app
           let upstream;
           try {
             upstream = new WebSocket(target, protocols, {
-              // Tor by default; direct only when the embed opts in (Tor-blocked apps).
+              // Tor by default; direct only with an explicitly scoped capability.
               agent: upstreamAgent,
               // Redirects could leave the validated host allowlist. A client must
               // reconnect to an explicitly validated target instead.
@@ -227,7 +262,7 @@ app
                 Origin: new URL(target).origin.replace(/^ws/, "http"),
                 "User-Agent": req.headers["user-agent"] || "",
               },
-              maxPayload: 64 * 1024 * 1024,
+              maxPayload: MAX_WS_PAYLOAD_BYTES,
             });
           } catch {
             try {
@@ -256,6 +291,11 @@ app
 
           client.on("message", (data, isBinary) => {
             if (upstream.readyState === WebSocket.OPEN) {
+              if (upstream.bufferedAmount > MAX_WS_QUEUE_BYTES) {
+                closeBoth();
+
+                return;
+              }
               upstream.send(data, { binary: isBinary });
             } else if (upstream.readyState === WebSocket.CONNECTING) {
               const dataBytes = Array.isArray(data)
@@ -284,6 +324,11 @@ app
           });
           upstream.on("message", (data, isBinary) => {
             if (client.readyState === WebSocket.OPEN) {
+              if (client.bufferedAmount > MAX_WS_QUEUE_BYTES) {
+                closeBoth();
+
+                return;
+              }
               client.send(data, { binary: isBinary });
             }
           });

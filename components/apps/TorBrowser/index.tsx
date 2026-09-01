@@ -1,5 +1,20 @@
-import { PROXY_PATH } from "components/apps/Browser/config";
-import { Arrow, Refresh, Stop } from "components/apps/Browser/NavigationIcons";
+import {
+  CLEARNET_BOOKMARKS,
+  CLEARNET_HOME,
+  CLEARNET_ONION_BLOCKED_PAGE,
+  CLEARNET_SEARCH_QUERY,
+  DEFAULT_CLEARNET_JS_MODE,
+  DEFAULT_TOR_JS_MODE,
+  isOnionUrl,
+  PROXY_PATH,
+} from "components/apps/Browser/config";
+import {
+  Arrow,
+  ExternalLink,
+  Home,
+  Refresh,
+  Stop,
+} from "components/apps/Browser/NavigationIcons";
 import StyledBrowser from "components/apps/Browser/StyledBrowser";
 import type { ComponentProcessProps } from "components/system/Apps/RenderComponent";
 import useTitle from "components/system/Window/useTitle";
@@ -11,6 +26,7 @@ import {
   SANDBOXED_IFRAME_CONFIG,
 } from "utils/constants";
 import { getUrlOrSearch, label, updateBrowserHistory } from "utils/functions";
+import { fetchProxyCapability } from "utils/useProxyCapability";
 
 // The Tor Browser start page: Torch, the long-running darknet search engine.
 // It needs no JavaScript, so it renders in the JS-disabled "Safest" sandbox. If it
@@ -22,9 +38,6 @@ const TOR_HOME =
 // Address-bar search → Torch's own search (GET /search?query=).
 const TOR_SEARCH_QUERY =
   "http://torchdeedp3i2jigzjdmfpn5ttjhthh5wbmda2rr3jvqjg5p77c54dqd.onion/search?query=";
-
-const CLEARNET_HOME = "https://search.brave.com/";
-const CLEARNET_SEARCH_QUERY = "https://search.brave.com/search?q=";
 
 // Bookmarks. "Search" is the home onion above; the rest are the operator's .onion
 // hidden services — they resolve only while their listeners are running (otherwise
@@ -76,21 +89,6 @@ const TOR_BOOKMARKS: { name: string; url: string }[] = [
   },
 ];
 
-// First-party public services, available in the separate clearnet browser.  Keep
-// this list deliberately explicit so opening the browser never leaks an onion
-// address into a non-Tor request.
-const CLEARNET_BOOKMARKS: { name: string; url: string }[] = [
-  { name: "SecurityOps", url: "https://securityops.com.br/" },
-  { name: "SecurityOps .co", url: "https://securityops.co/" },
-  { name: "SecurityOS", url: "https://os.securityops.co/" },
-  { name: "GODS EYE", url: "https://eye.securityops.co/" },
-  { name: "SecurityOps IRC", url: "https://irc.securityops.com.br/" },
-  { name: "CryptPad", url: "https://office.securityops.co/" },
-  { name: "Keywave", url: "https://chat.securityops.co/" },
-  { name: "Wiki", url: "https://wiki.securityops.co/" },
-  { name: "Git .co", url: "https://git.securityops.co/" },
-  { name: "Git .com.br", url: "https://git.securityops.com.br/" },
-];
 const KEYWAVE_ORIGIN = "https://chat.securityops.co";
 const ZUPT_WEB_ORIGIN = "https://share.securityops.co";
 
@@ -176,33 +174,37 @@ const newIsoToken = (): string => {
 
   crypto.getRandomValues(bytes);
 
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
 };
 
 type Tab = {
-  key: number;
   address: string;
-  src: string;
-  syncPending: boolean;
-  title: string;
   history: string[];
-  position: number;
-  loading: boolean;
   // Per-tab isolation token: selects a Tor circuit in Tor mode and separates the
   // exact-origin ZUPT CSRF jar in either route. Stable across tab navigation.
   iso: string;
+  key: number;
+  loading: boolean;
+  position: number;
+  // Forces a genuine iframe navigation even when reloading the same URL. React
+  // otherwise sees an unchanged `src` prop and the reload button becomes inert.
+  revision: number;
+  src: string;
+  syncPending: boolean;
+  title: string;
 };
 
 const blankTab = (key: number, address: string, iso?: string): Tab => ({
-  key,
   address,
+  history: address ? [address] : [],
+  iso: iso ?? newIsoToken(),
+  key,
+  loading: false,
+  position: address ? 0 : -1,
+  revision: 0,
   src: "",
   syncPending: false,
   title: "",
-  history: address ? [address] : [],
-  position: address ? 0 : -1,
-  loading: false,
-  iso: iso ?? newIsoToken(),
 });
 
 const tabLabel = (tab: Tab): string => {
@@ -224,19 +226,19 @@ const tabLabel = (tab: Tab): string => {
 //   off      -> ?nojs=1   : ALL scripts stripped + CSP script-src 'none' (Safest)
 //   noscript -> ?librejs=1: first-party scripts only; third-party blocked
 //   all      -> (none)    : every script runs
-type JsMode = "off" | "noscript" | "all";
+type JsMode = "all" | "noscript" | "off";
 
 const NEXT_JS_MODE: Record<JsMode, JsMode> = {
-  off: "noscript",
-  noscript: "all",
   all: "off",
+  noscript: "all",
+  off: "noscript",
 };
 
 const JS_MODE_LABEL: Record<JsMode, string> = {
-  off: "Scripts: OFF — Safest (all JavaScript blocked). Click for NoScript mode (first-party scripts only).",
+  all: "Scripts: ALL allowed. Click to block everything (Safest).",
   noscript:
     "Scripts: NoScript — first-party scripts only, third-party blocked. Click to allow ALL scripts.",
-  all: "Scripts: ALL allowed. Click to block everything (Safest).",
+  off: "Scripts: OFF — Safest (all JavaScript blocked). Click for NoScript mode (first-party scripts only).",
 };
 
 type BrowserProps = ComponentProcessProps & { mode?: BrowserMode };
@@ -258,10 +260,15 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const keyCounter = useRef(0);
+  const navigationCounter = useRef(0);
+  const pendingNavigations = useRef(new Map<number, number>());
   // Tor launches in NoScript "Safest" mode; clearnet launches with JavaScript for
   // normal site compatibility. The Security Ops extension stays off in both modes,
   // and neither setting persists between browser sessions.
-  const [jsMode, setJsMode] = useState<JsMode>(isTor ? "off" : "all");
+  const [jsMode, setJsMode] = useState<JsMode>(
+    isTor ? DEFAULT_TOR_JS_MODE : DEFAULT_CLEARNET_JS_MODE
+  );
+  const [capabilityError, setCapabilityError] = useState(false);
   const [extEnabled, setExtEnabled] = useState(false);
   const [tabs, setTabs] = useState<Tab[]>(() => [blankTab(0, initialUrl)]);
   const [activeKey, setActiveKey] = useState(0);
@@ -297,6 +304,13 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
         return { address: addressInput, src: "" };
       }
 
+      // Never send a hidden-service hostname to the host resolver. Clearnet and
+      // Tor are separate applications; the user must open .onion destinations in
+      // Tor Browser explicitly rather than receiving a silent route switch.
+      if (!isTor && isOnionUrl(addressUrl)) {
+        return { address: addressUrl, src: CLEARNET_ONION_BLOCKED_PAGE };
+      }
+
       let isKeywave = false;
       let isZupt = false;
 
@@ -310,8 +324,19 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
         // an unusual implementation still fails URL parsing here.
       }
 
+      const profile = isKeywave ? "keywave" : isZupt ? "zupt" : "browser";
+      const routeCapability = await fetchProxyCapability(
+        isTor ? "tor" : "direct",
+        profile,
+        iso,
+        jsMode
+      );
+
       return {
-        address: addressInput,
+        // Keep the omnibox and history aligned with the destination actually
+        // requested. In particular, free-text searches become their complete
+        // SecurityOps/Torch search URL instead of leaving stale query text behind.
+        address: addressUrl,
         // &iso=<tab token> pins this tab to its own Tor circuit (separate exit IP).
         src: `${PROXY_PATH}${encodeURIComponent(addressUrl)}${
           jsMode === "off"
@@ -321,9 +346,9 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
             : ""
         }${extEnabled ? "&ext=1" : ""}${isKeywave ? "&keywave=1" : ""}${
           isZupt ? "&zupt=1" : ""
-        }${(isTor || isZupt) && iso ? `&iso=${iso}` : ""}${
+        }&profile=${profile}${iso ? `&iso=${iso}` : ""}${
           isTor ? "" : "&direct=1"
-        }`,
+        }&cap=${encodeURIComponent(routeCapability)}`,
       };
     },
     [extEnabled, isTor, jsMode, searchQuery]
@@ -333,32 +358,60 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
     async (
       key: number,
       addressInput: string,
-      push = true,
+      push: boolean,
       // Override the tab's isolation token (used when opening a brand-new tab whose
       // state hasn't committed yet). Otherwise the tab's current token is used.
       isoOverride?: string
     ): Promise<void> => {
+      navigationCounter.current += 1;
+      const navigationId = navigationCounter.current;
+
+      pendingNavigations.current.set(key, navigationId);
       patchTab(key, { loading: true });
 
       const iso =
         isoOverride ?? tabsRef.current.find((t) => t.key === key)?.iso ?? "";
-      const { src, address } = await resolveSrc(addressInput, iso);
+      let resolved: { address: string; src: string };
+
+      try {
+        resolved = await resolveSrc(addressInput, iso);
+        setCapabilityError(false);
+      } catch {
+        setCapabilityError(true);
+        // A failed async resolver (for example an unavailable IPFS gateway
+        // module) must not leave the tab permanently showing a loading state.
+        if (pendingNavigations.current.get(key) === navigationId) {
+          pendingNavigations.current.delete(key);
+          patchTab(key, { loading: false });
+        }
+        return;
+      }
+
+      // A newer address-bar submission or Stop action wins. This prevents a slow
+      // async resolution from unexpectedly replacing the page the user chose.
+      if (pendingNavigations.current.get(key) !== navigationId) return;
+      pendingNavigations.current.delete(key);
+
+      const { src, address } = resolved;
 
       setTabs((prev) =>
         prev.map((t) => {
           if (t.key !== key) return t;
 
-          const history = push
-            ? [...t.history.slice(0, t.position + 1), address]
-            : t.history;
+          const nextHistory = push
+            ? updateBrowserHistory(t.history, t.position, address)
+            : { history: t.history, position: t.position };
 
           return {
             ...t,
             address,
+            history: nextHistory.history,
+            loading: Boolean(src),
+            position: nextHistory.position,
+            revision: t.revision + 1,
             src,
-            history,
-            position: push ? history.length - 1 : t.position,
-            syncPending: true,
+            syncPending: Boolean(src),
+            title: address === t.address ? t.title : "",
           };
         })
       );
@@ -376,13 +429,15 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
 
       setTabs((prev) => [...prev, blankTab(key, "", iso)]);
       setActiveKey(key);
-      void navigateTab(key, addressInput, true, iso);
+      navigateTab(key, addressInput, true, iso);
+      window.requestAnimationFrame(() => inputRef.current?.select());
     },
     [home, navigateTab]
   );
 
   const closeTab = useCallback(
     (key: number): void => {
+      pendingNavigations.current.delete(key);
       setTabs((prev) => {
         if (prev.length <= 1) return prev;
         const index = prev.findIndex((t) => t.key === key);
@@ -416,9 +471,9 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
   );
 
   const removeBookmark = useCallback(
-    (url: string): void => {
+    (bookmarkUrl: string): void => {
       setUserBookmarks((prev) => {
-        const next = prev.filter((bookmark) => bookmark.url !== url);
+        const next = prev.filter((bookmark) => bookmark.url !== bookmarkUrl);
 
         writeUserBookmarks(mode, next);
 
@@ -454,7 +509,7 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
   const goToBookmark = useCallback(
     (bookmarkUrl: string): void => {
       if (inputRef.current) inputRef.current.value = bookmarkUrl;
-      void navigateTab(activeKey, bookmarkUrl, true);
+      navigateTab(activeKey, bookmarkUrl, true);
     },
     [activeKey, navigateTab]
   );
@@ -488,15 +543,68 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
     const iso = newIsoToken();
 
     patchTab(activeKey, { iso });
-    if (tab.address) void navigateTab(activeKey, tab.address, false, iso);
+    if (tab.address) navigateTab(activeKey, tab.address, false, iso);
   }, [activeKey, navigateTab, patchTab]);
+
+  const stopLoading = useCallback((): void => {
+    pendingNavigations.current.delete(activeKey);
+
+    try {
+      iframeRef.current?.contentWindow?.stop();
+    } catch {
+      // Some engines deny stop() on an opaque-origin sandbox. Clearing the local
+      // loading state still restores the reload control without weakening it.
+    }
+
+    patchTab(activeKey, { loading: false });
+  }, [activeKey, patchTab]);
+
+  const reload = useCallback((): void => {
+    if (activeTab?.address) {
+      navigateTab(activeKey, activeTab.address, false);
+    }
+  }, [activeKey, activeTab?.address, navigateTab]);
+
+  const goHome = useCallback((): void => {
+    if (inputRef.current) inputRef.current.value = home;
+    navigateTab(activeKey, home, true);
+  }, [activeKey, home, navigateTab]);
+
+  const nativeWindowUrl = useMemo(() => {
+    if (isTor || !activeTab?.address) return "";
+
+    try {
+      const parsed = new URL(activeTab.address);
+
+      // Never hand an onion to the host browser: that can leak a DNS attempt and
+      // defeats the strict separation between the clearnet and Tor apps.
+      return (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+        !isOnionUrl(parsed.href)
+        ? parsed.href
+        : "";
+    } catch {
+      return "";
+    }
+  }, [activeTab?.address, isTor]);
+
+  const openNativeWindow = useCallback((): void => {
+    if (!nativeWindowUrl) return;
+
+    const nativeWindow = window.open(
+      nativeWindowUrl,
+      "_blank",
+      "noopener,noreferrer"
+    );
+
+    if (nativeWindow) nativeWindow.opener = undefined;
+  }, [nativeWindowUrl]);
 
   const didInit = useRef(false);
 
   useEffect(() => {
     if (!didInit.current) {
       didInit.current = true;
-      void navigateTab(0, initialUrl, false);
+      navigateTab(0, initialUrl, false);
     }
   }, [initialUrl, navigateTab]);
 
@@ -569,16 +677,47 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
     }
   }, [activeTab, prependFileToTitle]);
 
-  // Reload the active tab when a mode toggle (JS / extension) changes.
+  const appliedPolicy = useRef({ extEnabled, jsMode });
+
+  // Reload every tab when a mode toggle (JS / extension) really changes. The
+  // iframe sandbox is global to this browser window, so leaving background tabs on
+  // stale proxy flags would make the badge disagree with their effective policy.
+  // Comparing values instead of a first-render boolean also survives React Strict
+  // Mode's development effect replay without opening a second cold Tor circuit.
   useEffect(() => {
-    if (activeTab?.address)
-      void navigateTab(activeKey, activeTab.address, false);
+    if (
+      appliedPolicy.current.extEnabled === extEnabled &&
+      appliedPolicy.current.jsMode === jsMode
+    ) {
+      return;
+    }
+
+    appliedPolicy.current = { extEnabled, jsMode };
+
+    tabsRef.current.forEach((tab) => {
+      if (tab.address) {
+        navigateTab(tab.key, tab.address, false).catch(() => false);
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jsMode, extEnabled]);
 
   const canGoBack = (activeTab?.position ?? 0) > 0;
   const canGoForward =
     activeTab && activeTab.position < activeTab.history.length - 1;
+  const jsModeName =
+    jsMode === "all"
+      ? "JS ALL"
+      : jsMode === "noscript"
+      ? "FIRST-PARTY JS"
+      : "JS OFF";
+  const hasTorPolicyWarning = isTor && jsMode !== "off";
+  const hasBrowserWarning = capabilityError || hasTorPolicyWarning;
+  const modeStatus = isTor
+    ? jsMode === "off"
+      ? "TOR · SAFEST · FAIL-CLOSED"
+      : `TOR PROXY · ${jsModeName} · NAVIGATION RISK`
+    : `DIRECT · ${jsModeName} · NOT ANONYMOUS`;
 
   const go = (step: number): void => {
     if (!activeTab) return;
@@ -588,11 +727,11 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
     if (address === undefined) return;
     patchTab(activeKey, { position });
     if (inputRef.current) inputRef.current.value = address;
-    void navigateTab(activeKey, address, false);
+    navigateTab(activeKey, address, false);
   };
 
   return (
-    <StyledBrowser $hasSrcDoc={false}>
+    <StyledBrowser $hasSrcDoc={false} $hasTorPolicyWarning={hasBrowserWarning}>
       <nav className="tabstrip">
         {tabs.map((tab) => (
           <span
@@ -600,12 +739,17 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
             className={tab.key === activeKey ? "tab active" : "tab"}
           >
             <button
+              aria-current={tab.key === activeKey ? "page" : undefined}
               className="tab-select"
+              onAuxClick={({ button }) => button === 1 && closeTab(tab.key)}
               onClick={() => selectTab(tab.key)}
               type="button"
               {...label(tab.address || "New tab")}
             >
-              {tabLabel(tab)}
+              {tab.loading && (
+                <span aria-hidden="true" className="tab-spinner" />
+              )}
+              <span className="tab-title">{tabLabel(tab)}</span>
             </button>
             {tabs.length > 1 && (
               <button
@@ -645,13 +789,13 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
             <Arrow direction="right" />
           </Button>
           <Button
-            disabled={activeTab?.loading}
-            onClick={() =>
-              activeTab && navigateTab(activeKey, activeTab.address, false)
-            }
-            {...label("Reload this page")}
+            onClick={activeTab?.loading ? stopLoading : reload}
+            {...label(activeTab?.loading ? "Stop loading" : "Reload this page")}
           >
             {activeTab?.loading ? <Stop /> : <Refresh />}
+          </Button>
+          <Button onClick={goHome} {...label(`Home — ${home}`)}>
+            <Home />
           </Button>
           {isTor && (
             <Button
@@ -678,7 +822,16 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
               </svg>
             </Button>
           )}
-          <Button onClick={toggleJs} {...label(JS_MODE_LABEL[jsMode])}>
+          <Button
+            onClick={toggleJs}
+            {...label(
+              `${JS_MODE_LABEL[jsMode]}${
+                isTor
+                  ? " Tor warning: script-driven frame navigation cannot be completely contained by an HTML-rewriting proxy."
+                  : ""
+              }`
+            )}
+          >
             <svg
               height="16"
               opacity={
@@ -732,24 +885,58 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
         </div>
         <input
           ref={inputRef}
+          aria-label={
+            isTor
+              ? "Tor address or private search"
+              : "Clearnet address or SecurityOps search"
+          }
+          autoCapitalize="none"
+          autoComplete="off"
           defaultValue={initialUrl}
           enterKeyHint="go"
           onFocusCapture={() => inputRef.current?.select()}
           onKeyDown={({ key }) => {
             if (inputRef.current && key === "Enter") {
-              void navigateTab(activeKey, inputRef.current.value, true);
+              navigateTab(activeKey, inputRef.current.value, true);
               window.getSelection()?.removeAllRanges();
               inputRef.current.blur();
+            } else if (key === "Escape") {
+              if (activeTab?.loading) stopLoading();
+              inputRef.current?.blur();
             }
           }}
+          placeholder={
+            isTor
+              ? "Search privately with Torch or enter an address"
+              : "Search SecurityOps or enter an address"
+          }
+          spellCheck={false}
           type="text"
         />
-        <span className={`mode-badge ${isTor ? "tor" : "direct"}`}>
-          {isTor
-            ? jsMode === "off"
-              ? "TOR · SAFEST"
-              : "TOR · JS ENABLED"
-            : "DIRECT · NOT ANONYMOUS"}
+        {!isTor && (
+          <Button
+            className="native-window"
+            disabled={!nativeWindowUrl}
+            onClick={openNativeWindow}
+            {...label(
+              "Open in a native browser window for maximum site compatibility (direct connection; leaves the SecurityOS sandbox)"
+            )}
+          >
+            <ExternalLink />
+            <span>Full site</span>
+          </Button>
+        )}
+        <span
+          className={`mode-badge ${isTor ? "tor" : "direct"}`}
+          {...label(
+            isTor
+              ? jsMode === "off"
+                ? "Fail-closed Tor route with scripts disabled."
+                : "Managed traffic uses Tor, but page scripts can force navigation outside an HTML-rewriting proxy."
+              : "Direct clearnet route. Your network address is visible to sites."
+          )}
+        >
+          {modeStatus}
         </span>
       </nav>
       <nav className="bookmarks">
@@ -798,10 +985,34 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
           </span>
         ))}
       </nav>
+      {capabilityError ? (
+        <div className="tor-policy-warning" role="alert">
+          SecurityOS could not authorize this network route.{" "}
+          <button onClick={reload} type="button">
+            Retry
+          </button>
+        </div>
+      ) : hasTorPolicyWarning ? (
+        <div className="tor-policy-warning" role="alert">
+          JavaScript can force a raw frame navigation that a web proxy cannot
+          intercept. Managed requests stay Tor-routed, but strict fail-closed
+          anonymity requires JS OFF or a Tor-routed native browser/VM.
+        </div>
+      ) : undefined}
+      {activeTab?.loading && (
+        <div
+          aria-label={isTor ? "Loading through Tor" : "Loading directly"}
+          className="loading-track"
+          role="progressbar"
+        >
+          <span />
+        </div>
+      )}
       {tabs.map((tab) => (
         <iframe
-          key={tab.key}
+          key={`${tab.key}:${tab.revision}`}
           ref={tab.key === activeKey ? iframeRef : undefined}
+          onError={() => patchTab(tab.key, { loading: false })}
           onLoad={() => patchTab(tab.key, { loading: false })}
           src={tab.src || undefined}
           style={{ display: tab.key === activeKey ? undefined : "none" }}

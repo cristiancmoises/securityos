@@ -145,10 +145,9 @@ const useV86 = (
       ...config,
     };
 
-    // Guest networking is opt-in: only attach a relay when the user has chosen
-    // one (clearnet or Tor) in the session. Otherwise the VM boots with no
-    // external network — no silent third-party relay connection. Changing the
-    // relay applies on the next VM boot.
+    // The session defaults to the local, fail-closed Tor relay. An empty value
+    // explicitly disables networking; clearnet/custom relays are explicit Tor
+    // Control choices. Changing the relay applies on the next VM boot.
     if (emulatorRelayUrl) {
       v86StarterConfig.network_relay_url = emulatorRelayUrl;
     }

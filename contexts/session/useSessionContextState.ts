@@ -6,6 +6,7 @@ import type {
   SessionContextState,
   SessionData,
   SortOrders,
+  UndercoverAppearance,
   WallpaperFit,
   WindowStates,
 } from "contexts/session/types";
@@ -22,6 +23,7 @@ import {
   DEFAULT_WALLPAPER,
   DEFAULT_WALLPAPER_FIT,
   SESSION_FILE,
+  UNDERCOVER_WALLPAPER,
 } from "utils/constants";
 
 const DEFAULT_SESSION = (defaultSession || {}) as unknown as SessionData;
@@ -48,6 +50,8 @@ const useSessionContextState = (): SessionContextState => {
   );
   const [wallpaperFit, setWallpaperFit] = useState(DEFAULT_WALLPAPER_FIT);
   const [wallpaperImage, setWallpaperImage] = useState(DEFAULT_WALLPAPER);
+  const [undercoverAppearance, setUndercoverAppearance] =
+    useState<UndercoverAppearance>();
   const [volume, setVolume] = useState(DEFAULT_VOLUME);
   const [muted, setMuted] = useState(DEFAULT_MUTED);
   const [runHistory, setRunHistory] = useState<string[]>([]);
@@ -74,6 +78,30 @@ const useSessionContextState = (): SessionContextState => {
     },
     []
   );
+  const enableUndercover = useCallback((): void => {
+    if (themeName === "undercover") return;
+
+    setUndercoverAppearance({ themeName, wallpaperFit, wallpaperImage });
+    setThemeName("undercover");
+    setWallpaper(UNDERCOVER_WALLPAPER, DEFAULT_WALLPAPER_FIT);
+  }, [setWallpaper, themeName, wallpaperFit, wallpaperImage]);
+  const disableUndercover = useCallback((): void => {
+    if (themeName !== "undercover") return;
+
+    const previousAppearance =
+      undercoverAppearance?.themeName === "undercover"
+        ? undefined
+        : undercoverAppearance;
+
+    setThemeName(previousAppearance?.themeName ?? DEFAULT_THEME);
+    setWallpaper(
+      previousAppearance?.wallpaperImage ?? DEFAULT_WALLPAPER,
+      previousAppearance?.wallpaperFit ?? DEFAULT_WALLPAPER_FIT
+    );
+    // React's state setter requires an explicit value to clear this snapshot.
+    // eslint-disable-next-line unicorn/no-useless-undefined
+    setUndercoverAppearance(undefined);
+  }, [setWallpaper, themeName, undercoverAppearance]);
   const [haltSession, setHaltSession] = useState(false);
   const setSortOrder = useCallback(
     (
@@ -115,6 +143,7 @@ const useSessionContextState = (): SessionContextState => {
             runHistory,
             sortOrders,
             themeName,
+            undercoverAppearance,
             volume,
             wallpaperFit,
             wallpaperImage,
@@ -144,6 +173,7 @@ const useSessionContextState = (): SessionContextState => {
     sessionLoaded,
     sortOrders,
     themeName,
+    undercoverAppearance,
     volume,
     wallpaperFit,
     wallpaperImage,
@@ -178,6 +208,9 @@ const useSessionContextState = (): SessionContextState => {
             setEmulatorRelayUrl(session.emulatorRelayUrl);
           }
           if (session.themeName) setThemeName(session.themeName);
+          if (session.undercoverAppearance) {
+            setUndercoverAppearance(session.undercoverAppearance);
+          }
           if (session.wallpaperImage) {
             setWallpaper(session.wallpaperImage, session.wallpaperFit);
           }
@@ -231,7 +264,9 @@ const useSessionContextState = (): SessionContextState => {
   return {
     aiApi,
     clockSource,
+    disableUndercover,
     emulatorRelayUrl,
+    enableUndercover,
     foregroundId,
     iconPositions,
     muted,
@@ -254,6 +289,7 @@ const useSessionContextState = (): SessionContextState => {
     sortOrders,
     stackOrder,
     themeName,
+    undercoverAppearance,
     volume,
     wallpaperFit,
     wallpaperImage,

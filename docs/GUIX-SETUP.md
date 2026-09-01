@@ -48,9 +48,10 @@ guix system reconfigure /etc/config.scm   # atomic, declarative system updates
 
 ## 4. Route Guix through Tor (privacy)
 
-The VM's network is **opt-in** (off by default for privacy). Before `guix pull` /
-`guix install`, open **Tor Control** and select **Tor** so the VM's traffic exits
-over Tor. Verify inside the guest:
+The VM defaults to the local, fail-closed Tor relay. Before `guix pull` /
+`guix install`, start the local bridge and confirm **Tor Control** remains on
+**Tor**. If the bridge is unavailable, the guest stays offline rather than
+falling back to clearnet. Verify inside the guest:
 
 ```fish
 curl https://check.torproject.org/api/ip   # IsTor: true

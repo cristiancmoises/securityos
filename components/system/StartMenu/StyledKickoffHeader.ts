@@ -3,7 +3,7 @@ import styled from "styled-components";
 /**
  * KDE Plasma "Kickoff" header strip: a thin search bar pinned to the top of the
  * launcher. Token-driven (titleBar.background / accent.edge / text) so the
- * Undercover (Windows 11 light) theme recolors it. The search field is a real input
+ * The neutral light Undercover theme recolors it. The search field is a real input
  * that queries the app/file index and shows a results dropdown (see Search.tsx).
  */
 const StyledKickoffHeader = styled.div`
@@ -104,6 +104,12 @@ const StyledKickoffHeader = styled.div`
     }
 
     .search-results img {
+      flex-shrink: 0;
+      height: 18px;
+      width: 18px;
+    }
+
+    .search-results picture {
       flex-shrink: 0;
       height: 18px;
       width: 18px;

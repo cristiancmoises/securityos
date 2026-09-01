@@ -4,6 +4,48 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.24.0] — 2026-09-01
+
+- Renamed the user-facing **Vaptvupt** application to **Zupt**, while preserving
+  the identity, commands, licensing, and `.zupt` format of the bundled Vaptvupt
+  engine. The legacy internal PID and shortcut `BaseURL` remain valid, so existing
+  persisted Vaptvupt process references require no migration.
+- Removed **WhatsApp**, **Telegram**, **Session**, and **CryptPad** from the process
+  catalog, Start menu, desktop, browser bookmarks, search index, app-specific proxy
+  reachability, and active documentation. Cloudmacs no longer builds TDLib/Telega,
+  loads WhatsAppel, or mounts their state. Shared session infrastructure is
+  unchanged.
+- Added **Wiki** for `wiki.securityops.co`. Wiki, **GODS EYE**, and **SecurityOps
+  IRC** now use the same explicit Tor/Clearnet route selector as Zupt: Tor is the
+  fail-closed default, while complex Tor embeds remain best-effort. IRC and GODS
+  EYE Clearnet modes use native service-origin iframes, visibly marked direct/not
+  anonymous; their direct realtime/runtime traffic does not traverse `/api/ws`.
+- Reworked **Clearnet Browser** for normal-site compatibility: it starts at and
+  searches through `https://securityops.co/`, enables all scripts by default,
+  includes the SecurityOps `.com.br` and `.co` bookmarks, and provides an explicit
+  direct native-window fallback for sites that cannot run inside an opaque iframe.
+- Improved both browsers with functional stop/reload/home controls, race-safe
+  navigation, clearer per-tab loading and route/script status, accessible omnibox
+  behavior, corrected history/search addresses, and a protected clearnet fallback
+  that refuses `.onion` targets. Tor still defaults to scripts-off, uses isolated
+  circuits, and never falls back to clearnet.
+- Added short-lived signed proxy capabilities bound to app profile, route,
+  isolation session, and script policy. This fixes opaque-sandbox fetch/XHR CORS
+  without granting same-origin access, prevents Tor-to-direct or cross-app token
+  reuse, constrains fixed-app origins and WebSocket profiles, and adds bounded
+  HTTP/WS concurrency, queues, payloads, and capability issuance.
+- Rebuilt **Undercover** as a polished, familiar enterprise-workspace disguise
+  using neutral SecurityOS language and original code-native visuals only—no
+  proprietary operating-system name, logo, trademark, wallpaper, or other asset.
+- Added distinct multi-resolution Zupt, IRC, GODS EYE, Wiki, Pinball, and V86 icon
+  families. Every registered process icon now resolves at 16/32/48/96/144 pixels.
+- Updated the root README, in-OS welcome and handbook, Tor model, release notes,
+  and execution prompt. Current JavaScript and Rust advisory databases report zero
+  known vulnerabilities in the audited dependency graphs. Matrix SDK/Rust crypto,
+  SOCKS transport, and WebSocket runtime dependencies are now declared and updated
+  to 42.3.0, 18.7.0, 10.1.0, and 8.21.3 respectively, so clean non-Docker installs
+  reproduce the production server.
+
 ## [2.23.2] — 2026-09-01
 
 - Migrated the full native Matrix/E2EE app and its fail-closed, same-origin Tor
@@ -39,8 +81,9 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   messages to their owning iframe, and made Tor WebSockets fail closed.
 - Added a persistent direct/non-anonymous browser badge and robust address parsing
   for `.co`, `.com.br`, `.io`, IP addresses, ports, and paths.
-- SecurityOps IRC now embeds its real The Lounge/Socket.IO client over Tor; GODS
-  EYE uses its native cross-origin app with an explicit direct warning.
+- SecurityOps IRC now offers a best-effort Tor-proxied The Lounge view and an
+  explicit native service-origin Clearnet client. GODS EYE likewise keeps its
+  complex Tor view best-effort and uses a native cross-origin direct mode.
 - ZUPT Web now has explicit Tor and clearnet modes. A bounded, exact-origin,
   RAM-only CSRF bridge enables real key generation, multipart compression and
   attachment downloads without returning upstream cookies to the iframe; Tor and

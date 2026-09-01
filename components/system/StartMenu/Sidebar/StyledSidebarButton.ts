@@ -8,7 +8,7 @@ type StyledSidebarButtonProps = {
 const StyledSidebarButton = styled.li<StyledSidebarButtonProps>`
   /* KDE Plasma "Kickoff" category rail: flat rows, a left accent bar on the active
      item and a highlightBackground selected/hover wash — all theme-driven so the
-     Undercover (Windows 11 light) palette recolors the rail. */
+     light Undercover palette recolors the rail. */
   background-color: ${({ $active, theme }) =>
     $active ? theme.colors.highlightBackground : "transparent"};
   border: 1px solid transparent;

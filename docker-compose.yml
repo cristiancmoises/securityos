@@ -6,7 +6,8 @@
 # proxy (/api/proxy) routes every fetch through Tor over SOCKS5h (DNS + .onion
 # resolved AT Tor), so the in-OS Browser and Tor Browser exit over Tor by default.
 # No host networking, no manual flags. Both run read-only with RAM-only scratch
-# (amnesia: nothing persists, no logs), so `docker compose down` leaves no residue.
+# and no Docker container logs, so `docker compose down` leaves no app-state
+# residue. Reverse-proxy access-log policy remains the operator's responsibility.
 #
 # For the full stack that adds the memory-safe Rust proxy sidecar, use
 # `docker compose -f deploy/docker-compose.yml up -d` instead. For a single
@@ -90,14 +91,10 @@ services:
       TERM: xterm-256color
     volumes:
       # .emacs.d = the Spacemacs checkout; .spacemacs.d/init.el = the dotfile that
-      # enables the layers + telega/whatsappel/org/eww; whatsappel = the user's
-      # whatsapp-in-emacs package (loaded onto load-path, read-only).
+      # enables the configured layers plus Org and EWW integration.
       - ${HOME}/.cloudmacs.d:/home/emacs/.emacs.d
       - ${HOME}/.spacemacs.d:/home/emacs/.spacemacs.d
-      - ${HOME}/whatsappel:/home/emacs/whatsappel:ro
       - ${HOME}/cloudmacs-data:/home/emacs/data
-      # Persist telega (Telegram) state/cache so you don't re-auth every restart.
-      - ${HOME}/cloudmacs-telega:/home/emacs/.telega
     mem_limit: 2g
     pids_limit: 1024
     ports:

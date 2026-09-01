@@ -3,7 +3,7 @@
  * Single source of truth for SecurityOS HTTP security headers.
  *
  * Consumed by:
- *   - next.config.js          -> headers()  (ENFORCED when served via `next start` / Node)
+ *   - next.config.js          -> headers()  (ENFORCED by the custom `server.js` / Node)
  *   - scripts/genHeaders.js   -> public/_headers  (Netlify / Cloudflare Pages static hosting)
  *   - pages/_document.tsx     -> <meta http-equiv="Content-Security-Policy"> + referrer
  *                                (fallback for pure `next export` / dumb CDN hosting)

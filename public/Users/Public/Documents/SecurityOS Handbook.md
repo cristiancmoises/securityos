@@ -3,40 +3,40 @@
 Welcome. SecurityOS is a **privacy-first, security-education web desktop**. This
 handbook is your starting point — everything here runs in your browser.
 
-## What's new (v2.23)
+## What's new (v2.24)
 
 - **Two explicit browsing modes.** **Tor Browser** supports tabbed navigation of
   `.onion` and public sites over Tor, with per-tab circuit isolation and an opt-in
-  JavaScript safety control. **Clearnet Browser** offers the same navigation tools
-  for public websites, but is plainly marked **not anonymous**.
-- **GODS EYE** — a dedicated, sandboxed dashboard window for
-  `https://eye.securityops.co`.
-- **SecurityOps IRC** embeds the The Lounge client at `irc.securityops.com.br`;
-  its HTTP and Socket.IO traffic is tunneled through Tor. Local browser storage is
-  amnesic; server-side retention follows that service's policy.
-- **Desktop focus.** WhatsApp and Telegram shortcuts have been removed from the
-  desktop; their Start-menu launchers remain available.
+  JavaScript safety control. **Clearnet Browser** starts at and searches through
+  `https://securityops.co`, allows all scripts by default, exposes a native-window
+  compatibility action, and stays plainly marked **not anonymous**.
+- **One honest route control.** **Zupt**, **GODS EYE**, **SecurityOps IRC**, and
+  **Wiki** all provide the same explicit **Tor / Clearnet** selector. Tor fails
+  closed through the privacy proxy, but IRC/GODS EYE complex embeds are
+  best-effort. Their Clearnet views connect natively to the service origin and are
+  visibly direct/not anonymous; Wiki and Zupt use explicit direct server egress.
+- **App catalog cleanup.** The Vaptvupt app is now named **Zupt**. **WhatsApp**,
+  **Telegram**, **Session**, and **CryptPad** have been completely removed from the
+  desktop, Start menu, app catalog, and supported launch paths.
+- **Undercover and icons.** Undercover now uses a polished, familiar enterprise
+  workspace made entirely from neutral SecurityOS UI and original code-native
+  assets. The new and renamed apps have distinct multi-size icons.
 
 ## Earlier improvements
 
-- **CryptPad** — the encrypted office suite (`office.securityops.co`) now runs
-  **inside the OS over Tor**, via a new same-origin **WebSocket tunnel** that also
-  lets other real-time apps work through the proxy.
 - **Matrix sign-in fix.** The post-login "stuck on syncing" was a real proxy bug
   (a dropped trailing slash on `/pushrules/`) — now fixed; sign-in completes.
 - **Security hardening.** Closed a WebRTC real-IP leak (scripts mode), made encrypted
   Matrix attachments verify their hash, and tightened the SSRF + Radio-favicon paths.
 - **Start-menu search works.** Open the Start menu and type — it finds and launches
   any app or file (it was previously a non-functional placeholder).
-- **WhatsApp, Telegram & Session** launchers (open the official clients in a real
-  window) with clear, honest **over-Tor** guidance — see *Messengers & Tor* below.
 - **Matrix fixes:** image/file attachments now display, uploads no longer time out
   over Tor, and the Tor tunnel no longer leaks circuits or duplicates actions. (A
   stuck "Connecting over Tor…" means Tor or the homeserver is unreachable — not a
   bug; start Tor in *Tor Control*.)
 - **Radio:** exact country filtering and **only working stations** (offline/non-HTTPS
   ones are filtered out).
-- **ZUPT / VaptVupt:** full key, compression, extraction and verification forms in
+- **Zupt:** full key, compression, extraction and verification forms in
   selectable **Tor** or clearly marked **Clearnet** mode, plus a native direct
   fallback. Tor is the default and never falls back to clearnet automatically.
 
@@ -50,14 +50,12 @@ handbook is your starting point — everything here runs in your browser.
 | **Keywave** | Start ▸ *Keywave* | End-to-end-encrypted chat at `chat.securityops.co`. Tor mode keeps HTTP/Socket.IO in the fail-closed proxy and blocks WebRTC; the explicit clearnet window is the full text/media client and is not anonymous. |
 | **Radio** | Start ▸ *Radio* | Internet radio worldwide (radio-browser API) — **exact** country filter (ISO code), genre filter, **only working HTTPS stations** (offline/non-playable ones removed), favorites. |
 | **Tor Browser** | Desktop / Start ▸ *Tor Browser* | Tabbed `.onion` and public-site navigation over Tor. JavaScript is off by default; choose NoScript or All only when needed. Some sites can still reject Tor exits or require native browser features. |
-| **Clearnet Browser** | Desktop / Start ▸ *Clearnet Browser* | Full tabs, history and bookmarks for public websites. **Direct egress; not anonymous.** Built-in bookmarks include the SecurityOps public sites and GODS EYE. |
-| **GODS EYE** | Desktop / Start ▸ *GODS EYE* | Native cross-origin observability dashboard for `eye.securityops.co`. **Direct; not anonymous.** |
-| **IRC** | Desktop / Start ▸ *IRC* | Embedded SecurityOps The Lounge client at `irc.securityops.com.br`; HTTP and Socket.IO are carried over Tor. |
-| **WhatsApp / Telegram** | Start ▸ each app | Run the official web client **embedded INSIDE the OS, over Tor** (fetched server-side through the privacy proxy, so they work even on networks that block them). Heavy apps, so the embed is best-effort — a **Window** button opens the full client. |
-| **Session** | Start ▸ *Session* | **Launcher** (Session has no web client) — opens the official download page. Session is onion-routed once installed. |
-| **VaptVupt** | Start ▸ *VaptVupt* | First-party ZUPT compression/encryption tools with selectable **Tor** (default, fail-closed) and **Clearnet** (not anonymous) routes. The ephemeral proxy session supports key generation, uploads and downloads; **Full client · DIRECT** leaves the sandbox. |
-| **CryptPad** | Start ▸ *CryptPad* | The **encrypted office suite** (docs, sheets, code, drive) embedded **over Tor through the privacy proxy** (`office.securityops.co` redirects to the public pad.envs.net, which blocks framing — the proxy handles it). Best-effort in the sandbox; toolbar **Window** / **Tor Browser** open the full client for deep persistence. |
-| **Cloudmacs** | Start ▸ *Cloudmacs* | A full **Emacs** (Spacemacs) in the browser, with org-mode, eww, **telega** (Telegram) and **whatsappel** (WhatsApp). Also in *Open with* for text/code. |
+| **Clearnet Browser** | Desktop / Start ▸ *Clearnet Browser* | Full tabs, history, bookmarks, stop/reload/home controls, and a native-window fallback for public websites. Starts at and searches `securityops.co`, with **All scripts** enabled. **Direct egress; not anonymous.** |
+| **GODS EYE** | Desktop / Start ▸ *GODS EYE* | Best-effort Tor-sandboxed dashboard for `eye.securityops.co`; Clearnet embeds the native service origin for full Cesium compatibility and is not anonymous. |
+| **IRC** | Desktop / Start ▸ *IRC* | SecurityOps The Lounge client at `irc.securityops.com.br`; Tor HTTP/Socket.IO is best-effort through the fail-closed proxy, while Clearnet connects natively to the service rather than `/api/ws`. |
+| **Wiki** | Desktop / Start ▸ *Wiki* | SecurityOps knowledge base at `wiki.securityops.co` with explicit **Tor / Clearnet** routing. |
+| **Zupt** | Start ▸ *Zupt* | First-party compression/encryption tools with selectable **Tor** (default, fail-closed) and **Clearnet** (not anonymous) routes. The ephemeral proxy session supports key generation, uploads and downloads; **Full client · DIRECT** leaves the sandbox. |
+| **Cloudmacs** | Start ▸ *Cloudmacs* | A full **Emacs** (Spacemacs) in the browser, with org-mode and eww. Also in *Open with* for text/code. |
 | **Screen Capture** | Start ▸ *Screen Capture* | Screen recording + screenshots (mic/system audio, presets) with an optional webcam overlay and effect themes. |
 | **Tor Control** | Start ▸ *Tor Control* | Route the emulated Linux VM through Tor. See `TOR.md`. |
 | **Curated web tools** | Start ▸ *Security* (folder) | Vetted external references (CyberChef, ATT&CK, GTFOBins, …) opened in the in-OS Browser. |
@@ -95,51 +93,24 @@ leaves your machine:
   upstream client does not currently establish encrypted text without its media
   handshake, so the Tor view does not claim chat support. Direct mode reveals your
   network address to Keywave and its STUN/TURN service.
-- **ZUPT Web runs remotely.** The Tor route hides your IP from the service, but the
+- **Zupt Web runs remotely.** The Tor route hides your IP from the service, but the
   service still processes uploaded plaintext, passwords, and supplied private keys.
   Use local Vaptvupt/WASM for secrets that must never leave this device. Embedded
   uploads/downloads are capped at 256 MiB; use **Full client · DIRECT** for work that
   exceeds the sandbox compatibility limits.
-- **Cloudmacs** is a full **Emacs** (Spacemacs) in the browser — org-mode, eww, and
-  even **telega** (Telegram) and **whatsappel** (WhatsApp) — and it shows up in
-  *Open with* for text/code files.
+- **Cloudmacs** is a full **Emacs** (Spacemacs) in the browser — org-mode and eww —
+  and it shows up in *Open with* for text/code files.
 - **Radio** plays internet radio worldwide; **Webamp** plays the bundled music.
 - **Screen Capture** records or screenshots your screen (mic + system audio,
   quality/format/codec presets, a countdown and max-duration) with an optional
   **webcam overlay** and effect themes (Matrix rain, grayscale, sepia, neon, blur,
   background blur).
 
-## Messengers & Tor (WhatsApp · Telegram · Session)
+## Removed applications
 
-SecurityOS includes best-effort in-OS Tor embeds for WhatsApp and Telegram, plus
-an explicit top-level **Window** fallback. Their desktop shortcuts are removed,
-but the apps remain in Start. Session is a launcher because it has no web client.
-
-- Anti-framing headers are stripped by the HTTP proxy, and approved WebSockets are
-  carried by the same-origin, allowlisted Tor tunnel. The opaque sandbox remains
-  amnesic and blocks WebRTC/service-worker behavior, so deep functionality can be
-  partial.
-- **Session has no web client at all** — it's a desktop/mobile app on the Oxen
-  service-node network.
-
-The **Window** action opens the official client in a real top-level browser context,
-where native features work. That fallback uses your browser's normal connection and
-is not anonymized by the in-OS proxy.
-
-**To use them over Tor (anonymously):** route your *whole browser or device*
-through Tor first, then launch the app:
-
-1. Open **SecurityOS itself in the Tor Browser** (ideally via its `.onion`) — then
-   the launched WhatsApp/Telegram window is already over Tor.
-2. Or run SecurityOS inside **Tails**, or a system/router configured for
-   system-wide Tor.
-3. **Session** routes its *own* traffic over its onion network once installed — its
-   launcher only opens the official download page (do that step in the Tor Browser
-   to stay anonymous).
-
-> A web page cannot force a top-level window it opens onto Tor — only *you* can, by
-> putting the browser/OS on Tor. That's the honest trade-off these launchers make
-> explicit instead of pretending otherwise.
+**WhatsApp**, **Telegram**, **Session**, and **CryptPad** are not shipped as
+SecurityOS applications. Their process entries, shortcuts, dedicated assets, and
+supported in-OS launch paths have been removed.
 
 ## Make it yours
 
@@ -151,28 +122,32 @@ through Tor first, then launch the app:
   Lock from the **Start menu**.
 - The **taskbar volume** is a true **master volume** — it controls *all* web-OS
   sound, including WebAudio apps like Webamp and the v86 emulator.
-- **Undercover mode** repaints the desktop to look like Windows 11, for blending in.
+- **Undercover mode** applies a polished, familiar enterprise-workspace layout with
+  neutral SecurityOS branding and original, code-native visuals. It does not use a
+  proprietary operating-system name, logo, trademark, or artwork.
 - If old, corrupted saved data would otherwise stop the desktop from starting,
   SecurityOS shows a **recovery screen** (*Try again* / *Reset*) instead of
   reloading forever.
 
 ## Privacy model (read this)
 
-Three things can touch the network, and you control each:
+Four things can touch the network, and you control each:
 
 1. **The SecurityOS page itself** — anonymize by opening it in the **Tor Browser**
    (ideally via its `.onion`).
 2. **Tor Browser** — sends managed browsing through the server-side SOCKS5h proxy
-   and fails closed if Tor is unavailable. **Clearnet Browser** and **GODS EYE**
-   are separate, visibly direct/non-anonymous applications.
+   and fails closed if Tor is unavailable. **Clearnet Browser** is a separate,
+   visibly direct/non-anonymous application.
 3. **The Linux VM** — has its own network; route it via **Tor Control**.
-4. **Messaging apps** — WhatsApp and Telegram use best-effort Tor-proxied embeds
-   with a direct Window fallback; Session is a launcher because it has no web client.
+4. **Selectable service apps** — Zupt, GODS EYE, IRC, and Wiki show their chosen
+   Tor or Clearnet route and never switch silently. IRC/GODS EYE Tor views are
+   best-effort; their Clearnet views connect natively to the service origin.
 
 SecurityOS ships hardened: a strict Content-Security-Policy, `no-referrer`, a
 locked-down Permissions-Policy, and **no silent third-party connections** — the
-VM's network is off until you opt in, and optional features (server clock, IPFS,
-APOD wallpaper) only connect when you enable them.
+VM defaults to a local Tor relay and fails closed if its bridge is unavailable;
+clearnet remains opt-in. Optional features (server clock, IPFS, APOD wallpaper)
+only connect when you enable them.
 
 ## A suggested learning path
 

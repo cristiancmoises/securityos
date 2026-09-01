@@ -7,13 +7,14 @@ import { useProcesses } from "contexts/process";
 import processDirectory from "contexts/process/directory";
 import { basename, extname } from "path";
 import { useMemo, useRef, useState } from "react";
+import Icon from "styles/common/Icon";
 import { useSearch } from "utils/search";
 
 // The Start Menu search box. The header used to render a STATIC, non-functional
 // "Search…" placeholder (a span — no input, no handler), so the search button did
 // nothing. This makes it real:
 //   • APPS come from the authoritative process directory (matched by title), so any
-//     installed app — including the new WhatsApp/Telegram/Session — is found and
+//     installed app — including routed SecurityOps web apps — is found and
 //     launched instantly, independent of the file index (which ignores .url
 //     shortcuts).
 //   • FILES come from the lunr index (documents, etc.) via useSearch.
@@ -128,7 +129,7 @@ const StartMenuSearch: FC<StartMenuSearchProps> = ({ toggleStartMenu }) => {
             results.map((result) => (
               <li key={result.key}>
                 <button onClick={result.open} type="button">
-                  <img alt="" src={result.icon} />
+                  <Icon alt="" imgSize={16} src={result.icon} />
                   <span>{result.label}</span>
                 </button>
               </li>

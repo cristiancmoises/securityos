@@ -18,15 +18,20 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
   full tabbed navigation of `.onion` and clearnet sites; JavaScript is off by
   default. The proxy is SSRF-guarded, fails closed if Tor is
   misconfigured, pins the SSRF-validated IP, forwards only an allowlist of
-  response headers, and logs nothing. See [Tor Browser](#-tor-browser).
+  response headers, and performs no application-level request logging. See
+  [Tor Browser](#-tor-browser).
 - **🌐 Clearnet Browser** — a clearly labelled, full tabbed browser for ordinary
-  public websites. It has independent bookmarks for `securityops.com.br`,
-  `securityops.co`, and **GODS EYE**. It uses direct egress by design and is **not
-  anonymous**.
-- **👁️ GODS EYE** — a dedicated cross-origin dashboard window for
-  `https://eye.securityops.co`, clearly marked as a direct/non-anonymous app.
-- **💬 SecurityOps IRC** — embeds the SecurityOps **The Lounge** web client at
-  `irc.securityops.com.br`; its HTTP and Socket.IO transport goes through Tor.
+  public websites. It starts at and searches through `https://securityops.co`,
+  enables all page scripts by default for compatibility, and includes bookmarks
+  for the SecurityOps `.com.br` and `.co` services. Direct egress is always marked
+  **not anonymous**, and an explicit native-window action covers sites that cannot
+  run inside a sandboxed web desktop.
+- **👁️ GODS EYE · 💬 SecurityOps IRC · 📚 Wiki** — first-party service apps for
+  `eye.securityops.co`, `irc.securityops.com.br`, and `wiki.securityops.co`.
+  Each offers an explicit **Tor / Clearnet** route. Tor fails closed through the
+  privacy proxy, but these complex sandboxed views remain **best-effort**. IRC and
+  GODS EYE use native service-origin iframes in Clearnet mode—direct, visibly not
+  anonymous, and outside `/api/ws`; Wiki uses explicit direct server egress.
 - **🦀 Memory-safe proxy sidecar** — the untrusted fetch + HTML-rewriting path is also
   available as a Rust sidecar (Tor SOCKS5h, DNS-pinned SSRF guard, `lol_html`
   streaming rewriter); the OS delegates to it and transparently falls back to the
@@ -62,31 +67,21 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
   **only working HTTPS stations** — offline and non-playable (http-only) ones are
   filtered out — plus favorites and resilient mirror failover.
 - **📝 Cloudmacs** — a full **Emacs** (Spacemacs) in the browser (Gotty serving a
-  terminal Emacs), with **telega** (Telegram — TDLib built into the image),
-  **whatsappel** (WhatsApp), **org-mode**, and **eww**. Appears in _Open with_ for
+  terminal Emacs), with **org-mode** and **eww**. Appears in _Open with_ for
   text/code files.
 - **📺 SecTube** — the SecurityOps video frontend, embedded for playback.
-- **📁 ZUPT / VaptVupt web tools** — the first-party compression, encryption,
+- **📁 Zupt web tools** — the renamed first-party compression, encryption,
   extraction and archive-verification service has explicit **Tor** (default,
   fail-closed) and **Clearnet** (direct, not anonymous) modes. The cookie-free
   privacy boundary keeps only ZUPT's Secure, HttpOnly CSRF cookie in a bounded
   server-memory session, enabling multipart forms and downloads without exposing it
   to the iframe. The embedded proxy caps individual uploads/downloads at 256 MiB;
-  a clearly labelled **Full client · DIRECT** fallback opens the native site.
-- **🔐 CryptPad · 🟢 WhatsApp · Telegram — embedded INSIDE the OS, over Tor.** These
-  run through the privacy proxy (fetched server-side over Tor, anti-framing headers
-  stripped, realtime **WebSocket tunneled** via `/api/ws`, storage + an amnesic
-  in-memory **IndexedDB shim** injected), so they load **in-OS and even on networks
-  that block them** — your IP is never exposed. The embeds request the proxy with
-  **`&app=1`** ("embedded-app mode"), which forces the full **Node `clientShim`**
-  path so the runtime shim is always present — even in the production deployment that
-  delegates ordinary browsing to the memory-safe Rust sidecar (the sidecar injects no
-  shim, which is why the embeds previously loaded blank in prod). They're heavy
-  multi-origin SPAs, so the embed is still **best-effort** (no Service Workers or
-  persistent storage on an opaque origin); each app's toolbar has a **Window** button
-  that opens the full official client (run SecurityOS in the **Tor Browser** to keep
-  that over Tor). **Session** stays a launcher (no web client; it's onion-routed once
-  installed).
+  a clearly labelled **Full client · DIRECT** fallback opens the native site. The
+  bundled local Vaptvupt engine and `.zupt` format retain their upstream identity;
+  only the SecurityOS application is named **Zupt**.
+- **🧹 App catalog cleanup** — **WhatsApp**, **Telegram**, **Session**, and
+  **CryptPad** have been completely removed from SecurityOS. They have no desktop or
+  Start-menu launchers, process entries, browser bookmarks, or dedicated app routes.
 - **⏺️ Screen Capture** — screen recording + screenshots via `getDisplayMedia`
   (captures everything on screen, incl. cross-origin app iframes): countdown,
   microphone + system audio, quality/format/codec presets, and a max-duration. A
@@ -104,8 +99,9 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
   native audio/video plus WebAudio apps like **Webamp** and the **v86** emulator.
 - **🎵 Music + Webamp** — bundled free/classical music and the **Webamp**
   (Winamp-style) player, plus lots of wallpapers (including animated ones).
-- **🪟 Undercover mode** — a Windows-11-like appearance (folders/wallpaper/theming)
-  for blending in.
+- **🪟 Undercover mode** — a polished, familiar enterprise-workspace disguise with
+  a centered launcher, productivity layout, neutral branding, and original assets.
+  It contains no proprietary operating-system name, logo, trademark, or artwork.
 - **🛟 Resilience / recovery** — if corrupted saved data from an old version would
   otherwise stop the desktop from starting, SecurityOS shows a **recovery screen**
   (_Try again_ / _Reset_) instead of reloading forever.
@@ -141,30 +137,57 @@ access is appropriate. The applications do not silently fall back between modes.
 - Bookmarks point at the SecurityOps **hidden services**.
 - The proxy is SSRF-guarded, **fails closed** if Tor is misconfigured, **pins the
   SSRF-validated IP** (no DNS rebinding), forwards only an allowlist of response
-  headers, rewrites links/forms to stay in-app, and **logs nothing**.
+  headers, rewrites links/forms to stay in-app, and performs no application-level
+  request logging.
+
+Each sandbox receives a short-lived signed route capability bound to its app
+profile, Tor/direct mode, isolation session, and script policy. A Tor capability
+cannot authorize direct egress; fixed-app capabilities cannot be reused against
+another app/origin; only valid capabilities receive the narrow opaque-origin CORS
+response needed for readable fetch/XHR. HTTP and WebSocket concurrency, queues,
+payloads, and capability issuance are bounded. This boundary confines browser
+code—it is not user authentication. Operators who expose the arbitrary-destination
+Browser proxy publicly should add authenticated reverse-proxy access and redact
+capability-bearing proxy URLs from access logs.
 
 > **Compatibility.** The Tor Browser supports tabbed navigation and opt-in
 > JavaScript, but a site can still reject Tor exits or depend on browser
 > features unavailable in an opaque sandbox (such as service workers). Use the
 > Linux VM via Tor Control when a destination needs a native browser environment.
 
-## 🌐 Clearnet Browser & GODS EYE
+## 🌐 Clearnet Browser & routed web apps
 
 The **Clearnet Browser** has the same tab, address-bar history, bookmark and
 JavaScript controls as Tor Browser, but uses direct egress (`direct=1`) and is
-therefore **not an anonymity tool**. A persistent badge makes that boundary visible.
-Its built-in bookmarks cover the SecurityOps `.com.br` and `.co` sites.
+therefore **not an anonymity tool**. It starts at `https://securityops.co/`, sends
+free-text searches to that same origin, and defaults to **All scripts** for normal
+site compatibility. A persistent route/script badge makes that boundary visible;
+the native-window button is an explicit, direct fallback for applications that need
+browser capabilities the sandbox cannot provide. Its bookmarks cover the
+SecurityOps `.com.br` and `.co` services.
 
-**GODS EYE** uses a native cross-origin iframe because its Vite/Cesium modules and
-workers require their real origin. Same-origin policy isolates it from SecurityOS;
-its persistent **DIRECT · NOT ANONYMOUS** badge reflects the real network path.
+**GODS EYE**, **SecurityOps IRC**, and **Wiki** share the same deliberate route
+selector as Zupt. **Tor** uses the fail-closed proxy, but rendering complex
+Socket.IO/Cesium applications inside its opaque sandbox is best-effort. In
+**Clearnet**, IRC and GODS EYE load as native cross-origin iframes directly from
+their service origins; Wiki instead uses explicit non-Tor SecurityOS server egress.
+All direct paths are visibly not anonymous. The explicit **New circuit** action
+rotates Tor isolation.
 
 ## 💬 SecurityOps IRC
 
 IRC opens the SecurityOps **The Lounge** web client at `irc.securityops.com.br`.
-The embedded browser state is in-memory, and its Socket.IO endpoint is narrowly
-allowlisted and tunneled through `/api/ws` over Tor. Server-side account/history
-retention is governed by the SecurityOps IRC service, not by this desktop.
+In Tor mode, HTTP and the narrowly allowlisted Socket.IO endpoint are attempted
+through the fail-closed proxy and `/api/ws`; this sandboxed client is best-effort.
+In Clearnet mode, the iframe loads the native HTTPS origin and its Socket.IO
+connection goes directly from the browser to the service—not through `/api/ws`.
+Server-side account/history retention is governed by the SecurityOps IRC service,
+not by this desktop.
+
+GODS EYE follows the same privacy boundary: its Tor-proxied opaque-sandbox view is
+best-effort because Cesium modules and workers may require capabilities the proxy
+cannot reproduce. Clearnet mode embeds `https://eye.securityops.co/` natively at
+the service origin for full compatibility and is direct/not anonymous.
 
 ---
 
@@ -191,13 +214,11 @@ talks to Matrix off-Tor.
 
 ---
 
-## 🆕 New apps & how they work
+## 🆕 Apps & how they work
 
-- **WhatsApp · Telegram · Session.** WhatsApp and Telegram are best-effort embedded
-  clients over the Tor proxy with a Window fallback for features unavailable in the
-  opaque sandbox. Their shortcuts are intentionally absent from the desktop but
-  remain in Start. Session remains a launcher because it has no web client.
-- **ZUPT / VaptVupt web tools.** The embedded HTTPS service is selectable between
+- **Removed applications.** **WhatsApp**, **Telegram**, **Session**, and **CryptPad**
+  are not part of the SecurityOS app catalog and have no supported launch path.
+- **Zupt.** The embedded HTTPS service is selectable between
   fail-closed **Tor** routing and explicit **Clearnet** egress. Both stay inside an
   opaque-origin sandbox; a random per-mode session lets the proxy retain only the
   upstream CSRF cookie in memory so key generation, multipart uploads and downloads
@@ -206,6 +227,10 @@ talks to Matrix off-Tor.
   **Trust boundary:** these web operations run on `share.securityops.co`; that
   service receives uploaded plaintext, passwords, and any supplied private key.
   Use the bundled local Vaptvupt/WASM workflow when those values must stay on-device.
+- **GODS EYE · IRC · Wiki.** Each first-party service exposes the same explicit
+  **Tor / Clearnet** control and never falls back across that privacy boundary.
+  IRC and GODS EYE Tor embeds are best-effort; their Clearnet views are native,
+  service-origin connections rather than `/api/ws` proxy sessions.
 - **Keywave.** Tor mode renders only the service landing/control surface through an
   isolated, fail-closed HTTP/Socket.IO route. Calls and encrypted text currently
   start only after media permission in the upstream client, while WebRTC cannot be
@@ -226,7 +251,9 @@ talks to Matrix off-Tor.
 - **Strict OS-shell CSP** without `'unsafe-eval'` (WASM uses `'wasm-unsafe-eval'`), `frame-ancestors 'none'`,
   HSTS, COOP, CORP, and a locked-down **Permissions-Policy**.
 - **Explicit egress modes:** Tor Browser fails closed through Tor; Clearnet Browser
-  and GODS EYE are visibly direct. The v86 VM defaults to a local Tor relay.
+  is visibly direct; Zupt, GODS EYE, IRC, and Wiki require an explicit Tor/Clearnet
+  selection. The v86 VM defaults to a local Tor relay and stays offline if that
+  bridge is unavailable; it never falls back to clearnet.
 - **Confined proxy apps:** proxied executable resources, forms, workers and realtime
   connections are restricted to the concrete SecurityOS origin. ZUPT's sole cookie
   exception is exact-origin, 128-bit-session scoped, RAM-only and never returned to
