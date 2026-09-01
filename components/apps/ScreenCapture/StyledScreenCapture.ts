@@ -5,10 +5,14 @@ import styled from "styled-components";
 // scrollable so the option grid breathes; the Screenshot / Record buttons sit in a
 // prominent action bar.
 const StyledScreenCapture = styled.div`
-  background:
-    radial-gradient(
+  background: radial-gradient(
       130% 90% at 50% -10%,
-      color-mix(in srgb, ${({ theme }) => theme.colors.highlight} 18%, transparent) 0%,
+      color-mix(
+          in srgb,
+          ${({ theme }) => theme.colors.highlight} 18%,
+          transparent
+        )
+        0%,
       transparent 55%
     ),
     ${({ theme }) => theme.colors.background};
@@ -59,7 +63,11 @@ const StyledScreenCapture = styled.div`
 
   .options label {
     align-items: center;
-    background: color-mix(in srgb, ${({ theme }) => theme.colors.text} 5%, transparent);
+    background: color-mix(
+      in srgb,
+      ${({ theme }) => theme.colors.text} 5%,
+      transparent
+    );
     border: 1px solid
       color-mix(in srgb, ${({ theme }) => theme.colors.text} 10%, transparent);
     border-radius: 8px;
@@ -85,7 +93,11 @@ const StyledScreenCapture = styled.div`
   .options select {
     background: ${({ theme }) => theme.colors.background};
     border: 1px solid
-      color-mix(in srgb, ${({ theme }) => theme.colors.highlight} 45%, transparent);
+      color-mix(
+        in srgb,
+        ${({ theme }) => theme.colors.highlight} 45%,
+        transparent
+      );
     border-radius: 5px;
     color: ${({ theme }) => theme.colors.text};
     cursor: pointer;
@@ -135,7 +147,11 @@ const StyledScreenCapture = styled.div`
       transparent
     );
     border: 1px solid
-      color-mix(in srgb, ${({ theme }) => theme.colors.highlight} 50%, transparent);
+      color-mix(
+        in srgb,
+        ${({ theme }) => theme.colors.highlight} 50%,
+        transparent
+      );
     border-radius: 8px;
     color: ${({ theme }) => theme.colors.text};
     display: inline-flex;
@@ -158,7 +174,11 @@ const StyledScreenCapture = styled.div`
   .webcam-preview canvas {
     background: #000;
     border: 1px solid
-      color-mix(in srgb, ${({ theme }) => theme.colors.highlight} 60%, transparent);
+      color-mix(
+        in srgb,
+        ${({ theme }) => theme.colors.highlight} 60%,
+        transparent
+      );
     border-radius: 8px;
     box-shadow: 0 4px 14px -6px rgb(0 0 0 / 60%);
     height: 120px;
@@ -302,7 +322,11 @@ const StyledScreenCapture = styled.div`
     align-self: center;
     background: rgb(0 0 0 / 60%);
     border: 2px solid
-      color-mix(in srgb, ${({ theme }) => theme.colors.highlight} 60%, transparent);
+      color-mix(
+        in srgb,
+        ${({ theme }) => theme.colors.highlight} 60%,
+        transparent
+      );
     border-radius: 14px;
     color: #fff;
     display: flex;
@@ -316,9 +340,17 @@ const StyledScreenCapture = styled.div`
 
   .last-capture {
     align-items: center;
-    background: color-mix(in srgb, ${({ theme }) => theme.colors.text} 6%, transparent);
+    background: color-mix(
+      in srgb,
+      ${({ theme }) => theme.colors.text} 6%,
+      transparent
+    );
     border: 1px solid
-      color-mix(in srgb, ${({ theme }) => theme.colors.highlight} 35%, transparent);
+      color-mix(
+        in srgb,
+        ${({ theme }) => theme.colors.highlight} 35%,
+        transparent
+      );
     border-radius: 10px;
     display: flex;
     gap: 11px;
@@ -328,7 +360,11 @@ const StyledScreenCapture = styled.div`
 
   .last-capture img {
     border: 1px solid
-      color-mix(in srgb, ${({ theme }) => theme.colors.highlight} 50%, transparent);
+      color-mix(
+        in srgb,
+        ${({ theme }) => theme.colors.highlight} 50%,
+        transparent
+      );
     border-radius: 6px;
     flex-shrink: 0;
     height: 50px;

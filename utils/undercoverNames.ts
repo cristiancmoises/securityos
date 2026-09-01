@@ -37,9 +37,9 @@ const UNDERCOVER_DISPLAY_NAMES: Readonly<Record<string, string>> = {
   Winamp: "Media Player",
 
   // Light-touch friendly labels for the loose desktop notes (files are NOT renamed).
-  "README": "Read me",
-  "dev": "Notes",
-  "terms": "Notes",
+  README: "Read me",
+  dev: "Notes",
+  terms: "Notes",
 };
 
 /**

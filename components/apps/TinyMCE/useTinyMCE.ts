@@ -108,7 +108,6 @@ const useTinyMCE = (
     if (editor) {
       (editor.options.set as OptionSetter)("save_onsavecallback", async () => {
         const saveSpec: NotificationSpec = {
-          closeButton: true,
           text: "Successfully saved.",
           timeout: 5000,
           type: "success",
@@ -193,7 +192,11 @@ const useTinyMCE = (
   ]);
 
   useEffect(() => {
-    if (url && editor) loadFile().catch(() => {});
+    if (url && editor) {
+      loadFile().catch(() => {
+        // Ignore file errors raised after the editor effect has been scheduled.
+      });
+    }
   }, [editor, loadFile, readFile, url]);
 
   useEffect(

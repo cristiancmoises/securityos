@@ -94,7 +94,9 @@ const VaptvuptGui: FC<ComponentProcessProps> = () => {
       }
 
       setBusy(true);
-      setLog([`${mode === "encrypt" ? "Encrypting" : "Decrypting"} ${fullPath} …`]);
+      setLog([
+        `${mode === "encrypt" ? "Encrypting" : "Decrypting"} ${fullPath} …`,
+      ]);
 
       const { decryptData, encryptData, ENCRYPTED_EXTENSION } = await import(
         "utils/vaptvuptCrypto"
@@ -148,12 +150,24 @@ const VaptvuptGui: FC<ComponentProcessProps> = () => {
 
       try {
         await walk(fullPath, perFile);
-        append(`Done — ${stats.ok} ok, ${stats.skipped} skipped, ${stats.failed} failed.`);
+        append(
+          `Done — ${stats.ok} ok, ${stats.skipped} skipped, ${stats.failed} failed.`
+        );
       } finally {
         setBusy(false);
       }
     },
-    [busy, createPath, deletePath, exists, password, path, readFile, removeSource, walk]
+    [
+      busy,
+      createPath,
+      deletePath,
+      exists,
+      password,
+      path,
+      readFile,
+      removeSource,
+      walk,
+    ]
   );
 
   const runKeygen = useCallback(async (): Promise<void> => {
@@ -170,8 +184,12 @@ const VaptvuptGui: FC<ComponentProcessProps> = () => {
     setLog(["Generating ML-KEM-768 + X25519 keypair …"]);
 
     try {
-      const { generateKeypair, keyFingerprint, PRIVATE_KEY_EXTENSION, PUBLIC_KEY_EXTENSION } =
-        await import("utils/vaptvuptCrypto");
+      const {
+        generateKeypair,
+        keyFingerprint,
+        PRIVATE_KEY_EXTENSION,
+        PUBLIC_KEY_EXTENSION,
+      } = await import("utils/vaptvuptCrypto");
       const dir = resolve(keyDir);
       const { privateKey, publicKey } = await generateKeypair();
       const pubName = await createPath(
@@ -185,9 +203,19 @@ const VaptvuptGui: FC<ComponentProcessProps> = () => {
         privateKey
       );
 
-      append(`  public key  → ${join(dir, pubName)}  [${await keyFingerprint(publicKey)}]`);
-      append(`  PRIVATE key → ${join(dir, privName)}  [${await keyFingerprint(privateKey)}]`);
-      append("Keep the .vvkey private key secret + backed up — it cannot be recovered.");
+      append(
+        `  public key  → ${join(dir, pubName)}  [${await keyFingerprint(
+          publicKey
+        )}]`
+      );
+      append(
+        `  PRIVATE key → ${join(dir, privName)}  [${await keyFingerprint(
+          privateKey
+        )}]`
+      );
+      append(
+        "Keep the .vvkey private key secret + backed up — it cannot be recovered."
+      );
     } catch (error) {
       append(`FAILED: ${(error as Error).message}`);
     } finally {
@@ -220,7 +248,11 @@ const VaptvuptGui: FC<ComponentProcessProps> = () => {
 
       setBusy(true);
       setLog([
-        `${mode === "encrypt" ? "Encrypting to public key" : "Decrypting with private key"} ${fullPath} …`,
+        `${
+          mode === "encrypt"
+            ? "Encrypting to public key"
+            : "Decrypting with private key"
+        } ${fullPath} …`,
       ]);
 
       const {
@@ -274,7 +306,9 @@ const VaptvuptGui: FC<ComponentProcessProps> = () => {
 
       try {
         await walk(fullPath, perFile);
-        append(`Done — ${stats.ok} ok, ${stats.skipped} skipped, ${stats.failed} failed.`);
+        append(
+          `Done — ${stats.ok} ok, ${stats.skipped} skipped, ${stats.failed} failed.`
+        );
       } finally {
         setBusy(false);
       }
@@ -302,8 +336,9 @@ const VaptvuptGui: FC<ComponentProcessProps> = () => {
       {tab === "password" && (
         <>
           <p className="desc">
-            Encrypt &amp; decrypt files/folders with a password → <code>.zupt</code>{" "}
-            (PBKDF2 → AES-256 + HMAC, quantum-resistant). Authenticated.
+            Encrypt &amp; decrypt files/folders with a password →{" "}
+            <code>.zupt</code> (PBKDF2 → AES-256 + HMAC, quantum-resistant).
+            Authenticated.
           </p>
           <div>
             <label htmlFor="vv-path">Path (file or folder)</label>
@@ -337,7 +372,11 @@ const VaptvuptGui: FC<ComponentProcessProps> = () => {
             Remove plaintext originals after encrypting
           </label>
           <div className="btn-row">
-            <button disabled={busy} onClick={() => runPassword("encrypt")} type="button">
+            <button
+              disabled={busy}
+              onClick={() => runPassword("encrypt")}
+              type="button"
+            >
               Encrypt
             </button>
             <button
@@ -355,8 +394,9 @@ const VaptvuptGui: FC<ComponentProcessProps> = () => {
       {tab === "keygen" && (
         <>
           <p className="desc">
-            Generate a post-quantum keypair (<b>ML-KEM-768 + X25519</b>). Share the{" "}
-            <code>.vvpub</code> public key; keep the <code>.vvkey</code> private key secret.
+            Generate a post-quantum keypair (<b>ML-KEM-768 + X25519</b>). Share
+            the <code>.vvpub</code> public key; keep the <code>.vvkey</code>{" "}
+            private key secret.
           </p>
           <div>
             <label htmlFor="vv-kname">Key name</label>
@@ -392,13 +432,13 @@ const VaptvuptGui: FC<ComponentProcessProps> = () => {
             {tab === "encryptKey" ? (
               <>
                 Post-quantum encrypt to a recipient&apos;s public key (
-                <code>.vvpub</code>) → <code>.zupt</code>. Only their private key can
-                open it.
+                <code>.vvpub</code>) → <code>.zupt</code>. Only their private
+                key can open it.
               </>
             ) : (
               <>
-                Decrypt a post-quantum <code>.zupt</code> with your private key (
-                <code>.vvkey</code>).
+                Decrypt a post-quantum <code>.zupt</code> with your private key
+                (<code>.vvkey</code>).
               </>
             )}
           </p>
@@ -414,7 +454,9 @@ const VaptvuptGui: FC<ComponentProcessProps> = () => {
           </div>
           <div>
             <label htmlFor="vv-keypath">
-              {tab === "encryptKey" ? "Public key (.vvpub)" : "Private key (.vvkey)"}
+              {tab === "encryptKey"
+                ? "Public key (.vvpub)"
+                : "Private key (.vvkey)"}
             </label>
             <input
               id="vv-keypath"
@@ -432,7 +474,9 @@ const VaptvuptGui: FC<ComponentProcessProps> = () => {
           <div className="btn-row">
             <button
               disabled={busy}
-              onClick={() => runKeyMode(tab === "encryptKey" ? "encrypt" : "decrypt")}
+              onClick={() =>
+                runKeyMode(tab === "encryptKey" ? "encrypt" : "decrypt")
+              }
               type="button"
             >
               {tab === "encryptKey" ? "Encrypt" : "Decrypt"}
@@ -443,8 +487,8 @@ const VaptvuptGui: FC<ComponentProcessProps> = () => {
 
       {log.length > 0 && <pre className="output">{log.join("\n")}</pre>}
       <p className="muted">
-        Real Vaptvupt engine (WASM). Whole-disk encryption (cryptsetup/LUKS) runs in
-        the Linux VM — see the Terminal <code>vaptvupt</code> command.
+        Real Vaptvupt engine (WASM). Whole-disk encryption (cryptsetup/LUKS)
+        runs in the Linux VM — see the Terminal <code>vaptvupt</code> command.
       </p>
     </StyledTool>
   );

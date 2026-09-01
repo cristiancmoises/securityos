@@ -118,8 +118,8 @@ const useV86 = (
           ).arrayBuffer()
         )
       : url
-        ? await readFile(url)
-        : Buffer.from("");
+      ? await readFile(url)
+      : Buffer.from("");
     const ext = extname(isRemote ? new URL(url).pathname : url).toLowerCase();
     const isISO = ext === ".iso";
     const bufferUrl = bufferToUrl(imageContents);

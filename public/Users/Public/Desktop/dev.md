@@ -6,8 +6,9 @@
 
 **Security researcher · Ethical hacker · Sole maintainer & developer of SecurityOS & Vaptvupt**
 
-I build **SecurityOS** — a privacy-first, **Tor-only web operating system** for
-security work — and **Vaptvupt**, its built-in post-quantum encryption tool
+I build **SecurityOS** — a privacy-first web operating system with a fail-closed
+Tor Browser and clearly labelled direct applications for security work — and
+**Vaptvupt**, its built-in post-quantum encryption tool
 (producing `.zupt` files). SecurityOS is an **independent, one-person project**:
 no team, no company, no investors. I develop it **alone**, in the open.
 

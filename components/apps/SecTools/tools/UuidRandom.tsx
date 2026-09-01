@@ -43,7 +43,9 @@ const uuidV4 = (): string => {
 };
 
 const clamp = (value: number, min: number, max: number): number =>
-  Number.isFinite(value) ? Math.min(Math.max(Math.trunc(value), min), max) : min;
+  Number.isFinite(value)
+    ? Math.min(Math.max(Math.trunc(value), min), max)
+    : min;
 
 const copy = (text: string): void => {
   navigator.clipboard?.writeText(text).catch(() => {
@@ -137,7 +139,11 @@ const UuidRandomTool: FC = () => {
             <pre className="output">{hex}</pre>
           </div>
           <div className="btn-row">
-            <button className="secondary" onClick={() => copy(hex)} type="button">
+            <button
+              className="secondary"
+              onClick={() => copy(hex)}
+              type="button"
+            >
               Copy hex
             </button>
             <button

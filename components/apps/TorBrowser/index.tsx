@@ -10,7 +10,7 @@ import {
   NOSCRIPT_IFRAME_CONFIG,
   SANDBOXED_IFRAME_CONFIG,
 } from "utils/constants";
-import { getUrlOrSearch, label } from "utils/functions";
+import { getUrlOrSearch, label, updateBrowserHistory } from "utils/functions";
 
 // The Tor Browser start page: Torch, the long-running darknet search engine.
 // It needs no JavaScript, so it renders in the JS-disabled "Safest" sandbox. If it
@@ -49,7 +49,9 @@ const TOR_BOOKMARKS: { name: string; url: string }[] = [
   },
   {
     name: "Keywave",
-    url: "http://secopshnfap6cllndkzxf7345kjlbgqvfdkyrv6jfwkkfcwxtdfcqgid.onion/",
+    // The historical onion is currently unreachable; the live service still
+    // traverses Tor because this browser proxies clearnet destinations via SOCKS5h.
+    url: "https://chat.securityops.co/",
   },
   {
     name: "PrivateBin",
@@ -65,7 +67,8 @@ const TOR_BOOKMARKS: { name: string; url: string }[] = [
   },
   {
     name: "Zupt Web",
-    url: "http://secopsuwwht2unomwt3jofl33kfqsfd2z6cwip6rbqlapi7s4pys5vyd.onion/",
+    // Same routing rule as every Tor Browser clearnet tab: no direct fallback.
+    url: "https://share.securityops.co/",
   },
   {
     name: "URL Shortener",
@@ -79,10 +82,20 @@ const TOR_BOOKMARKS: { name: string; url: string }[] = [
 const CLEARNET_BOOKMARKS: { name: string; url: string }[] = [
   { name: "SecurityOps", url: "https://securityops.com.br/" },
   { name: "SecurityOps .co", url: "https://securityops.co/" },
+  { name: "SecurityOS", url: "https://os.securityops.co/" },
   { name: "GODS EYE", url: "https://eye.securityops.co/" },
+  { name: "SecurityOps IRC", url: "https://irc.securityops.com.br/" },
+  { name: "CryptPad", url: "https://office.securityops.co/" },
+  { name: "Keywave", url: "https://chat.securityops.co/" },
+  { name: "Wiki", url: "https://wiki.securityops.co/" },
+  { name: "Git .co", url: "https://git.securityops.co/" },
+  { name: "Git .com.br", url: "https://git.securityops.com.br/" },
 ];
+const KEYWAVE_ORIGIN = "https://chat.securityops.co";
+const ZUPT_WEB_ORIGIN = "https://share.securityops.co";
 
 type Bookmark = { name: string; url: string };
+export type BrowserMode = "clearnet" | "tor";
 
 // User bookmarks (the built-in BOOKMARKS above are the operator's onion services;
 // these are sites the USER saves). Persisted in localStorage so they survive
@@ -129,30 +142,35 @@ const writeUserBookmarks = (mode: BrowserMode, bookmarks: Bookmark[]): void => {
 // Tabs (in no-JS mode, the sandbox forbids scripts, so links open in the current
 // tab and new tabs come from the + button; with JS on, ctrl/middle-click + pop-ups
 // open new tabs via the in-page shim).
-const addressFromSrc = (src: string): string => {
+const addressFromProxySrc = (src: string): string => {
   try {
-    return new URL(src, window.location.origin).searchParams.get("url") || src;
-  } catch {
-    return src;
-  }
-};
+    const proxyUrl = new URL(src, window.location.origin);
 
-// Pull the Tor isolation token out of a proxied src (e.g. a link the in-page shim
-// opened in a new tab) so the new tab inherits the SAME circuit as the link it came
-// from. Falls back to "" (caller then mints a fresh token).
-const isoFromSrc = (src: string): string => {
-  try {
-    return new URL(src, window.location.origin).searchParams.get("iso") || "";
+    if (
+      proxyUrl.origin !== window.location.origin ||
+      proxyUrl.pathname !== "/api/proxy"
+    ) {
+      return "";
+    }
+
+    const address = proxyUrl.searchParams.get("url");
+
+    if (!address) return "";
+
+    const addressUrl = new URL(address);
+
+    return addressUrl.protocol === "http:" || addressUrl.protocol === "https:"
+      ? addressUrl.href
+      : "";
   } catch {
     return "";
   }
 };
 
-// An opaque 128-bit token used purely as the Tor SOCKS username:password for STREAM
+// An opaque 128-bit token used as the Tor SOCKS username:password for STREAM
 // ISOLATION (see pages/api/proxy.ts). A unique token => a separate Tor circuit =>
-// in general a different exit IP. It is NOT secret and reveals nothing about the
-// real client; it only selects which circuit Tor uses. crypto.getRandomValues is
-// fine here — this is client-side React (Math.random is avoided / may be unavailable).
+// in general a different exit IP. Exact-origin ZUPT also uses it as the key for its
+// ephemeral server-side CSRF jar. crypto.getRandomValues avoids predictable tokens.
 const newIsoToken = (): string => {
   const bytes = new Uint8Array(16);
 
@@ -165,13 +183,13 @@ type Tab = {
   key: number;
   address: string;
   src: string;
+  syncPending: boolean;
   title: string;
   history: string[];
   position: number;
   loading: boolean;
-  // Per-tab Tor stream-isolation token: gives this tab its own circuit/exit IP so
-  // sites in different tabs can't be correlated by a shared exit. "New Tor circuit"
-  // rotates it for a fresh exit. Stable across navigations within the tab.
+  // Per-tab isolation token: selects a Tor circuit in Tor mode and separates the
+  // exact-origin ZUPT CSRF jar in either route. Stable across tab navigation.
   iso: string;
 };
 
@@ -179,6 +197,7 @@ const blankTab = (key: number, address: string, iso?: string): Tab => ({
   key,
   address,
   src: "",
+  syncPending: false,
   title: "",
   history: address ? [address] : [],
   position: address ? 0 : -1,
@@ -220,8 +239,6 @@ const JS_MODE_LABEL: Record<JsMode, string> = {
   all: "Scripts: ALL allowed. Click to block everything (Safest).",
 };
 
-export type BrowserMode = "tor" | "clearnet";
-
 type BrowserProps = ComponentProcessProps & { mode?: BrowserMode };
 
 // Shared browser engine. Tor mode always uses SOCKS5h through the server-side Tor
@@ -241,12 +258,10 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const keyCounter = useRef(0);
-  // Secure-by-default, every launch: NoScript "Safest" (jsMode "off" -> all
-  // JavaScript blocked, script-src 'none', sandbox drops allow-scripts) and the
-  // Security Ops extension OFF (its scripts — incl. secops-reporter — never load,
-  // so no telemetry). The user can opt into scripts / the extension per session;
-  // it never persists, so a fresh window is always the hardened state.
-  const [jsMode, setJsMode] = useState<JsMode>("off");
+  // Tor launches in NoScript "Safest" mode; clearnet launches with JavaScript for
+  // normal site compatibility. The Security Ops extension stays off in both modes,
+  // and neither setting persists between browser sessions.
+  const [jsMode, setJsMode] = useState<JsMode>(isTor ? "off" : "all");
   const [extEnabled, setExtEnabled] = useState(false);
   const [tabs, setTabs] = useState<Tab[]>(() => [blankTab(0, initialUrl)]);
   const [activeKey, setActiveKey] = useState(0);
@@ -275,13 +290,28 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
     async (
       addressInput: string,
       iso: string
-    ): Promise<{ src: string; address: string }> => {
+    ): Promise<{ address: string; src: string }> => {
       const addressUrl = await getUrlOrSearch(addressInput, searchQuery);
 
-      if (!/^https?:/.test(addressUrl))
-        return { src: "", address: addressInput };
+      if (!/^https?:/.test(addressUrl)) {
+        return { address: addressInput, src: "" };
+      }
+
+      let isKeywave = false;
+      let isZupt = false;
+
+      try {
+        const targetOrigin = new URL(addressUrl).origin;
+
+        isKeywave = isTor && targetOrigin === KEYWAVE_ORIGIN;
+        isZupt = targetOrigin === ZUPT_WEB_ORIGIN;
+      } catch {
+        // getUrlOrSearch already produced an HTTP(S) URL; keep special modes off if
+        // an unusual implementation still fails URL parsing here.
+      }
 
       return {
+        address: addressInput,
         // &iso=<tab token> pins this tab to its own Tor circuit (separate exit IP).
         src: `${PROXY_PATH}${encodeURIComponent(addressUrl)}${
           jsMode === "off"
@@ -289,10 +319,11 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
             : jsMode === "noscript"
             ? "&librejs=1"
             : ""
-        }${extEnabled ? "&ext=1" : ""}${isTor && iso ? `&iso=${iso}` : ""}${
+        }${extEnabled ? "&ext=1" : ""}${isKeywave ? "&keywave=1" : ""}${
+          isZupt ? "&zupt=1" : ""
+        }${(isTor || isZupt) && iso ? `&iso=${iso}` : ""}${
           isTor ? "" : "&direct=1"
         }`,
-        address: addressInput,
       };
     },
     [extEnabled, isTor, jsMode, searchQuery]
@@ -327,6 +358,7 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
             src,
             history,
             position: push ? history.length - 1 : t.position,
+            syncPending: true,
           };
         })
       );
@@ -348,21 +380,6 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
     },
     [home, navigateTab]
   );
-
-  const openProxiedTab = useCallback((proxiedSrc: string): void => {
-    keyCounter.current += 1;
-    const key = keyCounter.current;
-    const address = addressFromSrc(proxiedSrc);
-    // Inherit the circuit of the link that spawned this tab (the shim carried the
-    // parent's &iso=); mint a fresh one only if the src somehow has none.
-    const iso = isoFromSrc(proxiedSrc) || newIsoToken();
-
-    setTabs((prev) => [
-      ...prev,
-      { ...blankTab(key, address, iso), src: proxiedSrc, loading: true },
-    ]);
-    setActiveKey(key);
-  }, []);
 
   const closeTab = useCallback(
     (key: number): void => {
@@ -398,15 +415,18 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
     readUserBookmarks(mode)
   );
 
-  const removeBookmark = useCallback((url: string): void => {
-    setUserBookmarks((prev) => {
-      const next = prev.filter((bookmark) => bookmark.url !== url);
+  const removeBookmark = useCallback(
+    (url: string): void => {
+      setUserBookmarks((prev) => {
+        const next = prev.filter((bookmark) => bookmark.url !== url);
 
-      writeUserBookmarks(mode, next);
+        writeUserBookmarks(mode, next);
 
-      return next;
-    });
-  }, [mode]);
+        return next;
+      });
+    },
+    [mode]
+  );
 
   // Save the active tab's current address (deduped). Names default to the page
   // title, then the hostname, then the raw address.
@@ -482,30 +502,54 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
 
   useEffect(() => {
     const onMessage = (event: MessageEvent): void => {
+      // Proxied pages have an opaque origin, so origin matching is impossible.
+      // Bind messages to this browser's active iframe instead: another app, popup,
+      // or browser window must never create tabs or alter titles here.
+      if (event.source !== iframeRef.current?.contentWindow) return;
+
       const data = event.data as {
+        __sosHref?: unknown;
         __sosNewTab?: unknown;
         __sosTitle?: unknown;
-        __sosHref?: unknown;
       };
-      const prefix = `${window.location.origin}/api/proxy?`;
 
-      if (
-        typeof data?.__sosNewTab === "string" &&
-        data.__sosNewTab.startsWith(prefix)
-      ) {
-        openProxiedTab(data.__sosNewTab);
-      } else if (
-        typeof data?.__sosTitle === "string" &&
-        data.__sosTitle &&
-        typeof data?.__sosHref === "string"
-      ) {
-        const target = addressFromSrc(data.__sosHref);
-        const title = data.__sosTitle.slice(0, 120);
+      if (typeof data?.__sosNewTab === "string") {
+        const address = addressFromProxySrc(data.__sosNewTab);
+
+        // Extract only the destination. Rebuilding the URL through openTab enforces
+        // this browser's routing mode, JS policy, extensions, and a fresh Tor
+        // isolation token; page-controlled proxy flags are never trusted.
+        if (address) openTab(address);
+      } else if (typeof data?.__sosHref === "string") {
+        const address = addressFromProxySrc(data.__sosHref);
+
+        if (!address) return;
+
+        const title =
+          typeof data.__sosTitle === "string"
+            ? data.__sosTitle.slice(0, 120)
+            : undefined;
 
         setTabs((prev) =>
-          prev.map((t) =>
-            t.src && addressFromSrc(t.src) === target ? { ...t, title } : t
-          )
+          prev.map((tab) => {
+            if (tab.key !== activeKey) return tab;
+
+            const { history, position } = updateBrowserHistory(
+              tab.history,
+              tab.position,
+              address,
+              tab.syncPending
+            );
+
+            return {
+              ...tab,
+              address,
+              history,
+              position,
+              syncPending: false,
+              ...(title === undefined ? {} : { title }),
+            };
+          })
         );
       }
     };
@@ -513,7 +557,7 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
     window.addEventListener("message", onMessage);
 
     return () => window.removeEventListener("message", onMessage);
-  }, [openProxiedTab]);
+  }, [activeKey, openTab]);
 
   useEffect(() => {
     if (!activeTab) return;
@@ -609,29 +653,31 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
           >
             {activeTab?.loading ? <Stop /> : <Refresh />}
           </Button>
-          {isTor && <Button
-            onClick={newCircuit}
-            {...label("New Tor circuit for this site (fresh exit IP)")}
-          >
-            <svg height="16" viewBox="0 0 24 24" width="16">
-              <path
-                d="M4.5 12a7.5 7.5 0 0 1 12.9-5.2M19.5 12a7.5 7.5 0 0 1-12.9 5.2"
-                fill="none"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="1.8"
-              />
-              <path
-                d="M17.4 3v3.8h-3.8M6.6 21v-3.8h3.8"
-                fill="none"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="1.8"
-              />
-            </svg>
-          </Button>}
+          {isTor && (
+            <Button
+              onClick={newCircuit}
+              {...label("New Tor circuit for this site (fresh exit IP)")}
+            >
+              <svg height="16" viewBox="0 0 24 24" width="16">
+                <path
+                  d="M4.5 12a7.5 7.5 0 0 1 12.9-5.2M19.5 12a7.5 7.5 0 0 1-12.9 5.2"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.8"
+                />
+                <path
+                  d="M17.4 3v3.8h-3.8M6.6 21v-3.8h3.8"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.8"
+                />
+              </svg>
+            </Button>
+          )}
           <Button onClick={toggleJs} {...label(JS_MODE_LABEL[jsMode])}>
             <svg
               height="16"
@@ -698,6 +744,13 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
           }}
           type="text"
         />
+        <span className={`mode-badge ${isTor ? "tor" : "direct"}`}>
+          {isTor
+            ? jsMode === "off"
+              ? "TOR · SAFEST"
+              : "TOR · JS ENABLED"
+            : "DIRECT · NOT ANONYMOUS"}
+        </span>
       </nav>
       <nav className="bookmarks">
         <Button

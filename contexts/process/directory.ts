@@ -42,7 +42,7 @@ const directory: Processes = {
     },
     icon: "/System/Icons/secchat.webp",
     singleton: true,
-    title: "SecChat",
+    title: "Keywave",
   },
   SecTube: {
     Component: dynamic(() => import("components/apps/SecTube")),
@@ -151,7 +151,7 @@ const directory: Processes = {
     title: "Marked",
   },
   IRC: {
-    Component: dynamic(() => import("components/apps/IRC")),
+    Component: dynamic(() => import("components/apps/IRCWeb")),
     backgroundColor: "#150f1b",
     defaultSize: {
       height: 600,

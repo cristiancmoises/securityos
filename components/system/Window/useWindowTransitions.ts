@@ -1,5 +1,5 @@
 import { useProcesses } from "contexts/process";
-import type { MotionProps, Variant } from "framer-motion";
+import type { MotionProps, TargetAndTransition } from "framer-motion";
 import { useEffect, useLayoutEffect, useState } from "react";
 import { TASKBAR_HEIGHT, TRANSITIONS_IN_SECONDS } from "utils/constants";
 import { viewHeight, viewWidth } from "utils/functions";
@@ -37,7 +37,7 @@ const baseMinimize = {
   scale: 0.7,
 };
 
-const getMaxDimensions = (): Partial<Variant> => ({
+const getMaxDimensions = (): TargetAndTransition => ({
   height: viewHeight() - TASKBAR_HEIGHT,
   width: viewWidth(),
 });
@@ -49,12 +49,8 @@ const useWindowTransitions = (
   const { processes: { [id]: process } = {} } = useProcesses();
   const { closing, componentWindow, maximized, minimized, taskbarEntry } =
     process || {};
-  const [maximize, setMaximize] = useState<Variant>(
-    Object.create(null) as Variant
-  );
-  const [minimize, setMinimize] = useState<Variant>(
-    Object.create(null) as Variant
-  );
+  const [maximize, setMaximize] = useState<TargetAndTransition>({});
+  const [minimize, setMinimize] = useState<TargetAndTransition>({});
 
   useLayoutEffect(() => {
     if (!componentWindow || closing) return;
@@ -101,7 +97,7 @@ const useWindowTransitions = (
   useEffect(() => {
     const monitorViewportResize = (): void => {
       if (maximized) {
-        setMaximize((currentMaximize: Variant) => ({
+        setMaximize((currentMaximize) => ({
           ...currentMaximize,
           ...getMaxDimensions(),
         }));

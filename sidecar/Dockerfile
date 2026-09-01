@@ -14,7 +14,7 @@ WORKDIR /build
 # Cache deps: copy manifests first, then sources.
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
-RUN cargo build --release && strip target/release/securityos-proxy
+RUN cargo build --release --locked && strip target/release/securityos-proxy
 
 # ---- runtime --------------------------------------------------------------
 FROM alpine:latest

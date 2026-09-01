@@ -38,8 +38,8 @@ const StyledMessenger = styled.div<{ $accent: string }>`
     align-items: center;
     background: ${({ $accent }) => $accent};
     border-radius: 22px;
-    box-shadow: 0 10px 30px -8px
-      color-mix(in srgb, ${({ $accent }) => $accent} 70%, #000);
+    box-shadow: 0 10px 30px -8px color-mix(in srgb, ${({ $accent }) => $accent}
+          70%, #000);
     display: flex;
     height: 84px;
     justify-content: center;

@@ -15,7 +15,7 @@ This is an architecture limit, not a setting.
 
 You have two good options instead:
 
-1. **A 32-bit amnesic / Tor live ISO inside SecurityOS.** Any *i686* live ISO
+1. **A 32-bit amnesic / Tor live ISO inside SecurityOS.** Any _i686_ live ISO
    boots in the Virtual x86 app and is amnesic. Route its network through Tor with
    the **Tor Control** app for TAILS-style anonymous, no-trace browsing.
 2. **Real TAILS in a native VM (outside the browser).** Download `tails.iso` and

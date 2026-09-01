@@ -42,10 +42,11 @@ const Widgets: FC = () => {
     id,
     onFocus: bringToFront,
     onMove: setPosition,
-    position: state.positions[id] ?? DEFAULT_WIDGETS_STATE.positions[id] ?? {
-      x: 24,
-      y: 24,
-    },
+    position: state.positions[id] ??
+      DEFAULT_WIDGETS_STATE.positions[id] ?? {
+        x: 24,
+        y: 24,
+      },
     zIndex: zIndexFor(id),
   });
 

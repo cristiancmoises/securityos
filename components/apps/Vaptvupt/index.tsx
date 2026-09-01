@@ -1,32 +1,36 @@
 import { PROXY_PATH } from "components/apps/Browser/config";
 import type { ComponentProcessProps } from "components/system/Apps/RenderComponent";
-import { useProcesses } from "contexts/process";
 import { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
 import { SANDBOXED_IFRAME_CONFIG } from "utils/constants";
 
-// Vaptvupt — the SecurityOps "zupt" file/folder share, served from its Tor hidden
-// service and loaded through the same-origin Tor proxy (like the Tor Browser):
-// every byte is fetched server-side over Tor and rendered in an opaque-origin
-// sandbox.
+// ZUPT's native site refuses framing. Both modes therefore use SecurityOS's
+// same-origin, SSRF-guarded proxy and render in an opaque-origin sandbox; only the
+// proxy's upstream route changes. Tor is fail-closed, while clearnet explicitly
+// opts into ordinary egress with direct=1.
 //
-// WHY THE PROXY (not a direct embed): share.securityops.co sends
-// `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'`, so a DIRECT iframe is
-// refused by the browser and the app shows blank. The proxy strips those framing
-// headers and serves the page in the sandbox, so it loads reliably.
+// The live service binds its CSRF form token to a Secure HttpOnly cookie. zupt=1
+// and a per-mode iso token let the proxy keep that single upstream cookie
+// server-side for this app session; it is never exposed to, or persisted by, the
+// browser.
 //
-// DOWNLOADS + UPLOADS both work over the proxy: SANDBOXED_IFRAME_CONFIG grants
-// `allow-downloads`, and pages/api/proxy.ts forwards POST/multipart request bodies
-// over Tor (up to 256 MiB) and streams large file downloads back in full (downloads
-// get a dedicated 256 MiB budget for attachments/binary types, so files over 25 MiB
-// no longer truncate) — all routed through Tor in the opaque-origin sandbox.
-const VAPTVUPT_URL =
-  "http://secopsuwwht2unomwt3jofl33kfqsfd2z6cwip6rbqlapi7s4pys5vyd.onion/";
-const VAPTVUPT_SRC = `${PROXY_PATH}${encodeURIComponent(VAPTVUPT_URL)}`;
+// The historical hidden service currently has no reachable descriptor. Tor mode
+// therefore reaches the healthy HTTPS service THROUGH Tor; it never silently
+// changes to direct egress.
+const VAPTVUPT_URL = "https://share.securityops.co/";
 const VAPTVUPT_ALLOW = "clipboard-read; clipboard-write; fullscreen";
 
-// How long to wait on a cold Tor circuit before telling the user it's slow (and
-// offering Reload / open-in-Tor-Browser) instead of leaving a silent spinner.
+type NetworkMode = "clearnet" | "tor";
+
+const newSessionToken = (): string => {
+  const bytes = new Uint8Array(16);
+
+  globalThis.crypto.getRandomValues(bytes);
+
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+};
+
+// How long to wait before replacing the passive loading veil with actionable help.
 const SLOW_LOAD_MS = 30_000;
 
 const StyledVaptvupt = styled.div`
@@ -53,12 +57,66 @@ const StyledVaptvupt = styled.div`
 
   .toolbar .title {
     flex: 1 1 auto;
+    min-width: 120px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .toolbar button {
+  .mode-switch {
+    border: 1px solid rgba(157, 123, 216, 35%);
+    border-radius: 6px;
+    display: flex;
+    overflow: hidden;
+  }
+
+  .mode-switch .mode {
+    background: transparent;
+    border: 0;
+    color: #d7c2ec;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11.5px;
+    padding: 4px 9px;
+    white-space: nowrap;
+  }
+
+  .mode-switch .mode + .mode {
+    border-left: 1px solid rgba(157, 123, 216, 35%);
+  }
+
+  .mode-switch .mode:hover {
+    background: rgba(157, 123, 216, 14%);
+  }
+
+  .mode-switch .mode.active {
+    background: rgba(157, 123, 216, 28%);
+    color: #fff;
+  }
+
+  .badge {
+    border: 1px solid;
+    border-radius: 999px;
+    flex: 0 0 auto;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    white-space: nowrap;
+  }
+
+  .badge.tor {
+    background: rgba(95, 208, 135, 10%);
+    border-color: rgba(95, 208, 135, 42%);
+    color: #78d99a;
+  }
+
+  .badge.direct {
+    background: rgba(240, 178, 82, 9%);
+    border-color: rgba(240, 178, 82, 45%);
+    color: #efba6b;
+  }
+
+  .toolbar .action {
     background: transparent;
     border: 1px solid rgba(157, 123, 216, 35%);
     border-radius: 5px;
@@ -70,8 +128,36 @@ const StyledVaptvupt = styled.div`
     white-space: nowrap;
   }
 
-  .toolbar button:hover {
+  .toolbar .action:hover {
     background: rgba(157, 123, 216, 14%);
+  }
+
+  .toolbar .action.full-client {
+    border-color: rgba(240, 178, 82, 45%);
+    color: #efba6b;
+  }
+
+  .route-note {
+    align-items: center;
+    background: #120e18;
+    border-bottom: 1px solid rgba(157, 123, 216, 18%);
+    color: #9685a9;
+    display: flex;
+    flex: 0 0 auto;
+    font-family: ${({ theme }) => theme.formats.systemFont};
+    font-size: 11px;
+    gap: 7px;
+    line-height: 1.35;
+    padding: 5px 10px;
+  }
+
+  .route-note strong {
+    color: #cbb8e4;
+    flex: 0 0 auto;
+  }
+
+  .route-note.direct strong {
+    color: #efba6b;
   }
 
   .frame-wrap {
@@ -129,7 +215,7 @@ const StyledVaptvupt = styled.div`
     margin-top: 4px;
   }
 
-  .overlay button {
+  .frame-wrap .overlay-action {
     background: rgba(157, 123, 216, 16%);
     border: 1px solid rgba(157, 123, 216, 45%);
     border-radius: 6px;
@@ -140,8 +226,28 @@ const StyledVaptvupt = styled.div`
     padding: 7px 14px;
   }
 
-  .overlay button:hover {
+  .frame-wrap .overlay-action:hover {
     background: rgba(157, 123, 216, 28%);
+  }
+
+  .frame-wrap .overlay-action.full-client {
+    border-color: rgba(240, 178, 82, 45%);
+    color: #efba6b;
+  }
+
+  @media (max-width: 760px) {
+    .toolbar {
+      flex-wrap: wrap;
+    }
+
+    .toolbar .title {
+      flex-basis: 100%;
+    }
+
+    .route-note {
+      align-items: flex-start;
+      flex-direction: column;
+    }
   }
 
   @keyframes vaptvupt-spin {
@@ -152,12 +258,24 @@ const StyledVaptvupt = styled.div`
 `;
 
 const Vaptvupt: FC<ComponentProcessProps> = ({ id }) => {
-  const { open } = useProcesses();
+  const [mode, setMode] = useState<NetworkMode>("tor");
   const [loading, setLoading] = useState(true);
   const [slow, setSlow] = useState(false);
-  // Bumping this key remounts the iframe → a clean reload over a fresh request.
   const [reloadKey, setReloadKey] = useState(0);
+  const sessionTokens = useRef<Record<NetworkMode, string>>();
   const slowTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  if (!sessionTokens.current) {
+    sessionTokens.current = {
+      clearnet: newSessionToken(),
+      tor: newSessionToken(),
+    };
+  }
+
+  const isTor = mode === "tor";
+  const src = `${PROXY_PATH}${encodeURIComponent(VAPTVUPT_URL)}&zupt=1&iso=${
+    sessionTokens.current[mode]
+  }${isTor ? "" : "&direct=1"}`;
 
   // Arm the "this is slow" hint whenever a (re)load starts; clear it on success.
   useEffect(() => {
@@ -173,59 +291,129 @@ const Vaptvupt: FC<ComponentProcessProps> = ({ id }) => {
   }, [loading, reloadKey]);
 
   const reload = (): void => {
+    // A failed/blocked Tor exit must not trap the app on the same circuit. Rotating
+    // also starts a fresh ephemeral CSRF jar; the root GET immediately seeds it.
+    if (isTor && sessionTokens.current) {
+      sessionTokens.current.tor = newSessionToken();
+    }
     setLoading(true);
     setReloadKey((key) => key + 1);
   };
 
-  const openInTorBrowser = (): void => {
+  const selectMode = (nextMode: NetworkMode): void => {
+    if (nextMode === mode) return;
+
+    setMode(nextMode);
+    setLoading(true);
+    setSlow(false);
+    setReloadKey((key) => key + 1);
+  };
+
+  const openFullClient = (): void => {
     try {
-      open("TorBrowser", { url: VAPTVUPT_URL });
+      window.open(VAPTVUPT_URL, "_blank", "noopener,noreferrer");
     } catch {
-      // Tor Browser failed to open — the embedded view is still available.
+      // The embedded client remains available if the browser blocks pop-ups.
     }
   };
 
   return (
     <StyledVaptvupt>
       <div className="toolbar">
-        <span className="title">🧅 Vaptvupt — encrypted file share, over Tor</span>
-        <button onClick={reload} title="Reload over Tor" type="button">
-          ↻ Reload
-        </button>
+        <span className="title">
+          ZUPT — compression, encryption &amp; recovery
+        </span>
+        <span aria-label="Network route" className="mode-switch" role="group">
+          <button
+            aria-pressed={isTor}
+            className={`mode${isTor ? " active" : ""}`}
+            onClick={() => selectMode("tor")}
+            title="Route the embedded ZUPT session through Tor"
+            type="button"
+          >
+            🧅 Tor
+          </button>
+          <button
+            aria-pressed={!isTor}
+            className={`mode${isTor ? "" : " active"}`}
+            onClick={() => selectMode("clearnet")}
+            title="Use ordinary server egress (not anonymous)"
+            type="button"
+          >
+            🌐 Clearnet
+          </button>
+        </span>
+        <span className={`badge ${isTor ? "tor" : "direct"}`}>
+          {isTor ? "TOR · FAIL-CLOSED" : "DIRECT · NOT ANONYMOUS"}
+        </span>
         <button
-          onClick={openInTorBrowser}
-          title="Open the share in the Tor Browser (toggle scripts if a page needs them)"
+          className="action"
+          onClick={reload}
+          title={
+            isTor
+              ? "Reload with a fresh Tor circuit and ephemeral CSRF session"
+              : "Reload using direct egress"
+          }
           type="button"
         >
-          Open in Tor Browser
+          {isTor ? "↻ New circuit" : "↻ Reload"}
         </button>
+        <button
+          className="action full-client"
+          onClick={openFullClient}
+          title="Open the native site outside SecurityOS; this direct fallback is not anonymized by the app"
+          type="button"
+        >
+          Full client · DIRECT
+        </button>
+      </div>
+      <div className={`route-note ${isTor ? "tor" : "direct"}`}>
+        <strong>{isTor ? "Tor session" : "Clearnet session"}</strong>
+        <span>
+          {isTor
+            ? "Pages, uploads and downloads stay on Tor; there is no automatic direct fallback."
+            : "Pages, uploads and downloads use ordinary SecurityOS server egress and are not anonymous."}
+          {
+            " The CSRF session is ephemeral and held only by the server-side proxy."
+          }
+        </span>
       </div>
       <div className="frame-wrap">
         <iframe
           key={reloadKey}
           allow={VAPTVUPT_ALLOW}
+          onError={() => setSlow(true)}
           onLoad={() => setLoading(false)}
-          src={VAPTVUPT_SRC}
-          title={id}
+          src={src}
+          title={`${id} (${isTor ? "Tor" : "clearnet"})`}
           {...SANDBOXED_IFRAME_CONFIG}
         />
         {loading && (
           <div className={`overlay${slow ? "" : " pass"}`}>
             <span className="spinner" />
-            <span>Connecting to Vaptvupt over Tor…</span>
+            <span>Connecting to ZUPT {isTor ? "over Tor" : "directly"}…</span>
             {slow && (
               <>
                 <span className="hint">
-                  A cold Tor circuit can take a while. If it doesn&apos;t appear,
-                  reload, or open it in the Tor Browser where you can retry and
-                  toggle scripts per page.
+                  {isTor
+                    ? "Tor or the service is unavailable. This mode fails closed and will not switch to clearnet on its own."
+                    : "The direct route or service is unavailable. Reload, or use the native full client outside the sandbox."}
                 </span>
                 <div className="actions">
-                  <button onClick={reload} type="button">
-                    ↻ Reload
+                  <button
+                    className="overlay-action"
+                    onClick={reload}
+                    type="button"
+                  >
+                    {isTor ? "↻ New Tor circuit" : "↻ Reload"}
                   </button>
-                  <button onClick={openInTorBrowser} type="button">
-                    Open in Tor Browser
+                  <button
+                    className="overlay-action full-client"
+                    onClick={openFullClient}
+                    title="Direct, native-browser fallback; not anonymized by SecurityOS"
+                    type="button"
+                  >
+                    Full client · DIRECT
                   </button>
                 </div>
               </>

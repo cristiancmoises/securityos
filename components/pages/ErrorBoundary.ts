@@ -39,7 +39,10 @@ const recordReload = (): void => {
 
     window.sessionStorage.setItem(
       RELOAD_LOG_KEY,
-      JSON.stringify([...log.filter((time) => now - time < RELOAD_WINDOW_MS), now])
+      JSON.stringify([
+        ...log.filter((time) => now - time < RELOAD_WINDOW_MS),
+        now,
+      ])
     );
   } catch {
     // ignore storage failures

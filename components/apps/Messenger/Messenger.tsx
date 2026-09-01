@@ -99,50 +99,53 @@ const Messenger: FC<{ config: MessengerConfig }> = ({ config }) => {
           {launched
             ? `Reopen ${name}`
             : available
-              ? `Open ${name}`
-              : `Get ${name}`}
+            ? `Open ${name}`
+            : `Get ${name}`}
         </button>
 
         <p className={`status${launched && !blocked ? " live" : ""}`}>
           {blocked
             ? "⚠ Your browser blocked the pop-up. Allow pop-ups for SecurityOS, then click again."
             : launched
-              ? `● Opened in its own window — uploads, downloads & calls work there. Click again to bring it back.`
-              : available
-                ? "Opens in a separate, full-feature window."
-                : ""}
+            ? `● Opened in its own window — uploads, downloads & calls work there. Click again to bring it back.`
+            : available
+            ? "Opens in a separate, full-feature window."
+            : ""}
         </p>
 
         <ul className="steps">{steps}</ul>
 
         <details className="tor-note">
-          <summary>{available ? `Using ${name} over Tor` : "Privacy & Tor"}</summary>
+          <summary>
+            {available ? `Using ${name} over Tor` : "Privacy & Tor"}
+          </summary>
           {available ? (
             <p>
-              {name} relies on <b>WebSockets</b>, which SecurityOS&apos;s built-in
-              Tor proxy blocks (a WebSocket would bypass Tor) — so this window is a{" "}
-              <b>direct</b> connection. To use {name} anonymously, route your{" "}
-              <b>whole browser or device</b> through Tor first: open SecurityOS in
-              the <b>Tor Browser</b>, or run it inside <b>Tails</b> / a system-wide
-              Tor, then launch {name} here. Full guide: <b>SecurityOS Handbook</b>{" "}
-              in Documents.
+              {name} relies on <b>WebSockets</b>, which SecurityOS&apos;s
+              built-in Tor proxy blocks (a WebSocket would bypass Tor) — so this
+              window is a <b>direct</b> connection. To use {name} anonymously,
+              route your <b>whole browser or device</b> through Tor first: open
+              SecurityOS in the <b>Tor Browser</b>, or run it inside{" "}
+              <b>Tails</b> / a system-wide Tor, then launch {name} here. Full
+              guide: <b>SecurityOS Handbook</b> in Documents.
             </p>
           ) : (
             <p>
-              {name} carries <b>its own onion routing</b> once installed — messages
-              travel over its private network with no phone number or email. This
-              window only opens the official <b>download page</b> (a direct
-              connection); run SecurityOS in the <b>Tor Browser</b> for that step
-              to stay anonymous. See the <b>SecurityOS Handbook</b> in Documents.
+              {name} carries <b>its own onion routing</b> once installed —
+              messages travel over its private network with no phone number or
+              email. This window only opens the official <b>download page</b> (a
+              direct connection); run SecurityOS in the <b>Tor Browser</b> for
+              that step to stay anonymous. See the <b>SecurityOS Handbook</b> in
+              Documents.
             </p>
           )}
         </details>
 
         <p className="footnote">
           The window is a normal browser window on your device. Files you{" "}
-          <b>download</b> save to your real Downloads folder, and{" "}
-          <b>uploads</b> use your device&apos;s file picker — both fully
-          functional. Closing it signs you out only if you choose to.
+          <b>download</b> save to your real Downloads folder, and <b>uploads</b>{" "}
+          use your device&apos;s file picker — both fully functional. Closing it
+          signs you out only if you choose to.
         </p>
       </div>
     </StyledMessenger>

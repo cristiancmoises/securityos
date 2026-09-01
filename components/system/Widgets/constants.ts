@@ -4,8 +4,7 @@ import type { WidgetId, WidgetsState } from "components/system/Widgets/types";
 export const WIDGETS_STORAGE_KEY = "securityos:widgets";
 
 /** Open-meteo endpoints (free, no key, CORS-enabled, https). */
-export const GEOCODING_API =
-  "https://geocoding-api.open-meteo.com/v1/search";
+export const GEOCODING_API = "https://geocoding-api.open-meteo.com/v1/search";
 export const FORECAST_API = "https://api.open-meteo.com/v1/forecast";
 
 /** Same-origin GET proxy (fetches over Tor) — see Browser/config PROXY_PATH. */

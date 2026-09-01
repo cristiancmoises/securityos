@@ -14,7 +14,8 @@ const BASE64 = /^[0-9A-Za-z+/]+={0,2}$/;
 const BASE64URL = /^[0-9A-Za-z_-]+={0,2}$/;
 // Hex digests that contain at least one letter a-f are very likely hashes;
 // pure-decimal strings of the same length are far more likely to be numbers.
-const looksLikeHexDigest = (s: string): boolean => HEX.test(s) && /[a-f]/i.test(s);
+const looksLikeHexDigest = (s: string): boolean =>
+  HEX.test(s) && /[a-f]/i.test(s);
 
 // Confidence ordering used to keep the strongest guesses at the top.
 const RANK: Record<Candidate["confidence"], number> = {
@@ -25,13 +26,23 @@ const RANK: Record<Candidate["confidence"], number> = {
 
 // Map of hex digest length -> the algorithms that emit that length.
 const HEX_BY_LEN: Record<number, Array<Omit<Candidate, "confidence">>> = {
-  8: [{ name: "CRC-32 / Adler-32", note: "8 hex chars (32-bit checksum, not cryptographic)" }],
-  16: [{ name: "MySQL323 / CRC-64", note: "16 hex chars (legacy/short digest)" }],
+  8: [
+    {
+      name: "CRC-32 / Adler-32",
+      note: "8 hex chars (32-bit checksum, not cryptographic)",
+    },
+  ],
+  16: [
+    { name: "MySQL323 / CRC-64", note: "16 hex chars (legacy/short digest)" },
+  ],
   32: [
     { name: "MD5", note: "32 hex chars — most common 128-bit digest" },
     { name: "NTLM", note: "32 hex chars — MD4 of UTF-16LE password (Windows)" },
     { name: "MD4", note: "32 hex chars (rare, predecessor to MD5)" },
-    { name: "LM (half)", note: "32 hex chars if two 16-char halves are joined" },
+    {
+      name: "LM (half)",
+      note: "32 hex chars if two 16-char halves are joined",
+    },
     { name: "RIPEMD-128 / Tiger-128", note: "32 hex chars (uncommon)" },
   ],
   40: [
@@ -75,7 +86,11 @@ export const identifyHash = (raw: string): Candidate[] => {
     const id = input.slice(1).split("$", 1)[0];
     switch (id) {
       case "1":
-        add({ confidence: "high", name: "md5crypt ($1$)", note: "Unix MD5-based crypt(3) hash" });
+        add({
+          confidence: "high",
+          name: "md5crypt ($1$)",
+          note: "Unix MD5-based crypt(3) hash",
+        });
         break;
       case "2":
       case "2a":
@@ -89,10 +104,18 @@ export const identifyHash = (raw: string): Candidate[] => {
         });
         break;
       case "5":
-        add({ confidence: "high", name: "sha256crypt ($5$)", note: "Unix SHA-256-based crypt(3) hash" });
+        add({
+          confidence: "high",
+          name: "sha256crypt ($5$)",
+          note: "Unix SHA-256-based crypt(3) hash",
+        });
         break;
       case "6":
-        add({ confidence: "high", name: "sha512crypt ($6$)", note: "Unix SHA-512-based crypt(3) hash" });
+        add({
+          confidence: "high",
+          name: "sha512crypt ($6$)",
+          note: "Unix SHA-512-based crypt(3) hash",
+        });
         break;
       case "argon2d":
       case "argon2i":
@@ -106,20 +129,40 @@ export const identifyHash = (raw: string): Candidate[] => {
       case "pbkdf2":
       case "pbkdf2-sha256":
       case "pbkdf2-sha512":
-        add({ confidence: "high", name: `PBKDF2 ($${id}$)`, note: "Iterated HMAC password hash (PHC format)" });
+        add({
+          confidence: "high",
+          name: `PBKDF2 ($${id}$)`,
+          note: "Iterated HMAC password hash (PHC format)",
+        });
         break;
       case "scrypt":
       case "7":
-        add({ confidence: "high", name: "scrypt", note: "Memory-hard password hash" });
+        add({
+          confidence: "high",
+          name: "scrypt",
+          note: "Memory-hard password hash",
+        });
         break;
       case "y":
-        add({ confidence: "high", name: "yescrypt ($y$)", note: "Modern crypt(3) default on many Linux distros" });
+        add({
+          confidence: "high",
+          name: "yescrypt ($y$)",
+          note: "Modern crypt(3) default on many Linux distros",
+        });
         break;
       case "sha1":
-        add({ confidence: "high", name: "sha1crypt ($sha1$)", note: "NetBSD SHA-1-based crypt" });
+        add({
+          confidence: "high",
+          name: "sha1crypt ($sha1$)",
+          note: "NetBSD SHA-1-based crypt",
+        });
         break;
       case "apr1":
-        add({ confidence: "high", name: "Apache MD5 (apr1)", note: "Apache htpasswd MD5 variant" });
+        add({
+          confidence: "high",
+          name: "Apache MD5 (apr1)",
+          note: "Apache htpasswd MD5 variant",
+        });
         break;
       default:
         add({
@@ -156,7 +199,9 @@ export const identifyHash = (raw: string): Candidate[] => {
         add({
           confidence: isDigest ? base : "low",
           name: m.name,
-          note: isDigest ? m.note : `${m.note} — all-numeric, may not be a hash`,
+          note: isDigest
+            ? m.note
+            : `${m.note} — all-numeric, may not be a hash`,
         });
       });
     } else if (len % 2 === 0 && len >= 4) {
@@ -166,11 +211,19 @@ export const identifyHash = (raw: string): Candidate[] => {
         note: "Even-length hex with no standard digest match",
       });
     } else {
-      add({ confidence: "low", name: `Hex string (${len} chars)`, note: "Odd length — not a standard digest" });
+      add({
+        confidence: "low",
+        name: `Hex string (${len} chars)`,
+        note: "Odd length — not a standard digest",
+      });
     }
     // Even hex strings are also syntactically valid base64-ish; note it last.
     if (BASE64.test(input) && len % 4 === 0) {
-      add({ confidence: "low", name: "Base64", note: "Also decodes as base64, but hex interpretation is likelier" });
+      add({
+        confidence: "low",
+        name: "Base64",
+        note: "Also decodes as base64, but hex interpretation is likelier",
+      });
     }
     return sortCandidates(out);
   }
@@ -184,7 +237,9 @@ export const identifyHash = (raw: string): Candidate[] => {
     add({
       confidence: padOk ? "medium" : "low",
       name: isB64Url ? "Base64URL" : "Base64",
-      note: `~${decodedBytes}-byte payload${padOk ? "" : " (length not a multiple of 4)"}`,
+      note: `~${decodedBytes}-byte payload${
+        padOk ? "" : " (length not a multiple of 4)"
+      }`,
     });
     // Bare 22-char base64 with no padding is the bcrypt salt/hash alphabet too,
     // and 28/44/88 are the classic encoded SHA-1/256/512 lengths.
@@ -195,7 +250,11 @@ export const identifyHash = (raw: string): Candidate[] => {
       88: "encoded 64-byte value (SHA-512 digest, base64)",
     };
     if (lenMap[input.length]) {
-      add({ confidence: "medium", name: "Base64-encoded digest", note: lenMap[input.length] });
+      add({
+        confidence: "medium",
+        name: "Base64-encoded digest",
+        note: lenMap[input.length],
+      });
     }
     return sortCandidates(out);
   }
@@ -223,9 +282,19 @@ const estimateBase64Bytes = (s: string): number => {
 };
 
 const Badge = styled.span<{ $level: Candidate["confidence"] }>`
-  background: ${({ $level }) => ($level === "high" ? "#2f5d3a" : $level === "medium" ? "#5d532f" : "#3a2f4a")};
+  background: ${({ $level }) =>
+    $level === "high"
+      ? "#2f5d3a"
+      : $level === "medium"
+      ? "#5d532f"
+      : "#3a2f4a"};
   border-radius: 4px;
-  color: ${({ $level }) => ($level === "high" ? "#7ed492" : $level === "medium" ? "#e3d27e" : "#ab9cbb")};
+  color: ${({ $level }) =>
+    $level === "high"
+      ? "#7ed492"
+      : $level === "medium"
+      ? "#e3d27e"
+      : "#ab9cbb"};
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -258,9 +327,19 @@ const Row = styled.div`
 const SAMPLES: Array<{ label: string; value: string }> = [
   { label: "MD5", value: "5f4dcc3b5aa765d61d8327deb882cf99" },
   { label: "SHA-1", value: "5baa61e4c9b93f3f0682250b6cf8331b7ee68fd8" },
-  { label: "SHA-256", value: "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8" },
-  { label: "bcrypt", value: "$2b$12$KIXQ0Z1Z5z5z5z5z5z5z5uPq6q6q6q6q6q6q6q6q6q6q6q6q6q6q" },
-  { label: "Argon2", value: "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHQ$RdescudvJCsgt3ub+b+dWRWJTmaaJObG" },
+  {
+    label: "SHA-256",
+    value: "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8",
+  },
+  {
+    label: "bcrypt",
+    value: "$2b$12$KIXQ0Z1Z5z5z5z5z5z5z5uPq6q6q6q6q6q6q6q6q6q6q6q6q6q6q",
+  },
+  {
+    label: "Argon2",
+    value:
+      "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHQ$RdescudvJCsgt3ub+b+dWRWJTmaaJObG",
+  },
   { label: "sha512crypt", value: "$6$rounds=5000$saltsalt$hashhashhash" },
 ];
 
@@ -278,7 +357,8 @@ const HashIdentifierTool: FC = () => {
   const trimmed = value.trim();
   const charset = useMemo(() => {
     if (!trimmed) return "";
-    if (trimmed.startsWith("$") || trimmed.startsWith("{")) return "prefixed (modular crypt / scheme)";
+    if (trimmed.startsWith("$") || trimmed.startsWith("{"))
+      return "prefixed (modular crypt / scheme)";
     if (HEX.test(trimmed)) return "hexadecimal";
     if (BASE64.test(trimmed)) return "base64";
     if (BASE64URL.test(trimmed)) return "base64url";
@@ -290,7 +370,10 @@ const HashIdentifierTool: FC = () => {
   return (
     <StyledTool>
       <h2>Hash Identifier</h2>
-      <p className="desc">Guess the algorithm behind a hash from its length, charset, and prefix — fully offline.</p>
+      <p className="desc">
+        Guess the algorithm behind a hash from its length, charset, and prefix —
+        fully offline.
+      </p>
 
       <div>
         <label htmlFor="hashid-input">Hash or encoded string</label>
@@ -304,11 +387,21 @@ const HashIdentifierTool: FC = () => {
       </div>
 
       <div className="btn-row">
-        <button className="secondary" disabled={!value} onClick={onClear} type="button">
+        <button
+          className="secondary"
+          disabled={!value}
+          onClick={onClear}
+          type="button"
+        >
           Clear
         </button>
         {SAMPLES.map((s) => (
-          <button className="secondary" key={s.label} onClick={() => setValue(s.value)} type="button">
+          <button
+            className="secondary"
+            key={s.label}
+            onClick={() => setValue(s.value)}
+            type="button"
+          >
             {s.label}
           </button>
         ))}
@@ -316,13 +409,19 @@ const HashIdentifierTool: FC = () => {
 
       {trimmed ? (
         <p className="muted">
-          Length: <code>{trimmed.length}</code> &nbsp;|&nbsp; Charset: <code>{charset}</code>
+          Length: <code>{trimmed.length}</code> &nbsp;|&nbsp; Charset:{" "}
+          <code>{charset}</code>
         </p>
       ) : (
-        <p className="muted">Enter a value to see candidate algorithms. Identification is heuristic, not proof.</p>
+        <p className="muted">
+          Enter a value to see candidate algorithms. Identification is
+          heuristic, not proof.
+        </p>
       )}
 
-      {trimmed && candidates.length === 0 ? <p className="error">Could not analyze the input.</p> : null}
+      {trimmed && candidates.length === 0 ? (
+        <p className="error">Could not analyze the input.</p>
+      ) : null}
 
       {candidates.length > 0 ? (
         <div>

@@ -962,9 +962,13 @@ const useCommandInterpreter = (
 
             localEcho?.println(`  File: ${full}`);
             localEcho?.println(
-              `  Type: ${s.isDirectory() ? "directory" : "file"}    Size: ${s.size} bytes`
+              `  Type: ${s.isDirectory() ? "directory" : "file"}    Size: ${
+                s.size
+              } bytes`
             );
-            localEcho?.println(`  Modified: ${new Date(s.mtimeMs).toISOString()}`);
+            localEcho?.println(
+              `  Modified: ${new Date(s.mtimeMs).toISOString()}`
+            );
           }
           break;
         }
@@ -972,14 +976,19 @@ const useCommandInterpreter = (
           const est = (await navigator.storage?.estimate?.()) || {};
           const usage = est.usage || 0;
           const quota = est.quota || 0;
-          const kb = (n: number): string => Math.ceil(n / 1024).toLocaleString();
+          const kb = (n: number): string =>
+            Math.ceil(n / 1024).toLocaleString();
           const pct = quota ? Math.round((usage / quota) * 100) : 0;
 
-          localEcho?.println("Filesystem       1K-blocks       Used  Available  Use%  Mounted");
           localEcho?.println(
-            `SecurityOS-VFS  ${kb(quota).padStart(11)}  ${kb(usage).padStart(9)}  ${kb(
-              Math.max(quota - usage, 0)
-            ).padStart(9)}  ${`${pct}%`.padStart(4)}  /`
+            "Filesystem       1K-blocks       Used  Available  Use%  Mounted"
+          );
+          localEcho?.println(
+            `SecurityOS-VFS  ${kb(quota).padStart(11)}  ${kb(usage).padStart(
+              9
+            )}  ${kb(Math.max(quota - usage, 0)).padStart(
+              9
+            )}  ${`${pct}%`.padStart(4)}  /`
           );
           break;
         }
@@ -1007,7 +1016,10 @@ const useCommandInterpreter = (
           };
 
           if (lcBaseCommand === "tree") {
-            const printTree = async (p: string, depth: number): Promise<void> => {
+            const printTree = async (
+              p: string,
+              depth: number
+            ): Promise<void> => {
               if (depth > 4 || !(await lstat(p)).isDirectory()) return;
 
               const entries = await readdir(p);
@@ -1091,7 +1103,10 @@ const useCommandInterpreter = (
 
               updateFolder(dirname(dest), created || basename(dest));
               localEcho?.println(
-                `Saved ${body.length} bytes → ${join(dirname(dest), created || basename(dest))}`
+                `Saved ${body.length} bytes → ${join(
+                  dirname(dest),
+                  created || basename(dest)
+                )}`
               );
             } else {
               localEcho?.println(body.toString());
@@ -1218,10 +1233,12 @@ const useCommandInterpreter = (
                 sha256sum: "SHA-256",
                 sha512sum: "SHA-512",
               }[lcBaseCommand] as AlgorithmIdentifier;
-              const digest = await crypto.subtle.digest(
-                algorithm,
-                await readFile(filePath)
-              );
+              const fileBuffer = await readFile(filePath);
+              const digestInput = new Uint8Array(fileBuffer.byteLength);
+
+              digestInput.set(fileBuffer);
+
+              const digest = await crypto.subtle.digest(algorithm, digestInput);
 
               localEcho?.println(
                 `${[...new Uint8Array(digest)]
@@ -1259,7 +1276,9 @@ const useCommandInterpreter = (
             }
 
             if (buffer.length > maxBytes) {
-              localEcho?.println(`... (${buffer.length - maxBytes} more bytes)`);
+              localEcho?.println(
+                `... (${buffer.length - maxBytes} more bytes)`
+              );
             }
           } else {
             localEcho?.println(file ? PATH_NOT_FOUND : SYNTAX_ERROR);
@@ -1278,7 +1297,9 @@ const useCommandInterpreter = (
         case "uname":
           localEcho?.println(
             commandArgs[0] === "-a"
-              ? `SecurityOS ${window.location.hostname} ${displayVersion()} browser x86_64 SecurityOS`
+              ? `SecurityOS ${
+                  window.location.hostname
+                } ${displayVersion()} browser x86_64 SecurityOS`
               : "SecurityOS"
           );
           break;
@@ -1380,7 +1401,9 @@ const useCommandInterpreter = (
             );
             localEcho?.println("  vaptvupt encrypt <path> <password>");
             localEcho?.println("  vaptvupt decrypt <path.zupt> <password>");
-            localEcho?.println("  (aliases: encrypt / decrypt <path> <password>)");
+            localEcho?.println(
+              "  (aliases: encrypt / decrypt <path> <password>)"
+            );
             localEcho?.println(
               "For full VAPT + the native binary, run it in the Linux VM (V86 app)."
             );
@@ -1492,7 +1515,9 @@ const useCommandInterpreter = (
           localEcho?.println(
             "TAILS.iso can't boot here — use a 32-bit amnesic/Tor live ISO, or run real"
           );
-          localEcho?.println("TAILS in a native VM. See docs/LIVE-ISO.md. Opening the VM…");
+          localEcho?.println(
+            "TAILS in a native VM. See docs/LIVE-ISO.md. Opening the VM…"
+          );
           open("V86");
           break;
         case "fish":
@@ -1513,7 +1538,9 @@ const useCommandInterpreter = (
           localEcho?.println(
             "Guix VM (fish runs it from ~/.config/fish/config.fish)."
           );
-          localEcho?.println("Boot the Guix VM (docs/GUIX-SETUP.md) to see it.");
+          localEcho?.println(
+            "Boot the Guix VM (docs/GUIX-SETUP.md) to see it."
+          );
           break;
         default:
           if (baseCommand) {

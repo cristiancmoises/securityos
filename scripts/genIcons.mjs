@@ -49,7 +49,10 @@ const vaptvupt = () => {
     [`28`, `15`, MAGENTA],
     [`30`, `80`, MAGENTA],
   ]
-    .map(([x, y, c]) => `<circle cx="${x}" cy="${y}" r="3.4" fill="${c}" filter="url(#g)"/>`)
+    .map(
+      ([x, y, c]) =>
+        `<circle cx="${x}" cy="${y}" r="3.4" fill="${c}" filter="url(#g)"/>`
+    )
     .join("");
   const defs =
     glow("g") +
@@ -89,7 +92,9 @@ const FOLDER_DEFS =
 const folderBackBody = (topEdge = true) =>
   `<path d="M10 30 Q10 23 17 23 L36 23 Q40 23 43 27 L46 31 L80 31 Q86 31 86 37 L86 78 Q86 84 80 84 L16 84 Q10 84 10 78 Z"
      fill="url(#fbody)" stroke="${CYAN}" stroke-width="2" stroke-opacity="0.9" filter="url(#fg)"/>` +
-  (topEdge ? `<path d="M14 33 L82 33" stroke="url(#fedge)" stroke-width="1.8"/>` : "");
+  (topEdge
+    ? `<path d="M14 33 L82 33" stroke="url(#fedge)" stroke-width="1.8"/>`
+    : "");
 
 // front pocket (covers lower body; top edge is the visible flap)
 const folderFront = () =>
@@ -97,7 +102,8 @@ const folderFront = () =>
      fill="url(#ffront)" stroke="${CYAN}" stroke-width="2" stroke-opacity="0.95" filter="url(#fg)"/>` +
   `<path d="M12 52 L84 52" stroke="url(#fedge)" stroke-width="1.8"/>`;
 
-const folder = () => wrap(FOLDER_DEFS, folderBackBody(false) + folderFrontClosed());
+const folder = () =>
+  wrap(FOLDER_DEFS, folderBackBody(false) + folderFrontClosed());
 // closed: front face flush near the top so it reads as one shut folder, with a
 // cyan->magenta neon edge, faint circuit traces and glowing nodes (futuristic).
 function folderFrontClosed() {
@@ -139,7 +145,8 @@ const undercover = () => {
       <stop offset="0%" stop-color="#3b8ef0"/>
       <stop offset="100%" stop-color="#1a5fc0"/>
     </linearGradient>`;
-  const sq = (x, y) => `<rect x="${x}" y="${y}" width="30" height="30" rx="4" fill="url(#win)"/>`;
+  const sq = (x, y) =>
+    `<rect x="${x}" y="${y}" width="30" height="30" rx="4" fill="url(#win)"/>`;
   return wrap(defs, sq(14, 14) + sq(52, 14) + sq(14, 52) + sq(52, 52));
 };
 
@@ -178,11 +185,21 @@ for (const [name, svg] of Object.entries(ICONS)) {
   writeFileSync(svgPath, svg);
   for (const size of SIZES) {
     const png = join(TMP, `${name}-${size}.png`);
-    execFileSync("rsvg-convert", ["-w", String(size), "-h", String(size), svgPath, "-o", png]);
+    execFileSync("rsvg-convert", [
+      "-w",
+      String(size),
+      "-h",
+      String(size),
+      svgPath,
+      "-o",
+      png,
+    ]);
     const dir = join(OUT, `${size}x${size}`);
     mkdirSync(dir, { recursive: true });
     // eslint-disable-next-line no-await-in-loop
-    await sharp(png).webp({ lossless: true }).toFile(join(dir, `${name}.webp`));
+    await sharp(png)
+      .webp({ lossless: true })
+      .toFile(join(dir, `${name}.webp`));
     count += 1;
   }
   console.log("icon ->", name, `(${SIZES.length} sizes)`);

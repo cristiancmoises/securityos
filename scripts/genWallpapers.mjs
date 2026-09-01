@@ -11,7 +11,8 @@ import sharp from "sharp";
 const W = 2560;
 const H = 1440;
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const OUT = process.env.WP_OUT || join(ROOT, "public/Users/Public/Pictures/Wallpapers");
+const OUT =
+  process.env.WP_OUT || join(ROOT, "public/Users/Public/Pictures/Wallpapers");
 const TMP = "/tmp/wpgen";
 
 // ---------- tiny seeded PRNG ----------
@@ -54,7 +55,11 @@ const rad = (c, stops, cx, cy, rx, ry = rx) => {
   const gid = id(c, "rg");
   c.defs.push(
     `<radialGradient id="${gid}" gradientUnits="userSpaceOnUse" cx="${cx}" cy="${cy}" r="${rx}" fx="${cx}" fy="${cy}"${
-      ry !== rx ? ` gradientTransform="translate(0 ${cy}) scale(1 ${ry / rx}) translate(0 ${-cy})"` : ""
+      ry !== rx
+        ? ` gradientTransform="translate(0 ${cy}) scale(1 ${
+            ry / rx
+          }) translate(0 ${-cy})"`
+        : ""
     }>${stops
       .map(
         ([o, col, op = 1]) =>
@@ -135,20 +140,34 @@ const nebulaLayer = (c, hex, freq, oct, op) => {
 };
 const grainLayer = (c, op = 0.05) => {
   const f = grain(c, 0.9, 0.9);
-  c.body.push(`<rect width="${W}" height="${H}" filter="url(#${f})" opacity="${op}"/>`);
+  c.body.push(
+    `<rect width="${W}" height="${H}" filter="url(#${f})" opacity="${op}"/>`
+  );
 };
 const vignette = (c, strength = 0.85) => {
-  const g = rad(c, [
-    ["55%", "#000000", 0],
-    ["100%", "#000000", strength],
-  ], W / 2, H / 2, W * 0.72);
+  const g = rad(
+    c,
+    [
+      ["55%", "#000000", 0],
+      ["100%", "#000000", strength],
+    ],
+    W / 2,
+    H / 2,
+    W * 0.72
+  );
   c.body.push(`<rect width="${W}" height="${H}" fill="url(#${g})"/>`);
 };
 const glow = (c, cx, cy, r, hex, op = 0.5) => {
-  const g = rad(c, [
-    ["0%", hex, op],
-    ["100%", hex, 0],
-  ], cx, cy, r);
+  const g = rad(
+    c,
+    [
+      ["0%", hex, op],
+      ["100%", hex, 0],
+    ],
+    cx,
+    cy,
+    r
+  );
   c.body.push(`<rect width="${W}" height="${H}" fill="url(#${g})"/>`);
 };
 const stars = (c, n, cols) => {
@@ -160,9 +179,15 @@ const stars = (c, n, cols) => {
     const rad2 = rr(c, 0.5, 2.2);
     const op = rr(c, 0.25, 0.95);
     const col = pick(c, cols);
-    s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad2.toFixed(2)}" fill="${col}" opacity="${op.toFixed(2)}"/>`;
+    s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad2.toFixed(
+      2
+    )}" fill="${col}" opacity="${op.toFixed(2)}"/>`;
     if (c.r() > 0.9)
-      s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(rad2 * 2.4).toFixed(2)}" fill="${col}" opacity="${(op * 0.4).toFixed(2)}" filter="url(#${b})"/>`;
+      s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(
+        rad2 * 2.4
+      ).toFixed(2)}" fill="${col}" opacity="${(op * 0.4).toFixed(
+        2
+      )}" filter="url(#${b})"/>`;
   }
   c.body.push(`<g>${s}</g>`);
 };
@@ -176,7 +201,11 @@ const lightRays = (c, cx, cy, hex, count = 16, len = H * 1.3, op = 0.16) => {
     const y1 = cy + Math.sin(a - w) * len;
     const x2 = cx + Math.cos(a + w) * len;
     const y2 = cy + Math.sin(a + w) * len;
-    s += `<path d="M${cx} ${cy} L${x1.toFixed(1)} ${y1.toFixed(1)} L${x2.toFixed(1)} ${y2.toFixed(1)} Z" fill="${hex}" opacity="${(op * rr(c, 0.5, 1)).toFixed(3)}"/>`;
+    s += `<path d="M${cx} ${cy} L${x1.toFixed(1)} ${y1.toFixed(
+      1
+    )} L${x2.toFixed(1)} ${y2.toFixed(1)} Z" fill="${hex}" opacity="${(
+      op * rr(c, 0.5, 1)
+    ).toFixed(3)}"/>`;
   }
   c.body.push(`<g filter="url(#${b})" style="mix-blend-mode:screen">${s}</g>`);
 };
@@ -193,7 +222,11 @@ const particles = (c, n, hex, hex2, linkDist = 220) => {
       const d = Math.hypot(dx, dy);
       if (d < linkDist) {
         const op = (1 - d / linkDist) * 0.5;
-        lines += `<line x1="${pts[i][0].toFixed(1)}" y1="${pts[i][1].toFixed(1)}" x2="${pts[j][0].toFixed(1)}" y2="${pts[j][1].toFixed(1)}" stroke="${hex2}" stroke-width="1" opacity="${op.toFixed(3)}"/>`;
+        lines += `<line x1="${pts[i][0].toFixed(1)}" y1="${pts[i][1].toFixed(
+          1
+        )}" x2="${pts[j][0].toFixed(1)}" y2="${pts[j][1].toFixed(
+          1
+        )}" stroke="${hex2}" stroke-width="1" opacity="${op.toFixed(3)}"/>`;
       }
     }
   }
@@ -201,14 +234,19 @@ const particles = (c, n, hex, hex2, linkDist = 220) => {
   let dots = "";
   for (const [x, y] of pts) {
     const r = rr(c, 1.6, 4.5);
-    dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r * 2.6).toFixed(1)}" fill="${hex}" opacity="0.25" filter="url(#${b})"/>`;
-    dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${hex}" opacity="0.95"/>`;
+    dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(
+      r * 2.6
+    ).toFixed(1)}" fill="${hex}" opacity="0.25" filter="url(#${b})"/>`;
+    dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(
+      1
+    )}" fill="${hex}" opacity="0.95"/>`;
   }
   c.body.push(`<g>${lines}${dots}</g>`);
 };
 
 // Matrix-style glyph rain
-const GLYPHS = "ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜ0123456789ABCDEFｦｧｨｩ".split("");
+const GLYPHS =
+  "ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜ0123456789ABCDEFｦｧｨｩ".split("");
 const glyphRain = (c, headHex, tailHex, density = 1, sizePx = 26) => {
   const colW = sizePx * 1.15;
   const cols = Math.floor(W / colW);
@@ -224,11 +262,19 @@ const glyphRain = (c, headHex, tailHex, density = 1, sizePx = 26) => {
       if (y < -sizePx || y > H + sizePx) continue;
       const ch = pick(c, GLYPHS);
       if (k === 0) {
-        g += `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-family="'Sarasa Mono J', monospace" font-size="${sizePx}" fill="#eafff0" opacity="0.95">${ch}</text>`;
-        g += `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-family="'Sarasa Mono J', monospace" font-size="${sizePx}" fill="${headHex}" opacity="0.7" filter="url(#${b})">${ch}</text>`;
+        g += `<text x="${x.toFixed(1)}" y="${y.toFixed(
+          1
+        )}" font-family="'Sarasa Mono J', monospace" font-size="${sizePx}" fill="#eafff0" opacity="0.95">${ch}</text>`;
+        g += `<text x="${x.toFixed(1)}" y="${y.toFixed(
+          1
+        )}" font-family="'Sarasa Mono J', monospace" font-size="${sizePx}" fill="${headHex}" opacity="0.7" filter="url(#${b})">${ch}</text>`;
       } else {
         const op = Math.max(0.05, 0.85 * (1 - k / len));
-        g += `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-family="'Sarasa Mono J', monospace" font-size="${sizePx}" fill="${tailHex}" opacity="${op.toFixed(2)}">${ch}</text>`;
+        g += `<text x="${x.toFixed(1)}" y="${y.toFixed(
+          1
+        )}" font-family="'Sarasa Mono J', monospace" font-size="${sizePx}" fill="${tailHex}" opacity="${op.toFixed(
+          2
+        )}">${ch}</text>`;
       }
     }
   }
@@ -242,18 +288,28 @@ const perspectiveGrid = (c, hex, horizonY, vanishX, glowHex) => {
   // verticals converge to vanishing point
   for (let i = -14; i <= 14; i += 1) {
     const bx = vanishX + (i / 14) * W * 1.4;
-    g += `<line x1="${vanishX}" y1="${horizonY}" x2="${bx.toFixed(1)}" y2="${H}" stroke="${hex}" stroke-width="2" opacity="0.5"/>`;
+    g += `<line x1="${vanishX}" y1="${horizonY}" x2="${bx.toFixed(
+      1
+    )}" y2="${H}" stroke="${hex}" stroke-width="2" opacity="0.5"/>`;
   }
   // horizontals with perspective spacing
   let y = horizonY;
   let step = 6;
   while (y < H) {
-    g += `<line x1="0" y1="${y.toFixed(1)}" x2="${W}" y2="${y.toFixed(1)}" stroke="${hex}" stroke-width="${(1 + (y - horizonY) / 200).toFixed(2)}" opacity="${Math.min(0.7, 0.2 + (y - horizonY) / H).toFixed(2)}"/>`;
+    g += `<line x1="0" y1="${y.toFixed(1)}" x2="${W}" y2="${y.toFixed(
+      1
+    )}" stroke="${hex}" stroke-width="${(1 + (y - horizonY) / 200).toFixed(
+      2
+    )}" opacity="${Math.min(0.7, 0.2 + (y - horizonY) / H).toFixed(2)}"/>`;
     y += step;
     step *= 1.32;
   }
   c.body.push(`<g filter="url(#${b})">${g}</g>`);
-  c.body.push(`<rect x="0" y="${horizonY - 2}" width="${W}" height="3" fill="${glowHex}" opacity="0.8"/>`);
+  c.body.push(
+    `<rect x="0" y="${
+      horizonY - 2
+    }" width="${W}" height="3" fill="${glowHex}" opacity="0.8"/>`
+  );
 };
 
 // jagged mountain ridge
@@ -281,10 +337,17 @@ const contours = (c, lineHex, n = 22, op = 0.5) => {
     const fr = rr(c, 1.2, 3.2);
     let d = `M0 ${(y0 + Math.sin(ph) * amp).toFixed(1)} `;
     for (let x = 0; x <= W; x += 40) {
-      const y = y0 + Math.sin((x / W) * Math.PI * 2 * fr + ph) * amp + Math.sin((x / W) * Math.PI * 6 + i) * amp * 0.2;
+      const y =
+        y0 +
+        Math.sin((x / W) * Math.PI * 2 * fr + ph) * amp +
+        Math.sin((x / W) * Math.PI * 6 + i) * amp * 0.2;
       d += `L${x} ${y.toFixed(1)} `;
     }
-    g += `<path d="${d}" fill="none" stroke="${lineHex}" stroke-width="${rr(c, 1, 2.2).toFixed(2)}" opacity="${(op * rr(c, 0.4, 1)).toFixed(2)}"/>`;
+    g += `<path d="${d}" fill="none" stroke="${lineHex}" stroke-width="${rr(
+      c,
+      1,
+      2.2
+    ).toFixed(2)}" opacity="${(op * rr(c, 0.4, 1)).toFixed(2)}"/>`;
   }
   c.body.push(`<g>${g}</g>`);
 };
@@ -303,8 +366,18 @@ const circuit = (c, hex, glowHex, count = 60) => {
       else y += (c.r() - 0.5) * 420;
       d += `L${x.toFixed(1)} ${y.toFixed(1)} `;
     }
-    g += `<path d="${d}" fill="none" stroke="${hex}" stroke-width="${rr(c, 1, 2.4).toFixed(2)}" opacity="${rr(c, 0.18, 0.5).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/>`;
-    g += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rr(c, 2.5, 5).toFixed(1)}" fill="${glowHex}" opacity="0.8"/>`;
+    g += `<path d="${d}" fill="none" stroke="${hex}" stroke-width="${rr(
+      c,
+      1,
+      2.4
+    ).toFixed(2)}" opacity="${rr(c, 0.18, 0.5).toFixed(
+      2
+    )}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    g += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rr(
+      c,
+      2.5,
+      5
+    ).toFixed(1)}" fill="${glowHex}" opacity="0.8"/>`;
   }
   c.body.push(`<g>${g}</g>`);
   c.body.push(`<g filter="url(#${b})" opacity="0.6">${g}</g>`);
@@ -331,7 +404,13 @@ const hexGrid = (c, hex, glowHex) => {
     const off = col % 2 ? hstep / 2 : 0;
     for (let y = -s + off; y < H + s; y += hstep) {
       const active = c.r() > 0.92;
-      g += `<path d="${hexPath(x, y)}" fill="${active ? glowHex : "none"}" fill-opacity="${active ? 0.18 : 0}" stroke="${hex}" stroke-width="1" opacity="${rr(c, 0.12, 0.32).toFixed(2)}"/>`;
+      g += `<path d="${hexPath(x, y)}" fill="${
+        active ? glowHex : "none"
+      }" fill-opacity="${
+        active ? 0.18 : 0
+      }" stroke="${hex}" stroke-width="1" opacity="${rr(c, 0.12, 0.32).toFixed(
+        2
+      )}"/>`;
     }
     col += 1;
   }
@@ -343,16 +422,34 @@ const sakura = (c, n) => {
   const cols = ["#ffd1ec", "#ff9ed6", "#ffb3df", "#ffe3f1"];
   let g = "";
   const petal = (x, y, s, rot, col, op) =>
-    `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${rot.toFixed(0)}) scale(${s.toFixed(2)})" opacity="${op.toFixed(2)}"><path d="M0 0 C 6 -10 14 -8 12 2 C 18 0 18 10 8 11 C 10 18 0 20 0 12 C -10 20 -18 11 -8 11 C -18 10 -18 0 -12 2 C -14 -8 -6 -10 0 0 Z" fill="${col}"/></g>`;
+    `<g transform="translate(${x.toFixed(1)} ${y.toFixed(
+      1
+    )}) rotate(${rot.toFixed(0)}) scale(${s.toFixed(2)})" opacity="${op.toFixed(
+      2
+    )}"><path d="M0 0 C 6 -10 14 -8 12 2 C 18 0 18 10 8 11 C 10 18 0 20 0 12 C -10 20 -18 11 -8 11 C -18 10 -18 0 -12 2 C -14 -8 -6 -10 0 0 Z" fill="${col}"/></g>`;
   for (let i = 0; i < n; i += 1) {
     const far = c.r() > 0.6;
-    g += petal(rr(c, 0, W), rr(c, 0, H), rr(c, 0.6, far ? 1.1 : 2.4), rr(c, 0, 360), pick(c, cols), far ? rr(c, 0.2, 0.45) : rr(c, 0.5, 0.9));
+    g += petal(
+      rr(c, 0, W),
+      rr(c, 0, H),
+      rr(c, 0.6, far ? 1.1 : 2.4),
+      rr(c, 0, 360),
+      pick(c, cols),
+      far ? rr(c, 0.2, 0.45) : rr(c, 0.5, 0.9)
+    );
   }
   c.body.push(`<g>${g}</g>`);
   // a few blurred foreground petals
   let f = "";
   for (let i = 0; i < n / 6; i += 1)
-    f += petal(rr(c, 0, W), rr(c, 0, H), rr(c, 2.5, 4), rr(c, 0, 360), pick(c, cols), 0.5);
+    f += petal(
+      rr(c, 0, W),
+      rr(c, 0, H),
+      rr(c, 2.5, 4),
+      rr(c, 0, 360),
+      pick(c, cols),
+      0.5
+    );
   c.body.push(`<g filter="url(#${b})">${f}</g>`);
 };
 
@@ -362,48 +459,168 @@ const emblemGlow = (c, cx, cy, r, hex) => glow(c, cx, cy, r, hex, 0.55);
 const cross = (c, cx, cy, s, hex, glowHex) => {
   const b = blur(c, 14);
   const arm = s * 0.22;
-  const v = `<rect x="${cx - arm / 2}" y="${cy - s}" width="${arm}" height="${s * 2}" rx="${arm / 3}"/>`;
-  const hbar = `<rect x="${cx - s * 0.62}" y="${cy - s * 0.42}" width="${s * 1.24}" height="${arm}" rx="${arm / 3}"/>`;
-  c.body.push(`<g fill="${glowHex}" filter="url(#${b})" opacity="0.9">${v}${hbar}</g>`);
-  const grd = lin(c, [["0%", "#fff8e6"], ["100%", hex]], 0, 0, 0, 1);
+  const v = `<rect x="${cx - arm / 2}" y="${cy - s}" width="${arm}" height="${
+    s * 2
+  }" rx="${arm / 3}"/>`;
+  const hbar = `<rect x="${cx - s * 0.62}" y="${cy - s * 0.42}" width="${
+    s * 1.24
+  }" height="${arm}" rx="${arm / 3}"/>`;
+  c.body.push(
+    `<g fill="${glowHex}" filter="url(#${b})" opacity="0.9">${v}${hbar}</g>`
+  );
+  const grd = lin(
+    c,
+    [
+      ["0%", "#fff8e6"],
+      ["100%", hex],
+    ],
+    0,
+    0,
+    0,
+    1
+  );
   c.body.push(`<g fill="url(#${grd})">${v}${hbar}</g>`);
 };
 
 const shield = (c, cx, cy, s, hex, glowHex) => {
   const b = blur(c, 16);
-  const d = `M${cx} ${cy - s} L${cx + s * 0.78} ${cy - s * 0.6} L${cx + s * 0.78} ${cy + s * 0.18} Q${cx + s * 0.78} ${cy + s * 0.8} ${cx} ${cy + s * 1.05} Q${cx - s * 0.78} ${cy + s * 0.8} ${cx - s * 0.78} ${cy + s * 0.18} L${cx - s * 0.78} ${cy - s * 0.6} Z`;
-  c.body.push(`<path d="${d}" fill="${glowHex}" opacity="0.6" filter="url(#${b})"/>`);
-  const grd = lin(c, [["0%", glowHex, 0.25], ["100%", "#02060f", 0.15]], 0, 0, 0, 1);
-  c.body.push(`<path d="${d}" fill="url(#${grd})" stroke="${hex}" stroke-width="6"/>`);
+  const d = `M${cx} ${cy - s} L${cx + s * 0.78} ${cy - s * 0.6} L${
+    cx + s * 0.78
+  } ${cy + s * 0.18} Q${cx + s * 0.78} ${cy + s * 0.8} ${cx} ${
+    cy + s * 1.05
+  } Q${cx - s * 0.78} ${cy + s * 0.8} ${cx - s * 0.78} ${cy + s * 0.18} L${
+    cx - s * 0.78
+  } ${cy - s * 0.6} Z`;
+  c.body.push(
+    `<path d="${d}" fill="${glowHex}" opacity="0.6" filter="url(#${b})"/>`
+  );
+  const grd = lin(
+    c,
+    [
+      ["0%", glowHex, 0.25],
+      ["100%", "#02060f", 0.15],
+    ],
+    0,
+    0,
+    0,
+    1
+  );
+  c.body.push(
+    `<path d="${d}" fill="url(#${grd})" stroke="${hex}" stroke-width="6"/>`
+  );
   // keyhole
-  c.body.push(`<circle cx="${cx}" cy="${cy - s * 0.05}" r="${s * 0.16}" fill="${hex}"/>`);
-  c.body.push(`<path d="M${cx - s * 0.07} ${cy} L${cx + s * 0.07} ${cy} L${cx + s * 0.12} ${cy + s * 0.34} L${cx - s * 0.12} ${cy + s * 0.34} Z" fill="${hex}"/>`);
+  c.body.push(
+    `<circle cx="${cx}" cy="${cy - s * 0.05}" r="${s * 0.16}" fill="${hex}"/>`
+  );
+  c.body.push(
+    `<path d="M${cx - s * 0.07} ${cy} L${cx + s * 0.07} ${cy} L${
+      cx + s * 0.12
+    } ${cy + s * 0.34} L${cx - s * 0.12} ${cy + s * 0.34} Z" fill="${hex}"/>`
+  );
 };
 
 const padlock = (c, cx, cy, s, hex, glowHex) => {
   const b = blur(c, 14);
-  c.body.push(`<circle cx="${cx}" cy="${cy}" r="${s * 1.1}" fill="${glowHex}" opacity="0.4" filter="url(#${b})"/>`);
+  c.body.push(
+    `<circle cx="${cx}" cy="${cy}" r="${
+      s * 1.1
+    }" fill="${glowHex}" opacity="0.4" filter="url(#${b})"/>`
+  );
   // shackle (open)
-  c.body.push(`<path d="M${cx - s * 0.5} ${cy - s * 0.2} L${cx - s * 0.5} ${cy - s * 0.7} A ${s * 0.5} ${s * 0.5} 0 0 1 ${cx + s * 0.5} ${cy - s * 0.95}" fill="none" stroke="${hex}" stroke-width="${s * 0.16}" stroke-linecap="round"/>`);
-  const grd = lin(c, [["0%", glowHex], ["100%", hex]], 0, 0, 0, 1);
-  c.body.push(`<rect x="${cx - s * 0.62}" y="${cy - s * 0.18}" width="${s * 1.24}" height="${s * 0.95}" rx="${s * 0.12}" fill="url(#${grd})"/>`);
-  c.body.push(`<circle cx="${cx}" cy="${cy + s * 0.22}" r="${s * 0.13}" fill="#04140c"/>`);
-  c.body.push(`<rect x="${cx - s * 0.05}" y="${cy + s * 0.22}" width="${s * 0.1}" height="${s * 0.28}" fill="#04140c"/>`);
+  c.body.push(
+    `<path d="M${cx - s * 0.5} ${cy - s * 0.2} L${cx - s * 0.5} ${
+      cy - s * 0.7
+    } A ${s * 0.5} ${s * 0.5} 0 0 1 ${cx + s * 0.5} ${
+      cy - s * 0.95
+    }" fill="none" stroke="${hex}" stroke-width="${
+      s * 0.16
+    }" stroke-linecap="round"/>`
+  );
+  const grd = lin(
+    c,
+    [
+      ["0%", glowHex],
+      ["100%", hex],
+    ],
+    0,
+    0,
+    0,
+    1
+  );
+  c.body.push(
+    `<rect x="${cx - s * 0.62}" y="${cy - s * 0.18}" width="${
+      s * 1.24
+    }" height="${s * 0.95}" rx="${s * 0.12}" fill="url(#${grd})"/>`
+  );
+  c.body.push(
+    `<circle cx="${cx}" cy="${cy + s * 0.22}" r="${s * 0.13}" fill="#04140c"/>`
+  );
+  c.body.push(
+    `<rect x="${cx - s * 0.05}" y="${cy + s * 0.22}" width="${
+      s * 0.1
+    }" height="${s * 0.28}" fill="#04140c"/>`
+  );
 };
 
 const mask = (c, cx, cy, s, hex, glowHex) => {
   const b = blur(c, 16);
-  c.body.push(`<ellipse cx="${cx}" cy="${cy}" rx="${s * 1.2}" ry="${s * 1.35}" fill="${glowHex}" opacity="0.45" filter="url(#${b})"/>`);
-  const grd = lin(c, [["0%", "#f4f0ff"], ["100%", "#cfc4ec"]], 0, 0, 0, 1);
+  c.body.push(
+    `<ellipse cx="${cx}" cy="${cy}" rx="${s * 1.2}" ry="${
+      s * 1.35
+    }" fill="${glowHex}" opacity="0.45" filter="url(#${b})"/>`
+  );
+  const grd = lin(
+    c,
+    [
+      ["0%", "#f4f0ff"],
+      ["100%", "#cfc4ec"],
+    ],
+    0,
+    0,
+    0,
+    1
+  );
   // face
-  c.body.push(`<path d="M${cx} ${cy - s} Q${cx + s * 0.9} ${cy - s * 0.9} ${cx + s * 0.7} ${cy + s * 0.2} Q${cx + s * 0.45} ${cy + s} ${cx} ${cy + s * 1.25} Q${cx - s * 0.45} ${cy + s} ${cx - s * 0.7} ${cy + s * 0.2} Q${cx - s * 0.9} ${cy - s * 0.9} ${cx} ${cy - s} Z" fill="url(#${grd})" stroke="${hex}" stroke-width="3"/>`);
+  c.body.push(
+    `<path d="M${cx} ${cy - s} Q${cx + s * 0.9} ${cy - s * 0.9} ${
+      cx + s * 0.7
+    } ${cy + s * 0.2} Q${cx + s * 0.45} ${cy + s} ${cx} ${cy + s * 1.25} Q${
+      cx - s * 0.45
+    } ${cy + s} ${cx - s * 0.7} ${cy + s * 0.2} Q${cx - s * 0.9} ${
+      cy - s * 0.9
+    } ${cx} ${cy - s} Z" fill="url(#${grd})" stroke="${hex}" stroke-width="3"/>`
+  );
   // eyes
-  c.body.push(`<path d="M${cx - s * 0.45} ${cy - s * 0.15} q${s * 0.2} ${-s * 0.18} ${s * 0.34} 0 q${-s * 0.17} ${s * 0.14} ${-s * 0.34} 0 Z" fill="#2a2140"/>`);
-  c.body.push(`<path d="M${cx + s * 0.11} ${cy - s * 0.15} q${s * 0.2} ${-s * 0.18} ${s * 0.34} 0 q${-s * 0.17} ${s * 0.14} ${-s * 0.34} 0 Z" fill="#2a2140"/>`);
+  c.body.push(
+    `<path d="M${cx - s * 0.45} ${cy - s * 0.15} q${s * 0.2} ${-s * 0.18} ${
+      s * 0.34
+    } 0 q${-s * 0.17} ${s * 0.14} ${-s * 0.34} 0 Z" fill="#2a2140"/>`
+  );
+  c.body.push(
+    `<path d="M${cx + s * 0.11} ${cy - s * 0.15} q${s * 0.2} ${-s * 0.18} ${
+      s * 0.34
+    } 0 q${-s * 0.17} ${s * 0.14} ${-s * 0.34} 0 Z" fill="#2a2140"/>`
+  );
   // smile + mustache + goatee
-  c.body.push(`<path d="M${cx - s * 0.4} ${cy + s * 0.3} Q${cx} ${cy + s * 0.62} ${cx + s * 0.4} ${cy + s * 0.3}" fill="none" stroke="#2a2140" stroke-width="4"/>`);
-  c.body.push(`<path d="M${cx} ${cy + s * 0.34} q${-s * 0.18} ${s * 0.05} ${-s * 0.26} ${s * 0.16} q${s * 0.16} ${-s * 0.04} ${s * 0.26} ${s * 0.18} q${s * 0.1} ${-s * 0.22} ${s * 0.26} ${-s * 0.18} q${-s * 0.08} ${-s * 0.11} ${-s * 0.26} ${-s * 0.16} Z" fill="#2a2140"/>`);
-  c.body.push(`<path d="M${cx - s * 0.06} ${cy + s * 0.7} L${cx + s * 0.06} ${cy + s * 0.7} L${cx} ${cy + s * 1.0} Z" fill="#2a2140"/>`);
+  c.body.push(
+    `<path d="M${cx - s * 0.4} ${cy + s * 0.3} Q${cx} ${cy + s * 0.62} ${
+      cx + s * 0.4
+    } ${cy + s * 0.3}" fill="none" stroke="#2a2140" stroke-width="4"/>`
+  );
+  c.body.push(
+    `<path d="M${cx} ${cy + s * 0.34} q${-s * 0.18} ${s * 0.05} ${-s * 0.26} ${
+      s * 0.16
+    } q${s * 0.16} ${-s * 0.04} ${s * 0.26} ${s * 0.18} q${s * 0.1} ${
+      -s * 0.22
+    } ${s * 0.26} ${-s * 0.18} q${-s * 0.08} ${-s * 0.11} ${-s * 0.26} ${
+      -s * 0.16
+    } Z" fill="#2a2140"/>`
+  );
+  c.body.push(
+    `<path d="M${cx - s * 0.06} ${cy + s * 0.7} L${cx + s * 0.06} ${
+      cy + s * 0.7
+    } L${cx} ${cy + s * 1.0} Z" fill="#2a2140"/>`
+  );
 };
 
 const fingerprint = (c, cx, cy, s, hex, op = 0.9) => {
@@ -412,19 +629,42 @@ const fingerprint = (c, cx, cy, s, hex, op = 0.9) => {
   for (let i = 0; i < 11; i += 1) {
     const rx = s * (0.18 + i * 0.082);
     const ry = rx * rr(c, 1.05, 1.25);
-    const dash = i % 3 === 0 ? `stroke-dasharray="${ri(c, 30, 90)} ${ri(c, 10, 40)}"` : "";
+    const dash =
+      i % 3 === 0 ? `stroke-dasharray="${ri(c, 30, 90)} ${ri(c, 10, 40)}"` : "";
     const rot = rr(c, -12, 12);
-    g += `<ellipse cx="${cx}" cy="${cy}" rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" fill="none" stroke="${hex}" stroke-width="${rr(c, 2, 3.4).toFixed(2)}" opacity="${(op * (1 - i * 0.03)).toFixed(2)}" ${dash} transform="rotate(${rot.toFixed(1)} ${cx} ${cy})"/>`;
+    g += `<ellipse cx="${cx}" cy="${cy}" rx="${rx.toFixed(1)}" ry="${ry.toFixed(
+      1
+    )}" fill="none" stroke="${hex}" stroke-width="${rr(c, 2, 3.4).toFixed(
+      2
+    )}" opacity="${(op * (1 - i * 0.03)).toFixed(
+      2
+    )}" ${dash} transform="rotate(${rot.toFixed(1)} ${cx} ${cy})"/>`;
   }
   c.body.push(`<g filter="url(#${b})">${g}</g>`);
 };
 
 const magnifier = (c, cx, cy, s, hex, glowHex) => {
   const b = blur(c, 12);
-  c.body.push(`<circle cx="${cx}" cy="${cy}" r="${s}" fill="${glowHex}" opacity="0.3" filter="url(#${b})"/>`);
-  c.body.push(`<circle cx="${cx}" cy="${cy}" r="${s}" fill="none" stroke="${hex}" stroke-width="${s * 0.12}"/>`);
-  c.body.push(`<circle cx="${cx}" cy="${cy}" r="${s * 0.86}" fill="#0a0f12" opacity="0.35"/>`);
-  c.body.push(`<line x1="${cx + s * 0.74}" y1="${cy + s * 0.74}" x2="${cx + s * 1.7}" y2="${cy + s * 1.7}" stroke="${hex}" stroke-width="${s * 0.2}" stroke-linecap="round"/>`);
+  c.body.push(
+    `<circle cx="${cx}" cy="${cy}" r="${s}" fill="${glowHex}" opacity="0.3" filter="url(#${b})"/>`
+  );
+  c.body.push(
+    `<circle cx="${cx}" cy="${cy}" r="${s}" fill="none" stroke="${hex}" stroke-width="${
+      s * 0.12
+    }"/>`
+  );
+  c.body.push(
+    `<circle cx="${cx}" cy="${cy}" r="${
+      s * 0.86
+    }" fill="#0a0f12" opacity="0.35"/>`
+  );
+  c.body.push(
+    `<line x1="${cx + s * 0.74}" y1="${cy + s * 0.74}" x2="${
+      cx + s * 1.7
+    }" y2="${cy + s * 1.7}" stroke="${hex}" stroke-width="${
+      s * 0.2
+    }" stroke-linecap="round"/>`
+  );
 };
 
 const dnaHelix = (c, cx, hex, hex2) => {
@@ -443,34 +683,83 @@ const dnaHelix = (c, cx, hex, hex2) => {
     s2 += `${y === top ? "" : "L"}${x2.toFixed(1)} ${y} `;
     if (Math.round(y) % 56 === 0) {
       const front = Math.cos(t) > 0;
-      rungs += `<line x1="${x1.toFixed(1)}" y1="${y}" x2="${x2.toFixed(1)}" y2="${y}" stroke="${front ? hex : hex2}" stroke-width="${front ? 5 : 3}" opacity="${front ? 0.85 : 0.4}"/>`;
+      rungs += `<line x1="${x1.toFixed(1)}" y1="${y}" x2="${x2.toFixed(
+        1
+      )}" y2="${y}" stroke="${front ? hex : hex2}" stroke-width="${
+        front ? 5 : 3
+      }" opacity="${front ? 0.85 : 0.4}"/>`;
     }
   }
-  c.body.push(`<g filter="url(#${b})" opacity="0.5"><path d="${s1}" fill="none" stroke="${hex}" stroke-width="10"/><path d="${s2}" fill="none" stroke="${hex2}" stroke-width="10"/></g>`);
-  c.body.push(`<g>${rungs}<path d="${s1}" fill="none" stroke="${hex}" stroke-width="5"/><path d="${s2}" fill="none" stroke="${hex2}" stroke-width="5"/></g>`);
+  c.body.push(
+    `<g filter="url(#${b})" opacity="0.5"><path d="${s1}" fill="none" stroke="${hex}" stroke-width="10"/><path d="${s2}" fill="none" stroke="${hex2}" stroke-width="10"/></g>`
+  );
+  c.body.push(
+    `<g>${rungs}<path d="${s1}" fill="none" stroke="${hex}" stroke-width="5"/><path d="${s2}" fill="none" stroke="${hex2}" stroke-width="5"/></g>`
+  );
 };
 
 const pineEmblem = (c, cx, cy, s, hex, glowHex) => {
   const b = blur(c, 12);
-  c.body.push(`<circle cx="${cx}" cy="${cy}" r="${s * 1.15}" fill="${glowHex}" opacity="0.3" filter="url(#${b})"/>`);
-  c.body.push(`<circle cx="${cx}" cy="${cy}" r="${s}" fill="none" stroke="${hex}" stroke-width="4" opacity="0.8"/>`);
-  const grd = lin(c, [["0%", glowHex], ["100%", hex]], 0, 0, 0, 1);
+  c.body.push(
+    `<circle cx="${cx}" cy="${cy}" r="${
+      s * 1.15
+    }" fill="${glowHex}" opacity="0.3" filter="url(#${b})"/>`
+  );
+  c.body.push(
+    `<circle cx="${cx}" cy="${cy}" r="${s}" fill="none" stroke="${hex}" stroke-width="4" opacity="0.8"/>`
+  );
+  const grd = lin(
+    c,
+    [
+      ["0%", glowHex],
+      ["100%", hex],
+    ],
+    0,
+    0,
+    0,
+    1
+  );
   let tree = "";
   const tiers = 3;
   for (let i = 0; i < tiers; i += 1) {
-    const ty = cy - s * 0.55 + (i * s * 0.5);
+    const ty = cy - s * 0.55 + i * s * 0.5;
     const tw = s * (0.3 + i * 0.18);
-    tree += `<path d="M${cx} ${ty.toFixed(1)} L${cx + tw} ${(ty + s * 0.55).toFixed(1)} L${cx - tw} ${(ty + s * 0.55).toFixed(1)} Z" fill="url(#${grd})"/>`;
+    tree += `<path d="M${cx} ${ty.toFixed(1)} L${cx + tw} ${(
+      ty +
+      s * 0.55
+    ).toFixed(1)} L${cx - tw} ${(ty + s * 0.55).toFixed(
+      1
+    )} Z" fill="url(#${grd})"/>`;
   }
-  tree += `<rect x="${cx - s * 0.07}" y="${cy + s * 0.5}" width="${s * 0.14}" height="${s * 0.25}" fill="${hex}"/>`;
+  tree += `<rect x="${cx - s * 0.07}" y="${cy + s * 0.5}" width="${
+    s * 0.14
+  }" height="${s * 0.25}" fill="${hex}"/>`;
   c.body.push(`<g>${tree}</g>`);
 };
 
 const chip = (c, cx, cy, s, hex, glowHex) => {
   const b = blur(c, 16);
-  c.body.push(`<rect x="${cx - s}" y="${cy - s}" width="${s * 2}" height="${s * 2}" rx="${s * 0.12}" fill="${glowHex}" opacity="0.4" filter="url(#${b})"/>`);
-  const grd = lin(c, [["0%", "#0a1830"], ["100%", "#05101f"]], 0, 0, 0, 1);
-  c.body.push(`<rect x="${cx - s}" y="${cy - s}" width="${s * 2}" height="${s * 2}" rx="${s * 0.1}" fill="url(#${grd})" stroke="${hex}" stroke-width="4"/>`);
+  c.body.push(
+    `<rect x="${cx - s}" y="${cy - s}" width="${s * 2}" height="${s * 2}" rx="${
+      s * 0.12
+    }" fill="${glowHex}" opacity="0.4" filter="url(#${b})"/>`
+  );
+  const grd = lin(
+    c,
+    [
+      ["0%", "#0a1830"],
+      ["100%", "#05101f"],
+    ],
+    0,
+    0,
+    0,
+    1
+  );
+  c.body.push(
+    `<rect x="${cx - s}" y="${cy - s}" width="${s * 2}" height="${s * 2}" rx="${
+      s * 0.1
+    }" fill="url(#${grd})" stroke="${hex}" stroke-width="4"/>`
+  );
   // pins
   let pins = "";
   for (let i = 0; i < 7; i += 1) {
@@ -481,68 +770,194 @@ const chip = (c, cx, cy, s, hex, glowHex) => {
       [cx - s - s * 0.22, cy + t, s * 0.22, s * 0.12],
       [cx + s, cy + t, s * 0.22, s * 0.12],
     ])
-      pins += `<rect x="${px.toFixed(1)}" y="${py.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${hex}" opacity="0.85"/>`;
+      pins += `<rect x="${px.toFixed(1)}" y="${py.toFixed(
+        1
+      )}" width="${w.toFixed(1)}" height="${h.toFixed(
+        1
+      )}" fill="${hex}" opacity="0.85"/>`;
   }
   c.body.push(`<g>${pins}</g>`);
   // inner core + traces
-  c.body.push(`<rect x="${cx - s * 0.5}" y="${cy - s * 0.5}" width="${s}" height="${s}" rx="${s * 0.06}" fill="none" stroke="${glowHex}" stroke-width="3" opacity="0.9"/>`);
-  c.body.push(`<circle cx="${cx}" cy="${cy}" r="${s * 0.18}" fill="${glowHex}"/>`);
+  c.body.push(
+    `<rect x="${cx - s * 0.5}" y="${
+      cy - s * 0.5
+    }" width="${s}" height="${s}" rx="${
+      s * 0.06
+    }" fill="none" stroke="${glowHex}" stroke-width="3" opacity="0.9"/>`
+  );
+  c.body.push(
+    `<circle cx="${cx}" cy="${cy}" r="${s * 0.18}" fill="${glowHex}"/>`
+  );
   let tr = "";
   for (let i = 0; i < 8; i += 1) {
     const a = (i / 8) * Math.PI * 2;
-    tr += `<line x1="${(cx + Math.cos(a) * s * 0.18).toFixed(1)}" y1="${(cy + Math.sin(a) * s * 0.18).toFixed(1)}" x2="${(cx + Math.cos(a) * s * 0.5).toFixed(1)}" y2="${(cy + Math.sin(a) * s * 0.5).toFixed(1)}" stroke="${glowHex}" stroke-width="2.5" opacity="0.7"/>`;
+    tr += `<line x1="${(cx + Math.cos(a) * s * 0.18).toFixed(1)}" y1="${(
+      cy +
+      Math.sin(a) * s * 0.18
+    ).toFixed(1)}" x2="${(cx + Math.cos(a) * s * 0.5).toFixed(1)}" y2="${(
+      cy +
+      Math.sin(a) * s * 0.5
+    ).toFixed(1)}" stroke="${glowHex}" stroke-width="2.5" opacity="0.7"/>`;
   }
   c.body.push(`<g>${tr}</g>`);
 };
 
 const atom = (c, cx, cy, s, hex, glowHex) => {
   const b = blur(c, 10);
-  c.body.push(`<circle cx="${cx}" cy="${cy}" r="${s * 1.1}" fill="${glowHex}" opacity="0.3" filter="url(#${b})"/>`);
+  c.body.push(
+    `<circle cx="${cx}" cy="${cy}" r="${
+      s * 1.1
+    }" fill="${glowHex}" opacity="0.3" filter="url(#${b})"/>`
+  );
   for (let i = 0; i < 3; i += 1)
-    c.body.push(`<ellipse cx="${cx}" cy="${cy}" rx="${s}" ry="${s * 0.38}" fill="none" stroke="${hex}" stroke-width="4" opacity="0.85" transform="rotate(${i * 60} ${cx} ${cy})"/>`);
-  c.body.push(`<circle cx="${cx}" cy="${cy}" r="${s * 0.16}" fill="${glowHex}"/>`);
+    c.body.push(
+      `<ellipse cx="${cx}" cy="${cy}" rx="${s}" ry="${
+        s * 0.38
+      }" fill="none" stroke="${hex}" stroke-width="4" opacity="0.85" transform="rotate(${
+        i * 60
+      } ${cx} ${cy})"/>`
+    );
+  c.body.push(
+    `<circle cx="${cx}" cy="${cy}" r="${s * 0.16}" fill="${glowHex}"/>`
+  );
 };
 
 const torii = (c, cx, cy, s, hex) => {
   const col = s * 0.12;
-  c.body.push(`<rect x="${cx - s * 0.62}" y="${cy - s}" width="${col}" height="${s * 2}" fill="${hex}"/>`);
-  c.body.push(`<rect x="${cx + s * 0.5}" y="${cy - s}" width="${col}" height="${s * 2}" fill="${hex}"/>`);
-  c.body.push(`<path d="M${cx - s * 0.95} ${cy - s} Q${cx} ${cy - s * 1.25} ${cx + s * 0.95} ${cy - s} L${cx + s * 0.95} ${cy - s * 0.78} Q${cx} ${cy - s * 0.98} ${cx - s * 0.95} ${cy - s * 0.78} Z" fill="${hex}"/>`);
-  c.body.push(`<rect x="${cx - s * 0.78}" y="${cy - s * 0.55}" width="${s * 1.56}" height="${col * 0.9}" fill="${hex}"/>`);
+  c.body.push(
+    `<rect x="${cx - s * 0.62}" y="${cy - s}" width="${col}" height="${
+      s * 2
+    }" fill="${hex}"/>`
+  );
+  c.body.push(
+    `<rect x="${cx + s * 0.5}" y="${cy - s}" width="${col}" height="${
+      s * 2
+    }" fill="${hex}"/>`
+  );
+  c.body.push(
+    `<path d="M${cx - s * 0.95} ${cy - s} Q${cx} ${cy - s * 1.25} ${
+      cx + s * 0.95
+    } ${cy - s} L${cx + s * 0.95} ${cy - s * 0.78} Q${cx} ${cy - s * 0.98} ${
+      cx - s * 0.95
+    } ${cy - s * 0.78} Z" fill="${hex}"/>`
+  );
+  c.body.push(
+    `<rect x="${cx - s * 0.78}" y="${cy - s * 0.55}" width="${
+      s * 1.56
+    }" height="${col * 0.9}" fill="${hex}"/>`
+  );
 };
 
 const dove = (c, x, y, s, hex, op = 0.9) => {
-  c.body.push(`<path d="M${x} ${y} q${s * 0.5} ${-s * 0.5} ${s} ${-s * 0.1} q${-s * 0.3} ${s * 0.05} ${-s * 0.5} ${s * 0.25} q${s * 0.5} ${-s * 0.2} ${s} ${s * 0.1}" fill="none" stroke="${hex}" stroke-width="${s * 0.12}" stroke-linecap="round" opacity="${op}"/>`);
+  c.body.push(
+    `<path d="M${x} ${y} q${s * 0.5} ${-s * 0.5} ${s} ${-s * 0.1} q${
+      -s * 0.3
+    } ${s * 0.05} ${-s * 0.5} ${s * 0.25} q${s * 0.5} ${-s * 0.2} ${s} ${
+      s * 0.1
+    }" fill="none" stroke="${hex}" stroke-width="${
+      s * 0.12
+    }" stroke-linecap="round" opacity="${op}"/>`
+  );
 };
 
 // Stylized BSD "beastie" daemon emblem (horns, grin, trident tail).
 const beastie = (c, cx, cy, s, hex, glowHex) => {
   const b = blur(c, 16);
-  c.body.push(`<ellipse cx="${cx}" cy="${cy}" rx="${s * 1.25}" ry="${s * 1.4}" fill="${glowHex}" opacity="0.4" filter="url(#${b})"/>`);
-  const grd = lin(c, [["0%", hex], ["100%", glowHex]], 0, 0, 0, 1);
+  c.body.push(
+    `<ellipse cx="${cx}" cy="${cy}" rx="${s * 1.25}" ry="${
+      s * 1.4
+    }" fill="${glowHex}" opacity="0.4" filter="url(#${b})"/>`
+  );
+  const grd = lin(
+    c,
+    [
+      ["0%", hex],
+      ["100%", glowHex],
+    ],
+    0,
+    0,
+    0,
+    1
+  );
   // head/body silhouette
-  c.body.push(`<path d="M${cx} ${cy - s * 0.92} Q${cx + s * 0.86} ${cy - s * 0.8} ${cx + s * 0.7} ${cy + s * 0.1} Q${cx + s * 0.5} ${cy + s} ${cx} ${cy + s * 1.12} Q${cx - s * 0.5} ${cy + s} ${cx - s * 0.7} ${cy + s * 0.1} Q${cx - s * 0.86} ${cy - s * 0.8} ${cx} ${cy - s * 0.92} Z" fill="url(#${grd})" stroke="${glowHex}" stroke-width="4"/>`);
+  c.body.push(
+    `<path d="M${cx} ${cy - s * 0.92} Q${cx + s * 0.86} ${cy - s * 0.8} ${
+      cx + s * 0.7
+    } ${cy + s * 0.1} Q${cx + s * 0.5} ${cy + s} ${cx} ${cy + s * 1.12} Q${
+      cx - s * 0.5
+    } ${cy + s} ${cx - s * 0.7} ${cy + s * 0.1} Q${cx - s * 0.86} ${
+      cy - s * 0.8
+    } ${cx} ${
+      cy - s * 0.92
+    } Z" fill="url(#${grd})" stroke="${glowHex}" stroke-width="4"/>`
+  );
   // horns
-  c.body.push(`<path d="M${cx - s * 0.5} ${cy - s * 0.78} Q${cx - s * 0.78} ${cy - s * 1.3} ${cx - s * 0.42} ${cy - s * 1.42} Q${cx - s * 0.5} ${cy - s * 1.06} ${cx - s * 0.3} ${cy - s * 0.82} Z" fill="${hex}"/>`);
-  c.body.push(`<path d="M${cx + s * 0.5} ${cy - s * 0.78} Q${cx + s * 0.78} ${cy - s * 1.3} ${cx + s * 0.42} ${cy - s * 1.42} Q${cx + s * 0.5} ${cy - s * 1.06} ${cx + s * 0.3} ${cy - s * 0.82} Z" fill="${hex}"/>`);
+  c.body.push(
+    `<path d="M${cx - s * 0.5} ${cy - s * 0.78} Q${cx - s * 0.78} ${
+      cy - s * 1.3
+    } ${cx - s * 0.42} ${cy - s * 1.42} Q${cx - s * 0.5} ${cy - s * 1.06} ${
+      cx - s * 0.3
+    } ${cy - s * 0.82} Z" fill="${hex}"/>`
+  );
+  c.body.push(
+    `<path d="M${cx + s * 0.5} ${cy - s * 0.78} Q${cx + s * 0.78} ${
+      cy - s * 1.3
+    } ${cx + s * 0.42} ${cy - s * 1.42} Q${cx + s * 0.5} ${cy - s * 1.06} ${
+      cx + s * 0.3
+    } ${cy - s * 0.82} Z" fill="${hex}"/>`
+  );
   // eyes
-  c.body.push(`<circle cx="${cx - s * 0.26}" cy="${cy - s * 0.3}" r="${s * 0.11}" fill="#1a0202"/>`);
-  c.body.push(`<circle cx="${cx + s * 0.26}" cy="${cy - s * 0.3}" r="${s * 0.11}" fill="#1a0202"/>`);
+  c.body.push(
+    `<circle cx="${cx - s * 0.26}" cy="${cy - s * 0.3}" r="${
+      s * 0.11
+    }" fill="#1a0202"/>`
+  );
+  c.body.push(
+    `<circle cx="${cx + s * 0.26}" cy="${cy - s * 0.3}" r="${
+      s * 0.11
+    }" fill="#1a0202"/>`
+  );
   // grin
-  c.body.push(`<path d="M${cx - s * 0.34} ${cy + s * 0.06} Q${cx} ${cy + s * 0.42} ${cx + s * 0.34} ${cy + s * 0.06}" fill="none" stroke="#1a0202" stroke-width="${s * 0.05}"/>`);
+  c.body.push(
+    `<path d="M${cx - s * 0.34} ${cy + s * 0.06} Q${cx} ${cy + s * 0.42} ${
+      cx + s * 0.34
+    } ${cy + s * 0.06}" fill="none" stroke="#1a0202" stroke-width="${
+      s * 0.05
+    }"/>`
+  );
   // trident tail
-  c.body.push(`<line x1="${cx + s * 0.66}" y1="${cy + s * 0.3}" x2="${cx + s * 1.2}" y2="${cy + s * 0.78}" stroke="${hex}" stroke-width="${s * 0.07}" stroke-linecap="round"/>`);
-  c.body.push(`<path d="M${cx + s * 1.1} ${cy + s * 0.6} L${cx + s * 1.34} ${cy + s * 0.62} M${cx + s * 1.2} ${cy + s * 0.78} L${cx + s * 1.42} ${cy + s * 0.86} M${cx + s * 1.12} ${cy + s * 0.92} L${cx + s * 1.3} ${cy + s * 1.04}" stroke="${hex}" stroke-width="${s * 0.06}" stroke-linecap="round"/>`);
+  c.body.push(
+    `<line x1="${cx + s * 0.66}" y1="${cy + s * 0.3}" x2="${
+      cx + s * 1.2
+    }" y2="${cy + s * 0.78}" stroke="${hex}" stroke-width="${
+      s * 0.07
+    }" stroke-linecap="round"/>`
+  );
+  c.body.push(
+    `<path d="M${cx + s * 1.1} ${cy + s * 0.6} L${cx + s * 1.34} ${
+      cy + s * 0.62
+    } M${cx + s * 1.2} ${cy + s * 0.78} L${cx + s * 1.42} ${cy + s * 0.86} M${
+      cx + s * 1.12
+    } ${cy + s * 0.92} L${cx + s * 1.3} ${
+      cy + s * 1.04
+    }" stroke="${hex}" stroke-width="${s * 0.06}" stroke-linecap="round"/>`
+  );
 };
 
 // ---------- helper: HUD ring ----------
 const hudRing = (c, cx, cy, r, hex, dashed = true) => {
-  c.body.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${hex}" stroke-width="2" opacity="0.5" ${dashed ? `stroke-dasharray="${ri(c, 14, 30)} ${ri(c, 8, 18)}"` : ""}/>`);
+  c.body.push(
+    `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${hex}" stroke-width="2" opacity="0.5" ${
+      dashed ? `stroke-dasharray="${ri(c, 14, 30)} ${ri(c, 8, 18)}"` : ""
+    }/>`
+  );
 };
 
 // ---------- compose + render ----------
 const svg = (c) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><defs>${c.defs.join("")}</defs>${c.body.join("")}</svg>`;
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><defs>${c.defs.join(
+    ""
+  )}</defs>${c.body.join("")}</svg>`;
 
 const render = async (theme, name, build) => {
   const seed = hashSeed(`${theme}/${name}`);
@@ -554,9 +969,19 @@ const render = async (theme, name, build) => {
   const svgPath = join(TMP, `${theme}-${name}.svg`);
   const pngPath = join(TMP, `${theme}-${name}.png`);
   writeFileSync(svgPath, svg(c));
-  execFileSync("rsvg-convert", [svgPath, "-w", String(W), "-h", String(H), "-o", pngPath]);
+  execFileSync("rsvg-convert", [
+    svgPath,
+    "-w",
+    String(W),
+    "-h",
+    String(H),
+    "-o",
+    pngPath,
+  ]);
   const outFile = join(dir, `${name}.webp`);
-  const info = await sharp(pngPath).webp({ quality: 82, effort: 5 }).toFile(outFile);
+  const info = await sharp(pngPath)
+    .webp({ quality: 82, effort: 5 })
+    .toFile(outFile);
   console.log(`  ${theme}/${name}.webp  ${(info.size / 1024).toFixed(0)}KB`);
 };
 
@@ -573,13 +998,27 @@ const THEMES = {
       grainLayer(c, 0.04);
     },
     "matrix-core": (c) => {
-      radialBg(c, [["0%", "#063a20"], ["55%", "#021a0e"], ["100%", "#000301"]], W / 2, H / 2, W * 0.7);
+      radialBg(
+        c,
+        [
+          ["0%", "#063a20"],
+          ["55%", "#021a0e"],
+          ["100%", "#000301"],
+        ],
+        W / 2,
+        H / 2,
+        W * 0.7
+      );
       glyphRain(c, "#5fffa0", "#0c9c44", 0.55, 26);
       lightRays(c, W / 2, H / 2, "#00ff77", 22, H * 1.2, 0.1);
       glow(c, W / 2, H / 2, W * 0.32, "#00ff88", 0.5);
       hudRing(c, W / 2, H / 2, 360, "#39ff8d");
       hudRing(c, W / 2, H / 2, 430, "#1fae5e");
-      c.body.push(`<text x="${W / 2}" y="${H / 2 + 130}" font-family="'Sarasa Mono J', monospace" font-size="380" fill="#aaffc8" opacity="0.95" text-anchor="middle">日</text>`);
+      c.body.push(
+        `<text x="${W / 2}" y="${
+          H / 2 + 130
+        }" font-family="'Sarasa Mono J', monospace" font-size="380" fill="#aaffc8" opacity="0.95" text-anchor="middle">日</text>`
+      );
       vignette(c, 0.92);
       grainLayer(c, 0.04);
     },
@@ -611,10 +1050,18 @@ const THEMES = {
       const th = H * 0.5;
       const tx = (W - tw) / 2;
       const ty = (H - th) / 2;
-      c.body.push(`<rect x="${tx}" y="${ty}" width="${tw}" height="${th}" rx="16" fill="#040b08" stroke="#39ff14" stroke-width="2" opacity="0.96"/>`);
-      c.body.push(`<rect x="${tx}" y="${ty}" width="${tw}" height="44" rx="16" fill="#0a1a12"/>`);
+      c.body.push(
+        `<rect x="${tx}" y="${ty}" width="${tw}" height="${th}" rx="16" fill="#040b08" stroke="#39ff14" stroke-width="2" opacity="0.96"/>`
+      );
+      c.body.push(
+        `<rect x="${tx}" y="${ty}" width="${tw}" height="44" rx="16" fill="#0a1a12"/>`
+      );
       for (let i = 0; i < 3; i += 1)
-        c.body.push(`<circle cx="${tx + 28 + i * 28}" cy="${ty + 22}" r="7" fill="${["#ff5f56", "#ffbd2e", "#27c93f"][i]}"/>`);
+        c.body.push(
+          `<circle cx="${tx + 28 + i * 28}" cy="${ty + 22}" r="7" fill="${
+            ["#ff5f56", "#ffbd2e", "#27c93f"][i]
+          }"/>`
+        );
       const lines = [
         "root@securityos:~# nmap -sS -Pn 10.0.0.0/24",
         "[+] host up: 10.0.0.7  ports: 22,80,443",
@@ -628,12 +1075,21 @@ const THEMES = {
         "root@target:~# _",
       ];
       lines.forEach((ln, i) => {
-        const col = ln.startsWith("[+]") ? "#7dff5a" : ln.includes("root@") ? "#39ff14" : "#bfffcf";
-        c.body.push(`<text x="${tx + 34}" y="${ty + 92 + i * 46}" font-family="'Sarasa Mono J', monospace" font-size="27" fill="${col}" opacity="0.95">${ln}</text>`);
+        const col = ln.startsWith("[+]")
+          ? "#7dff5a"
+          : ln.includes("root@")
+          ? "#39ff14"
+          : "#bfffcf";
+        c.body.push(
+          `<text x="${tx + 34}" y="${
+            ty + 92 + i * 46
+          }" font-family="'Sarasa Mono J', monospace" font-size="27" fill="${col}" opacity="0.95">${ln}</text>`
+        );
       });
       // scanlines
       let sl = "";
-      for (let y = 0; y < H; y += 4) sl += `<rect x="0" y="${y}" width="${W}" height="2" fill="#000" opacity="0.18"/>`;
+      for (let y = 0; y < H; y += 4)
+        sl += `<rect x="0" y="${y}" width="${W}" height="2" fill="#000" opacity="0.18"/>`;
       c.body.push(`<g>${sl}</g>`);
       vignette(c, 0.9);
     },
@@ -647,19 +1103,33 @@ const THEMES = {
         const h = rr(c, 4, 34);
         const x = rr(c, -40, 40);
         const col = pick(c, ["#ff2d55", "#00e0ff", "#39ff14"]);
-        g += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${W}" height="${h.toFixed(1)}" fill="${col}" opacity="${rr(c, 0.05, 0.2).toFixed(2)}"/>`;
+        g += `<rect x="${x.toFixed(1)}" y="${y.toFixed(
+          1
+        )}" width="${W}" height="${h.toFixed(1)}" fill="${col}" opacity="${rr(
+          c,
+          0.05,
+          0.2
+        ).toFixed(2)}"/>`;
       }
       c.body.push(`<g style="mix-blend-mode:screen">${g}</g>`);
       glow(c, W / 2, H / 2, W * 0.4, "#ff2d55", 0.12);
-      c.body.push(`<text x="${W / 2}" y="${H / 2 + 70}" font-family="'Sarasa Mono J', monospace" font-weight="bold" font-size="220" fill="#39ff14" opacity="0.9" text-anchor="middle" letter-spacing="14">ACCESS</text>`);
-      c.body.push(`<text x="${W / 2}" y="${H / 2 + 200}" font-family="'Sarasa Mono J', monospace" font-size="90" fill="#ff2d55" opacity="0.85" text-anchor="middle" letter-spacing="40">GRANTED</text>`);
+      c.body.push(
+        `<text x="${W / 2}" y="${
+          H / 2 + 70
+        }" font-family="'Sarasa Mono J', monospace" font-weight="bold" font-size="220" fill="#39ff14" opacity="0.9" text-anchor="middle" letter-spacing="14">ACCESS</text>`
+      );
+      c.body.push(
+        `<text x="${W / 2}" y="${
+          H / 2 + 200
+        }" font-family="'Sarasa Mono J', monospace" font-size="90" fill="#ff2d55" opacity="0.85" text-anchor="middle" letter-spacing="40">GRANTED</text>`
+      );
       vignette(c, 0.9);
       grainLayer(c, 0.06);
     },
   },
 
   Anonymity: {
-    "constellation": (c) => {
+    constellation: (c) => {
       bgGrad(c, ["#0c0c1c", "#0a0a16", "#040408"]);
       nebulaLayer(c, "#3a2a7a", 0.0014, 4, 0.5);
       nebulaLayer(c, "#1c5a8a", 0.0022, 3, 0.32);
@@ -669,7 +1139,17 @@ const THEMES = {
       grainLayer(c, 0.04);
     },
     "the-mask": (c) => {
-      radialBg(c, [["0%", "#1a1640"], ["55%", "#0c0a22"], ["100%", "#040308"]], W / 2, H / 2, W * 0.7);
+      radialBg(
+        c,
+        [
+          ["0%", "#1a1640"],
+          ["55%", "#0c0a22"],
+          ["100%", "#040308"],
+        ],
+        W / 2,
+        H / 2,
+        W * 0.7
+      );
       particles(c, 46, "#8a6cff", "#3f6fff", 230);
       lightRays(c, W / 2, H * 0.45, "#7c5cff", 20, H * 1.2, 0.12);
       glow(c, W / 2, H * 0.46, W * 0.3, "#9d86ff", 0.4);
@@ -685,8 +1165,14 @@ const THEMES = {
       // hooded silhouette
       const cx = W / 2;
       const fy = H * 0.98;
-      c.body.push(`<path d="M${cx} ${fy - 560} q-120 10 -150 150 q-26 120 -20 410 l-150 0 l40 -250 q-70 60 -90 250 l-30 0 q10 -360 120 -470 q-30 -40 -20 -130 q20 -150 170 -160 q150 10 170 160 q10 90 -20 130 q110 110 120 470 l-30 0 q-20 -190 -90 -250 l40 250 l-150 0 q6 -290 -20 -410 q-30 -140 -150 -150 Z" fill="#05060e"/>`);
-      c.body.push(`<ellipse cx="${cx}" cy="${fy - 470}" rx="70" ry="86" fill="#0a0c18"/>`);
+      c.body.push(
+        `<path d="M${cx} ${
+          fy - 560
+        } q-120 10 -150 150 q-26 120 -20 410 l-150 0 l40 -250 q-70 60 -90 250 l-30 0 q10 -360 120 -470 q-30 -40 -20 -130 q20 -150 170 -160 q150 10 170 160 q10 90 -20 130 q110 110 120 470 l-30 0 q-20 -190 -90 -250 l40 250 l-150 0 q6 -290 -20 -410 q-30 -140 -150 -150 Z" fill="#05060e"/>`
+      );
+      c.body.push(
+        `<ellipse cx="${cx}" cy="${fy - 470}" rx="70" ry="86" fill="#0a0c18"/>`
+      );
       vignette(c, 0.92);
       grainLayer(c, 0.04);
     },
@@ -694,10 +1180,21 @@ const THEMES = {
 
   Security: {
     "hex-defense": (c) => {
-      radialBg(c, [["0%", "#0c2a5e"], ["55%", "#071634"], ["100%", "#02050e"]], W / 2, H * 0.45, W * 0.72);
+      radialBg(
+        c,
+        [
+          ["0%", "#0c2a5e"],
+          ["55%", "#071634"],
+          ["100%", "#02050e"],
+        ],
+        W / 2,
+        H * 0.45,
+        W * 0.72
+      );
       hexGrid(c, "#2257a0", "#39b6ff");
       particles(c, 54, "#5fd0ff", "#2f8fff", 250);
-      for (let i = 1; i <= 4; i += 1) hudRing(c, W / 2, H * 0.47, 150 + i * 110, "#2f8fff");
+      for (let i = 1; i <= 4; i += 1)
+        hudRing(c, W / 2, H * 0.47, 150 + i * 110, "#2f8fff");
       glow(c, W / 2, H * 0.47, W * 0.32, "#2f8fff", 0.32);
       glow(c, W * 0.2, H * 0.78, W * 0.34, "#00e5c0", 0.16);
       c.body.push(`<g opacity="0.16">`);
@@ -707,7 +1204,17 @@ const THEMES = {
       grainLayer(c, 0.04);
     },
     "shield-core": (c) => {
-      radialBg(c, [["0%", "#0b2350"], ["55%", "#06122a"], ["100%", "#02040c"]], W / 2, H / 2, W * 0.7);
+      radialBg(
+        c,
+        [
+          ["0%", "#0b2350"],
+          ["55%", "#06122a"],
+          ["100%", "#02040c"],
+        ],
+        W / 2,
+        H / 2,
+        W * 0.7
+      );
       hexGrid(c, "#10305c", "#2f8fff");
       lightRays(c, W / 2, H / 2, "#2f8fff", 22, H * 1.2, 0.12);
       glow(c, W / 2, H / 2, W * 0.3, "#3aa0ff", 0.4);
@@ -718,23 +1225,66 @@ const THEMES = {
       grainLayer(c, 0.04);
     },
     "radar-watch": (c) => {
-      radialBg(c, [["0%", "#062436"], ["60%", "#04101e"], ["100%", "#01060c"]], W / 2, H / 2, W * 0.7);
+      radialBg(
+        c,
+        [
+          ["0%", "#062436"],
+          ["60%", "#04101e"],
+          ["100%", "#01060c"],
+        ],
+        W / 2,
+        H / 2,
+        W * 0.7
+      );
       const cx = W / 2;
       const cy = H / 2;
       for (let i = 1; i <= 5; i += 1)
-        c.body.push(`<circle cx="${cx}" cy="${cy}" r="${i * 120}" fill="none" stroke="#1d9c8a" stroke-width="2" opacity="0.5"/>`);
+        c.body.push(
+          `<circle cx="${cx}" cy="${cy}" r="${
+            i * 120
+          }" fill="none" stroke="#1d9c8a" stroke-width="2" opacity="0.5"/>`
+        );
       for (let i = 0; i < 12; i += 1) {
         const a = (i / 12) * Math.PI * 2;
-        c.body.push(`<line x1="${cx}" y1="${cy}" x2="${(cx + Math.cos(a) * 620).toFixed(1)}" y2="${(cy + Math.sin(a) * 620).toFixed(1)}" stroke="#1d9c8a" stroke-width="1" opacity="0.3"/>`);
+        c.body.push(
+          `<line x1="${cx}" y1="${cy}" x2="${(cx + Math.cos(a) * 620).toFixed(
+            1
+          )}" y2="${(cy + Math.sin(a) * 620).toFixed(
+            1
+          )}" stroke="#1d9c8a" stroke-width="1" opacity="0.3"/>`
+        );
       }
       // sweep wedge
-      const sg = rad(c, [["0%", "#37ffd0", 0.5], ["100%", "#37ffd0", 0]], cx, cy, 620);
-      c.body.push(`<path d="M${cx} ${cy} L${cx + 620} ${cy} A620 620 0 0 0 ${(cx + Math.cos(-0.9) * 620).toFixed(1)} ${(cy + Math.sin(-0.9) * 620).toFixed(1)} Z" fill="url(#${sg})"/>`);
+      const sg = rad(
+        c,
+        [
+          ["0%", "#37ffd0", 0.5],
+          ["100%", "#37ffd0", 0],
+        ],
+        cx,
+        cy,
+        620
+      );
+      c.body.push(
+        `<path d="M${cx} ${cy} L${cx + 620} ${cy} A620 620 0 0 0 ${(
+          cx +
+          Math.cos(-0.9) * 620
+        ).toFixed(1)} ${(cy + Math.sin(-0.9) * 620).toFixed(
+          1
+        )} Z" fill="url(#${sg})"/>`
+      );
       // blips
       for (let i = 0; i < 9; i += 1) {
         const a = rr(c, 0, Math.PI * 2);
         const d = rr(c, 80, 580);
-        c.body.push(`<circle cx="${(cx + Math.cos(a) * d).toFixed(1)}" cy="${(cy + Math.sin(a) * d).toFixed(1)}" r="${rr(c, 4, 8).toFixed(1)}" fill="#5dffd6" opacity="0.9"/>`);
+        c.body.push(
+          `<circle cx="${(cx + Math.cos(a) * d).toFixed(1)}" cy="${(
+            cy +
+            Math.sin(a) * d
+          ).toFixed(1)}" r="${rr(c, 4, 8).toFixed(
+            1
+          )}" fill="#5dffd6" opacity="0.9"/>`
+        );
       }
       glow(c, cx, cy, W * 0.25, "#00e5c0", 0.18);
       vignette(c, 0.9);
@@ -748,13 +1298,27 @@ const THEMES = {
       hexGrid(c, "#3a3320", "#ffb22e");
       fingerprint(c, W / 2, H / 2, 520, "#ffb22e", 0.8);
       // scan line
-      c.body.push(`<rect x="${W / 2 - 560}" y="${H / 2 - 30}" width="1120" height="6" fill="#2fd6ff" opacity="0.8"/>`);
+      c.body.push(
+        `<rect x="${W / 2 - 560}" y="${
+          H / 2 - 30
+        }" width="1120" height="6" fill="#2fd6ff" opacity="0.8"/>`
+      );
       glow(c, W / 2, H / 2, W * 0.4, "#ffb22e", 0.14);
       vignette(c, 0.9);
       grainLayer(c, 0.05);
     },
     "evidence-magnify": (c) => {
-      radialBg(c, [["0%", "#13202a"], ["60%", "#0a1116"], ["100%", "#04070a"]], W / 2, H / 2, W * 0.7);
+      radialBg(
+        c,
+        [
+          ["0%", "#13202a"],
+          ["60%", "#0a1116"],
+          ["100%", "#04070a"],
+        ],
+        W / 2,
+        H / 2,
+        W * 0.7
+      );
       fingerprint(c, W * 0.62, H * 0.52, 360, "#2fd6ff", 0.55);
       lightRays(c, W * 0.4, H * 0.4, "#ffb22e", 16, H * 1.1, 0.08);
       magnifier(c, W * 0.4, H * 0.45, 230, "#ffd27a", "#ffb22e");
@@ -769,7 +1333,13 @@ const THEMES = {
       // data ticks
       let g = "";
       for (let i = 0; i < 60; i += 1)
-        g += `<rect x="${rr(c, 0, W).toFixed(1)}" y="${rr(c, 0, H).toFixed(1)}" width="${rr(c, 6, 30).toFixed(1)}" height="3" fill="#2fd6ff" opacity="${rr(c, 0.1, 0.4).toFixed(2)}"/>`;
+        g += `<rect x="${rr(c, 0, W).toFixed(1)}" y="${rr(c, 0, H).toFixed(
+          1
+        )}" width="${rr(c, 6, 30).toFixed(
+          1
+        )}" height="3" fill="#2fd6ff" opacity="${rr(c, 0.1, 0.4).toFixed(
+          2
+        )}"/>`;
       c.body.push(`<g>${g}</g>`);
       glow(c, W / 2, H / 2, W * 0.35, "#2fd6ff", 0.14);
       vignette(c, 0.9);
@@ -783,11 +1353,25 @@ const THEMES = {
       // sun with stripes
       const cx = W / 2;
       const cy = H * 0.42;
-      const sg = rad(c, [["0%", "#fff2b0"], ["55%", "#ffd24d"], ["100%", "#ff5d8f"]], cx, cy, 320);
+      const sg = rad(
+        c,
+        [
+          ["0%", "#fff2b0"],
+          ["55%", "#ffd24d"],
+          ["100%", "#ff5d8f"],
+        ],
+        cx,
+        cy,
+        320
+      );
       c.body.push(`<circle cx="${cx}" cy="${cy}" r="320" fill="url(#${sg})"/>`);
       // stripes carved out of sun's lower half
       for (let i = 0; i < 7; i += 1)
-        c.body.push(`<rect x="${cx - 330}" y="${cy + 40 + i * 30}" width="660" height="${10 + i * 3}" fill="#3a1252" opacity="0.9"/>`);
+        c.body.push(
+          `<rect x="${cx - 330}" y="${cy + 40 + i * 30}" width="660" height="${
+            10 + i * 3
+          }" fill="#3a1252" opacity="0.9"/>`
+        );
       stars(c, 120, ["#ffffff", "#ffd6f0", "#bda6ff"]);
       glow(c, cx, cy, W * 0.5, "#ff7ad9", 0.18);
       perspectiveGrid(c, "#ff5db0", H * 0.62, W / 2, "#ff9ee0");
@@ -800,11 +1384,27 @@ const THEMES = {
       bgGrad(c, ["#2a1144", "#6d2470", "#ff8a9b"]);
       glow(c, W * 0.7, H * 0.25, W * 0.5, "#ffd0e6", 0.3);
       // big soft moon
-      const mg = rad(c, [["0%", "#fff6fb"], ["70%", "#ffd9ec"], ["100%", "#ffb6d6", 0]], W * 0.74, H * 0.28, 260);
-      c.body.push(`<circle cx="${W * 0.74}" cy="${H * 0.28}" r="260" fill="url(#${mg})"/>`);
+      const mg = rad(
+        c,
+        [
+          ["0%", "#fff6fb"],
+          ["70%", "#ffd9ec"],
+          ["100%", "#ffb6d6", 0],
+        ],
+        W * 0.74,
+        H * 0.28,
+        260
+      );
+      c.body.push(
+        `<circle cx="${W * 0.74}" cy="${H * 0.28}" r="260" fill="url(#${mg})"/>`
+      );
       sakura(c, 150);
       // branch silhouette
-      c.body.push(`<path d="M0 ${H * 0.1} q300 60 520 30 q200 -28 360 70 q-180 -30 -360 0 q-240 40 -520 -10 Z" fill="#1c0a2c" opacity="0.85"/>`);
+      c.body.push(
+        `<path d="M0 ${
+          H * 0.1
+        } q300 60 520 30 q200 -28 360 70 q-180 -30 -360 0 q-240 40 -520 -10 Z" fill="#1c0a2c" opacity="0.85"/>`
+      );
       ridge(c, H * 0.84, 50, "#240d36", 0.95, 7);
       vignette(c, 0.7);
       grainLayer(c, 0.04);
@@ -813,13 +1413,41 @@ const THEMES = {
       bgGrad(c, ["#15093a", "#3a1466", "#7a2a78"]);
       const cx = W * 0.5;
       const cy = H * 0.4;
-      const mg = rad(c, [["0%", "#ffe7a8"], ["60%", "#ff9ec4"], ["100%", "#ff6aa8", 0]], cx, cy, 420);
+      const mg = rad(
+        c,
+        [
+          ["0%", "#ffe7a8"],
+          ["60%", "#ff9ec4"],
+          ["100%", "#ff6aa8", 0],
+        ],
+        cx,
+        cy,
+        420
+      );
       c.body.push(`<circle cx="${cx}" cy="${cy}" r="420" fill="url(#${mg})"/>`);
       stars(c, 160, ["#ffffff", "#ffd6f0", "#bda6ff"]);
       // water + reflection band
-      c.body.push(`<rect x="0" y="${H * 0.72}" width="${W}" height="${H * 0.28}" fill="#0e0626" opacity="0.85"/>`);
-      const rg = lin(c, [["0%", "#ffcaa0", 0.45], ["100%", "#ff6aa8", 0]], 0, 0, 0, 1);
-      c.body.push(`<rect x="${cx - 60}" y="${H * 0.72}" width="120" height="${H * 0.28}" fill="url(#${rg})"/>`);
+      c.body.push(
+        `<rect x="0" y="${H * 0.72}" width="${W}" height="${
+          H * 0.28
+        }" fill="#0e0626" opacity="0.85"/>`
+      );
+      const rg = lin(
+        c,
+        [
+          ["0%", "#ffcaa0", 0.45],
+          ["100%", "#ff6aa8", 0],
+        ],
+        0,
+        0,
+        0,
+        1
+      );
+      c.body.push(
+        `<rect x="${cx - 60}" y="${H * 0.72}" width="120" height="${
+          H * 0.28
+        }" fill="url(#${rg})"/>`
+      );
       torii(c, cx, H * 0.6, 240, "#160826");
       ridge(c, H * 0.72, 40, "#170828", 1, 9);
       vignette(c, 0.72);
@@ -829,7 +1457,17 @@ const THEMES = {
 
   Christ: {
     "radiant-cross": (c) => {
-      radialBg(c, [["0%", "#2a3568"], ["45%", "#141d44"], ["100%", "#060a1c"]], W / 2, H * 0.42, W * 0.8);
+      radialBg(
+        c,
+        [
+          ["0%", "#2a3568"],
+          ["45%", "#141d44"],
+          ["100%", "#060a1c"],
+        ],
+        W / 2,
+        H * 0.42,
+        W * 0.8
+      );
       nebulaLayer(c, "#caa24a", 0.0012, 4, 0.28);
       lightRays(c, W / 2, H * 0.4, "#ffd97a", 26, H * 1.4, 0.16);
       glow(c, W / 2, H * 0.42, W * 0.34, "#ffe6a0", 0.5);
@@ -844,13 +1482,30 @@ const THEMES = {
       bgGrad(c, ["#0a1430", "#26345f", "#caa05a", "#ffcf7a"]);
       const cx = W / 2;
       const cy = H * 0.6;
-      const sg = rad(c, [["0%", "#fff6d8"], ["40%", "#ffd97a"], ["100%", "#ffcf7a", 0]], cx, cy, 520);
+      const sg = rad(
+        c,
+        [
+          ["0%", "#fff6d8"],
+          ["40%", "#ffd97a"],
+          ["100%", "#ffcf7a", 0],
+        ],
+        cx,
+        cy,
+        520
+      );
       c.body.push(`<circle cx="${cx}" cy="${cy}" r="520" fill="url(#${sg})"/>`);
       lightRays(c, cx, cy, "#fff0c0", 24, H * 1.3, 0.12);
       stars(c, 70, ["#fff4d6", "#ffe9b8"]);
       // birds
       for (let i = 0; i < 6; i += 1)
-        dove(c, rr(c, W * 0.2, W * 0.8), rr(c, H * 0.16, H * 0.36), rr(c, 40, 80), "#1a1326", 0.5);
+        dove(
+          c,
+          rr(c, W * 0.2, W * 0.8),
+          rr(c, H * 0.16, H * 0.36),
+          rr(c, 40, 80),
+          "#1a1326",
+          0.5
+        );
       // hill with cross
       ridge(c, H * 0.72, 36, "#15224a", 1, 8);
       c.body.push(`<g opacity="0.95">`);
@@ -885,7 +1540,12 @@ const THEMES = {
         const y0 = H * 0.18 + i * 60;
         const col = ["#39ffa8", "#46c8ff", "#b07bff", "#39ffd0"][i];
         let d = `M0 ${y0}`;
-        for (let x = 0; x <= W; x += 60) d += ` L${x} ${(y0 + Math.sin(x / 320 + i) * 90 + Math.sin(x / 90) * 18).toFixed(1)}`;
+        for (let x = 0; x <= W; x += 60)
+          d += ` L${x} ${(
+            y0 +
+            Math.sin(x / 320 + i) * 90 +
+            Math.sin(x / 90) * 18
+          ).toFixed(1)}`;
         d += ` L${W} ${y0 + 220} L0 ${y0 + 220} Z`;
         a += `<path d="${d}" fill="${col}" opacity="0.22"/>`;
       }
@@ -895,16 +1555,44 @@ const THEMES = {
       ridge(c, H * 0.5, 120, "#0a2236", 1, 7);
       ridge(c, H * 0.6, 150, "#08303a", 1, 6);
       // lake reflection
-      c.body.push(`<rect x="0" y="${H * 0.72}" width="${W}" height="${H * 0.28}" fill="#041a16" opacity="0.85"/>`);
-      const rg = lin(c, [["0%", "#39ffa8", 0.25], ["100%", "#46c8ff", 0]], 0, 0, 0, 1);
-      c.body.push(`<rect x="0" y="${H * 0.72}" width="${W}" height="${H * 0.28}" fill="url(#${rg})"/>`);
+      c.body.push(
+        `<rect x="0" y="${H * 0.72}" width="${W}" height="${
+          H * 0.28
+        }" fill="#041a16" opacity="0.85"/>`
+      );
+      const rg = lin(
+        c,
+        [
+          ["0%", "#39ffa8", 0.25],
+          ["100%", "#46c8ff", 0],
+        ],
+        0,
+        0,
+        0,
+        1
+      );
+      c.body.push(
+        `<rect x="0" y="${H * 0.72}" width="${W}" height="${
+          H * 0.28
+        }" fill="url(#${rg})"/>`
+      );
       // pines
       pineRow(c, H * 0.72, "#03110d");
       vignette(c, 0.78);
       grainLayer(c, 0.04);
     },
     "topo-forest": (c) => {
-      radialBg(c, [["0%", "#0e3326"], ["55%", "#0a2018"], ["100%", "#02100c"]], W * 0.5, H * 0.4, W * 0.7);
+      radialBg(
+        c,
+        [
+          ["0%", "#0e3326"],
+          ["55%", "#0a2018"],
+          ["100%", "#02100c"],
+        ],
+        W * 0.5,
+        H * 0.4,
+        W * 0.7
+      );
       contours(c, "#46f0b0", 26, 0.5);
       glow(c, W * 0.7, H * 0.28, W * 0.4, "#2fc7d6", 0.16);
       glow(c, W * 0.25, H * 0.72, W * 0.4, "#36e0a0", 0.14);
@@ -914,7 +1602,17 @@ const THEMES = {
       grainLayer(c, 0.04);
     },
     "pine-emblem": (c) => {
-      radialBg(c, [["0%", "#0e3a2e"], ["55%", "#072018"], ["100%", "#02100c"]], W / 2, H / 2, W * 0.7);
+      radialBg(
+        c,
+        [
+          ["0%", "#0e3a2e"],
+          ["55%", "#072018"],
+          ["100%", "#02100c"],
+        ],
+        W / 2,
+        H / 2,
+        W * 0.7
+      );
       contours(c, "#2aa078", 16, 0.3);
       lightRays(c, W / 2, H * 0.3, "#43e0a0", 18, H * 1.1, 0.1);
       glow(c, W / 2, H / 2, W * 0.28, "#43e0a0", 0.36);
@@ -935,7 +1633,13 @@ const THEMES = {
         const x = rr(c, 0, W);
         const y = rr(c, 0, H);
         const len = rr(c, 40, 200);
-        g += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${len.toFixed(1)}" height="2" fill="#7cf0ff" opacity="${rr(c, 0.1, 0.4).toFixed(2)}"/>`;
+        g += `<rect x="${x.toFixed(1)}" y="${y.toFixed(
+          1
+        )}" width="${len.toFixed(1)}" height="2" fill="#7cf0ff" opacity="${rr(
+          c,
+          0.1,
+          0.4
+        ).toFixed(2)}"/>`;
       }
       c.body.push(`<g>${g}</g>`);
       glow(c, W * 0.3, H * 0.3, W * 0.4, "#28b6ff", 0.16);
@@ -944,7 +1648,17 @@ const THEMES = {
       grainLayer(c, 0.04);
     },
     "chip-core": (c) => {
-      radialBg(c, [["0%", "#0a2350"], ["55%", "#06122a"], ["100%", "#02040c"]], W / 2, H / 2, W * 0.7);
+      radialBg(
+        c,
+        [
+          ["0%", "#0a2350"],
+          ["55%", "#06122a"],
+          ["100%", "#02040c"],
+        ],
+        W / 2,
+        H / 2,
+        W * 0.7
+      );
       circuit(c, "#1c6bb0", "#28b6ff", 50);
       lightRays(c, W / 2, H / 2, "#28b6ff", 24, H * 1.2, 0.1);
       glow(c, W / 2, H / 2, W * 0.3, "#33c6ff", 0.4);
@@ -978,12 +1692,31 @@ const THEMES = {
       gentooMark(c, W / 2, H * 0.44, 300, "#cdbcff");
       glow(c, W / 2, H * 0.44, W * 0.22, "#9d86ff", 0.35);
       brandText(c, W / 2, H * 0.82, "G E N T O O", 84, "#cbb8ff", 26);
-      brandText(c, W / 2, H * 0.87, "compile the world", 30, "#8f78ff", 10, 500);
+      brandText(
+        c,
+        W / 2,
+        H * 0.87,
+        "compile the world",
+        30,
+        "#8f78ff",
+        10,
+        500
+      );
       vignette(c, 0.9);
       grainLayer(c, 0.04);
     },
     "gentoo-portage": (c) => {
-      radialBg(c, [["0%", "#2a2150"], ["55%", "#140f2c"], ["100%", "#05030e"]], W / 2, H / 2, W * 0.72);
+      radialBg(
+        c,
+        [
+          ["0%", "#2a2150"],
+          ["55%", "#140f2c"],
+          ["100%", "#05030e"],
+        ],
+        W / 2,
+        H / 2,
+        W * 0.72
+      );
       particles(c, 60, "#b39dff", "#6a4fff", 240);
       lightRays(c, W / 2, H * 0.46, "#7c5cff", 20, H * 1.2, 0.12);
       hudRing(c, W / 2, H / 2, 360, "#9d86ff");
@@ -1006,7 +1739,17 @@ const THEMES = {
 
   Emacs: {
     "emacs-lambda": (c) => {
-      radialBg(c, [["0%", "#241a44"], ["55%", "#150e2c"], ["100%", "#05030e"]], W / 2, H * 0.46, W * 0.72);
+      radialBg(
+        c,
+        [
+          ["0%", "#241a44"],
+          ["55%", "#150e2c"],
+          ["100%", "#05030e"],
+        ],
+        W / 2,
+        H * 0.46,
+        W * 0.72
+      );
       lightRays(c, W / 2, H * 0.46, "#9b6bff", 20, H * 1.2, 0.1);
       hudRing(c, W / 2, H * 0.44, 340, "#a98bff");
       parensGlyph(c, W / 2, H * 0.44, 260, "#7d5bd0");
@@ -1024,23 +1767,47 @@ const THEMES = {
       const th = H * 0.5;
       const tx = (W - tw) / 2;
       const ty = (H - th) / 2;
-      c.body.push(`<rect x="${tx}" y="${ty}" width="${tw}" height="${th}" rx="14" fill="#0b0820" stroke="#9b6bff" stroke-width="2" opacity="0.96"/>`);
-      c.body.push(`<rect x="${tx}" y="${ty}" width="${tw}" height="40" rx="14" fill="#1a1238"/>`);
-      c.body.push(`<text x="${tx + 20}" y="${ty + 27}" font-family="'Sarasa Mono J',monospace" font-size="20" fill="#c9b6ff" opacity="0.9">*scratch* — GNU Emacs</text>`);
+      c.body.push(
+        `<rect x="${tx}" y="${ty}" width="${tw}" height="${th}" rx="14" fill="#0b0820" stroke="#9b6bff" stroke-width="2" opacity="0.96"/>`
+      );
+      c.body.push(
+        `<rect x="${tx}" y="${ty}" width="${tw}" height="40" rx="14" fill="#1a1238"/>`
+      );
+      c.body.push(
+        `<text x="${tx + 20}" y="${
+          ty + 27
+        }" font-family="'Sarasa Mono J',monospace" font-size="20" fill="#c9b6ff" opacity="0.9">*scratch* — GNU Emacs</text>`
+      );
       const lines = [
         ";; This buffer is for text not saved.",
         "(defun hello (name)",
         '  (message "Hello, %s!" name))',
-        "(hello \"SecurityOS\")",
+        '(hello "SecurityOS")',
         "",
         "M-x package-install RET magit RET",
       ];
       lines.forEach((ln, i) => {
-        const col = ln.startsWith(";;") ? "#9b8bd0" : ln.startsWith("M-x") ? "#7dffb0" : "#d9ccff";
-        c.body.push(`<text x="${tx + 28}" y="${ty + 86 + i * 44}" font-family="'Sarasa Mono J',monospace" font-size="26" fill="${col}" opacity="0.95">${ln}</text>`);
+        const col = ln.startsWith(";;")
+          ? "#9b8bd0"
+          : ln.startsWith("M-x")
+          ? "#7dffb0"
+          : "#d9ccff";
+        c.body.push(
+          `<text x="${tx + 28}" y="${
+            ty + 86 + i * 44
+          }" font-family="'Sarasa Mono J',monospace" font-size="26" fill="${col}" opacity="0.95">${ln}</text>`
+        );
       });
-      c.body.push(`<rect x="${tx}" y="${ty + th - 34}" width="${tw}" height="34" fill="#2a1f55"/>`);
-      c.body.push(`<text x="${tx + 20}" y="${ty + th - 11}" font-family="'Sarasa Mono J',monospace" font-size="20" fill="#a98bff">-:**-  *scratch*   All  L4   (Lisp Interaction)</text>`);
+      c.body.push(
+        `<rect x="${tx}" y="${
+          ty + th - 34
+        }" width="${tw}" height="34" fill="#2a1f55"/>`
+      );
+      c.body.push(
+        `<text x="${tx + 20}" y="${
+          ty + th - 11
+        }" font-family="'Sarasa Mono J',monospace" font-size="20" fill="#a98bff">-:**-  *scratch*   All  L4   (Lisp Interaction)</text>`
+      );
       vignette(c, 0.9);
     },
     "emacs-parens": (c) => {
@@ -1058,13 +1825,32 @@ const THEMES = {
 
   Guix: {
     "guix-flow": (c) => {
-      radialBg(c, [["0%", "#3a2c08"], ["50%", "#1c1404"], ["100%", "#070501"]], W / 2, H * 0.46, W * 0.72);
+      radialBg(
+        c,
+        [
+          ["0%", "#3a2c08"],
+          ["50%", "#1c1404"],
+          ["100%", "#070501"],
+        ],
+        W / 2,
+        H * 0.46,
+        W * 0.72
+      );
       lightRays(c, W / 2, H * 0.46, "#ffcf33", 22, H * 1.2, 0.1);
       hudRing(c, W / 2, H * 0.44, 350, "#ffd84d");
       glow(c, W / 2, H * 0.44, W * 0.26, "#ffcf00", 0.36);
       guixMark(c, W / 2, H * 0.44, 240, "#ffe27a");
       brandText(c, W / 2, H * 0.82, "GNU GUIX", 80, "#ffe9a3", 24);
-      brandText(c, W / 2, H * 0.87, "functional · reproducible", 30, "#ffd84d", 8, 500);
+      brandText(
+        c,
+        W / 2,
+        H * 0.87,
+        "functional · reproducible",
+        30,
+        "#ffd84d",
+        8,
+        500
+      );
       vignette(c, 0.9);
       grainLayer(c, 0.04);
     },
@@ -1093,13 +1879,32 @@ const THEMES = {
   // ---- BSD: the classic daemon ("beastie") on a terminal-red field ----
   BSD: {
     "beastie-emblem": (c) => {
-      radialBg(c, [["0%", "#3a0c12"], ["55%", "#1c060a"], ["100%", "#070103"]], W / 2, H * 0.46, W * 0.72);
+      radialBg(
+        c,
+        [
+          ["0%", "#3a0c12"],
+          ["55%", "#1c060a"],
+          ["100%", "#070103"],
+        ],
+        W / 2,
+        H * 0.46,
+        W * 0.72
+      );
       lightRays(c, W / 2, H * 0.46, "#ff5d4d", 22, H * 1.2, 0.1);
       hudRing(c, W / 2, H * 0.44, 350, "#ff6f5e");
       glow(c, W / 2, H * 0.44, W * 0.26, "#ff4632", 0.36);
       beastie(c, W / 2, H * 0.44, 250, "#ff7a63", "#ff4632");
       brandText(c, W / 2, H * 0.82, "BSD", 92, "#ffd1c6", 30);
-      brandText(c, W / 2, H * 0.87, "the power to serve", 30, "#ff8f7e", 10, 500);
+      brandText(
+        c,
+        W / 2,
+        H * 0.87,
+        "the power to serve",
+        30,
+        "#ff8f7e",
+        10,
+        500
+      );
       vignette(c, 0.9);
       grainLayer(c, 0.04);
     },
@@ -1110,10 +1915,18 @@ const THEMES = {
       const th = H * 0.5;
       const tx = (W - tw) / 2;
       const ty = (H - th) / 2;
-      c.body.push(`<rect x="${tx}" y="${ty}" width="${tw}" height="${th}" rx="16" fill="#0e0405" stroke="#ff4632" stroke-width="2" opacity="0.96"/>`);
-      c.body.push(`<rect x="${tx}" y="${ty}" width="${tw}" height="44" rx="16" fill="#240a0c"/>`);
+      c.body.push(
+        `<rect x="${tx}" y="${ty}" width="${tw}" height="${th}" rx="16" fill="#0e0405" stroke="#ff4632" stroke-width="2" opacity="0.96"/>`
+      );
+      c.body.push(
+        `<rect x="${tx}" y="${ty}" width="${tw}" height="44" rx="16" fill="#240a0c"/>`
+      );
       for (let i = 0; i < 3; i += 1)
-        c.body.push(`<circle cx="${tx + 28 + i * 28}" cy="${ty + 22}" r="7" fill="${["#ff5f56", "#ffbd2e", "#27c93f"][i]}"/>`);
+        c.body.push(
+          `<circle cx="${tx + 28 + i * 28}" cy="${ty + 22}" r="7" fill="${
+            ["#ff5f56", "#ffbd2e", "#27c93f"][i]
+          }"/>`
+        );
       const lines = [
         "FreeBSD/amd64 (securityos) (ttyv0)",
         "login: root   Password: ********",
@@ -1127,11 +1940,20 @@ const THEMES = {
         "root@securityos:~ # _",
       ];
       lines.forEach((ln, i) => {
-        const col = ln.startsWith("[+]") ? "#ff8f7e" : ln.includes("root@") ? "#ff5d4d" : "#ffd1c6";
-        c.body.push(`<text x="${tx + 34}" y="${ty + 92 + i * 46}" font-family="'Sarasa Mono J', monospace" font-size="27" fill="${col}" opacity="0.95">${ln}</text>`);
+        const col = ln.startsWith("[+]")
+          ? "#ff8f7e"
+          : ln.includes("root@")
+          ? "#ff5d4d"
+          : "#ffd1c6";
+        c.body.push(
+          `<text x="${tx + 34}" y="${
+            ty + 92 + i * 46
+          }" font-family="'Sarasa Mono J', monospace" font-size="27" fill="${col}" opacity="0.95">${ln}</text>`
+        );
       });
       let sl = "";
-      for (let y = 0; y < H; y += 4) sl += `<rect x="0" y="${y}" width="${W}" height="2" fill="#000" opacity="0.18"/>`;
+      for (let y = 0; y < H; y += 4)
+        sl += `<rect x="0" y="${y}" width="${W}" height="2" fill="#000" opacity="0.18"/>`;
       c.body.push(`<g>${sl}</g>`);
       vignette(c, 0.9);
     },
@@ -1156,7 +1978,9 @@ const THEMES = {
       const th = H * 0.56;
       const tx = (W - tw) / 2;
       const ty = (H - th) / 2;
-      c.body.push(`<rect x="${tx}" y="${ty}" width="${tw}" height="${th}" rx="20" fill="#021006" stroke="#1f9c44" stroke-width="3" opacity="0.96"/>`);
+      c.body.push(
+        `<rect x="${tx}" y="${ty}" width="${tw}" height="${th}" rx="20" fill="#021006" stroke="#1f9c44" stroke-width="3" opacity="0.96"/>`
+      );
       const lines = [
         "$ cat /usr/include/unix.h",
         "/* This is the way the world ends */",
@@ -1170,26 +1994,62 @@ const THEMES = {
         "$ _",
       ];
       lines.forEach((ln, i) => {
-        const col = ln.startsWith("/*") ? "#6fcf8a" : ln.startsWith("$") ? "#7dffb0" : "#bfffcf";
-        c.body.push(`<text x="${tx + 40}" y="${ty + 80 + i * 48}" font-family="'Sarasa Mono J', monospace" font-size="28" fill="${col}" opacity="0.95">${ln}</text>`);
+        const col = ln.startsWith("/*")
+          ? "#6fcf8a"
+          : ln.startsWith("$")
+          ? "#7dffb0"
+          : "#bfffcf";
+        c.body.push(
+          `<text x="${tx + 40}" y="${
+            ty + 80 + i * 48
+          }" font-family="'Sarasa Mono J', monospace" font-size="28" fill="${col}" opacity="0.95">${ln}</text>`
+        );
       });
       // phosphor scanlines
       let sl = "";
-      for (let y = 0; y < H; y += 4) sl += `<rect x="0" y="${y}" width="${W}" height="2" fill="#000" opacity="0.2"/>`;
+      for (let y = 0; y < H; y += 4)
+        sl += `<rect x="0" y="${y}" width="${W}" height="2" fill="#000" opacity="0.2"/>`;
       c.body.push(`<g>${sl}</g>`);
       vignette(c, 0.9);
       grainLayer(c, 0.05);
     },
     "unix-pipes": (c) => {
-      radialBg(c, [["0%", "#08321c"], ["55%", "#041a0e"], ["100%", "#000402"]], W / 2, H * 0.46, W * 0.72);
+      radialBg(
+        c,
+        [
+          ["0%", "#08321c"],
+          ["55%", "#041a0e"],
+          ["100%", "#000402"],
+        ],
+        W / 2,
+        H * 0.46,
+        W * 0.72
+      );
       lightRays(c, W / 2, H * 0.46, "#2effa0", 18, H * 1.1, 0.08);
       hudRing(c, W / 2, H * 0.44, 350, "#39ff8d");
       glow(c, W / 2, H * 0.44, W * 0.26, "#00e060", 0.32);
       // ">_" prompt mark
-      c.body.push(`<text x="${W / 2 - 110}" y="${H * 0.46 + 90}" font-family="'Sarasa Mono J', monospace" font-weight="bold" font-size="320" fill="#aaffc8" opacity="0.95" text-anchor="middle">&gt;</text>`);
-      c.body.push(`<rect x="${W / 2 + 40}" y="${H * 0.46 - 30}" width="160" height="26" rx="6" fill="#aaffc8" opacity="0.95"/>`);
+      c.body.push(
+        `<text x="${W / 2 - 110}" y="${
+          H * 0.46 + 90
+        }" font-family="'Sarasa Mono J', monospace" font-weight="bold" font-size="320" fill="#aaffc8" opacity="0.95" text-anchor="middle">&gt;</text>`
+      );
+      c.body.push(
+        `<rect x="${W / 2 + 40}" y="${
+          H * 0.46 - 30
+        }" width="160" height="26" rx="6" fill="#aaffc8" opacity="0.95"/>`
+      );
       brandText(c, W / 2, H * 0.82, "U N I X", 88, "#cbffd9", 30);
-      brandText(c, W / 2, H * 0.87, "do one thing well", 30, "#39ff8d", 10, 500);
+      brandText(
+        c,
+        W / 2,
+        H * 0.87,
+        "do one thing well",
+        30,
+        "#39ff8d",
+        10,
+        500
+      );
       vignette(c, 0.9);
       grainLayer(c, 0.04);
     },
@@ -1218,28 +2078,75 @@ const THEMES = {
       grainLayer(c, 0.03);
     },
     "ringed-world": (c) => {
-      radialBg(c, [["0%", "#0a0a22"], ["60%", "#050414"], ["100%", "#010008"]], W / 2, H / 2, W * 0.8);
+      radialBg(
+        c,
+        [
+          ["0%", "#0a0a22"],
+          ["60%", "#050414"],
+          ["100%", "#010008"],
+        ],
+        W / 2,
+        H / 2,
+        W * 0.8
+      );
       stars(c, 300, ["#ffffff", "#cfe0ff", "#ffe6c8"]);
       const cx = W * 0.62;
       const cy = H * 0.5;
       const pr = 300;
       // planet
-      const pg = rad(c, [["0%", "#ffd9a0"], ["55%", "#d9863a"], ["100%", "#5a2a14"]], cx - pr * 0.3, cy - pr * 0.3, pr * 1.6);
-      c.body.push(`<circle cx="${cx}" cy="${cy}" r="${pr}" fill="url(#${pg})"/>`);
+      const pg = rad(
+        c,
+        [
+          ["0%", "#ffd9a0"],
+          ["55%", "#d9863a"],
+          ["100%", "#5a2a14"],
+        ],
+        cx - pr * 0.3,
+        cy - pr * 0.3,
+        pr * 1.6
+      );
+      c.body.push(
+        `<circle cx="${cx}" cy="${cy}" r="${pr}" fill="url(#${pg})"/>`
+      );
       // ring system
       const b = blur(c, 2);
-      c.body.push(`<g transform="rotate(-18 ${cx} ${cy})" filter="url(#${b})">`);
+      c.body.push(
+        `<g transform="rotate(-18 ${cx} ${cy})" filter="url(#${b})">`
+      );
       for (let i = 0; i < 6; i += 1)
-        c.body.push(`<ellipse cx="${cx}" cy="${cy}" rx="${pr * (1.5 + i * 0.12)}" ry="${pr * (0.34 + i * 0.028)}" fill="none" stroke="${["#ffe2b0", "#caa46a", "#ffd9a0"][i % 3]}" stroke-width="${(14 - i * 1.6).toFixed(1)}" opacity="${(0.5 - i * 0.05).toFixed(2)}"/>`);
+        c.body.push(
+          `<ellipse cx="${cx}" cy="${cy}" rx="${pr * (1.5 + i * 0.12)}" ry="${
+            pr * (0.34 + i * 0.028)
+          }" fill="none" stroke="${
+            ["#ffe2b0", "#caa46a", "#ffd9a0"][i % 3]
+          }" stroke-width="${(14 - i * 1.6).toFixed(1)}" opacity="${(
+            0.5 -
+            i * 0.05
+          ).toFixed(2)}"/>`
+        );
       c.body.push(`</g>`);
       // crescent shadow
-      c.body.push(`<circle cx="${cx + pr * 0.45}" cy="${cy}" r="${pr}" fill="#02010a" opacity="0.55"/>`);
+      c.body.push(
+        `<circle cx="${
+          cx + pr * 0.45
+        }" cy="${cy}" r="${pr}" fill="#02010a" opacity="0.55"/>`
+      );
       glow(c, W * 0.2, H * 0.3, W * 0.4, "#3f6fff", 0.14);
       vignette(c, 0.92);
       grainLayer(c, 0.03);
     },
     "star-forge": (c) => {
-      radialBg(c, [["0%", "#241046"], ["45%", "#0e0a28"], ["100%", "#02010a"]], W / 2, H * 0.45, W * 0.8);
+      radialBg(
+        c,
+        [
+          ["0%", "#241046"],
+          ["45%", "#0e0a28"],
+          ["100%", "#02010a"],
+        ],
+        W / 2,
+        H * 0.45,
+        W * 0.8
+      );
       nebulaLayer(c, "#7c3aff", 0.0013, 5, 0.45);
       nebulaLayer(c, "#ff5da0", 0.0021, 4, 0.3);
       lightRays(c, W / 2, H * 0.45, "#c9a0ff", 26, H * 1.4, 0.12);
@@ -1271,10 +2178,18 @@ const THEMES = {
           y += Math.sin(a) * 16;
           d += `L${x.toFixed(1)} ${y.toFixed(1)} `;
         }
-        g += `<path d="${d}" fill="none" stroke="${col}" stroke-width="${rr(c, 1, 2.6).toFixed(2)}" opacity="${rr(c, 0.18, 0.5).toFixed(2)}" stroke-linecap="round"/>`;
+        g += `<path d="${d}" fill="none" stroke="${col}" stroke-width="${rr(
+          c,
+          1,
+          2.6
+        ).toFixed(2)}" opacity="${rr(c, 0.18, 0.5).toFixed(
+          2
+        )}" stroke-linecap="round"/>`;
       }
       c.body.push(`<g style="mix-blend-mode:screen">${g}</g>`);
-      c.body.push(`<g filter="url(#${b})" opacity="0.5" style="mix-blend-mode:screen">${g}</g>`);
+      c.body.push(
+        `<g filter="url(#${b})" opacity="0.5" style="mix-blend-mode:screen">${g}</g>`
+      );
       glow(c, W * 0.3, H * 0.3, W * 0.4, "#7c5cff", 0.16);
       glow(c, W * 0.74, H * 0.66, W * 0.36, "#39e0ff", 0.14);
       vignette(c, 0.82);
@@ -1282,7 +2197,14 @@ const THEMES = {
     },
     "bauhaus-bloom": (c) => {
       bgGrad(c, ["#161430", "#241a44", "#0a0716"]);
-      const cols = ["#ff5d8f", "#ffd24d", "#39e0ff", "#7c5cff", "#46f0b0", "#ff7a3a"];
+      const cols = [
+        "#ff5d8f",
+        "#ffd24d",
+        "#39e0ff",
+        "#7c5cff",
+        "#46f0b0",
+        "#ff7a3a",
+      ];
       let g = "";
       for (let i = 0; i < 70; i += 1) {
         const x = rr(c, 0, W);
@@ -1292,11 +2214,27 @@ const THEMES = {
         const op = rr(c, 0.25, 0.7).toFixed(2);
         const kind = c.r();
         if (kind < 0.4)
-          g += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(s / 2).toFixed(1)}" fill="${col}" opacity="${op}"/>`;
+          g += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(
+            s / 2
+          ).toFixed(1)}" fill="${col}" opacity="${op}"/>`;
         else if (kind < 0.7)
-          g += `<rect x="${(x - s / 2).toFixed(1)}" y="${(y - s / 2).toFixed(1)}" width="${s.toFixed(1)}" height="${s.toFixed(1)}" fill="${col}" opacity="${op}" transform="rotate(${ri(c, 0, 90)} ${x.toFixed(1)} ${y.toFixed(1)})"/>`;
+          g += `<rect x="${(x - s / 2).toFixed(1)}" y="${(y - s / 2).toFixed(
+            1
+          )}" width="${s.toFixed(1)}" height="${s.toFixed(
+            1
+          )}" fill="${col}" opacity="${op}" transform="rotate(${ri(
+            c,
+            0,
+            90
+          )} ${x.toFixed(1)} ${y.toFixed(1)})"/>`;
         else
-          g += `<path d="M${x.toFixed(1)} ${(y - s / 2).toFixed(1)} L${(x + s / 2).toFixed(1)} ${(y + s / 2).toFixed(1)} L${(x - s / 2).toFixed(1)} ${(y + s / 2).toFixed(1)} Z" fill="${col}" opacity="${op}"/>`;
+          g += `<path d="M${x.toFixed(1)} ${(y - s / 2).toFixed(1)} L${(
+            x +
+            s / 2
+          ).toFixed(1)} ${(y + s / 2).toFixed(1)} L${(x - s / 2).toFixed(1)} ${(
+            y +
+            s / 2
+          ).toFixed(1)} Z" fill="${col}" opacity="${op}"/>`;
       }
       c.body.push(`<g style="mix-blend-mode:screen">${g}</g>`);
       vignette(c, 0.8);
@@ -1323,9 +2261,13 @@ const THEMES = {
           d += `L${px.toFixed(1)} ${py.toFixed(1)} `;
         }
         d += "Z";
-        g += `<path d="${d}" fill="none" stroke="${["#ffd6f0", "#bda6ff", "#a6f0ff"][i % 3]}" stroke-width="2" opacity="${(0.4 - i * 0.018).toFixed(2)}"/>`;
+        g += `<path d="${d}" fill="none" stroke="${
+          ["#ffd6f0", "#bda6ff", "#a6f0ff"][i % 3]
+        }" stroke-width="2" opacity="${(0.4 - i * 0.018).toFixed(2)}"/>`;
       }
-      c.body.push(`<g filter="url(#${b})" style="mix-blend-mode:screen">${g}</g>`);
+      c.body.push(
+        `<g filter="url(#${b})" style="mix-blend-mode:screen">${g}</g>`
+      );
       glow(c, cx, cy, W * 0.3, "#ff7ad9", 0.18);
       vignette(c, 0.86);
       grainLayer(c, 0.04);
@@ -1344,7 +2286,10 @@ function pineRow(c, baseY, col) {
     for (let i = 0; i < tiers; i += 1) {
       const ty = baseY - s * 1.6 + i * s * 0.42;
       const tw = s * (0.28 + i * 0.16);
-      tree += `<path d="M${x} ${ty.toFixed(1)} L${(x + tw).toFixed(1)} ${(ty + s * 0.55).toFixed(1)} L${(x - tw).toFixed(1)} ${(ty + s * 0.55).toFixed(1)} Z"/>`;
+      tree += `<path d="M${x} ${ty.toFixed(1)} L${(x + tw).toFixed(1)} ${(
+        ty +
+        s * 0.55
+      ).toFixed(1)} L${(x - tw).toFixed(1)} ${(ty + s * 0.55).toFixed(1)} Z"/>`;
     }
     g += `<g fill="${col}">${tree}</g>`;
     x += rr(c, 40, 120);
@@ -1362,20 +2307,41 @@ function brandText(c, x, y, str, size, fill, spacing = 16, weight = 700) {
 function gentooMark(c, cx, cy, r, fill) {
   const sw = r * 0.17;
   c.body.push(
-    `<g fill="none" stroke="${fill}" stroke-width="${sw.toFixed(1)}" stroke-linecap="round" opacity="0.95">` +
-      `<path d="M ${(cx + r).toFixed(1)} ${cy.toFixed(1)} A ${r.toFixed(1)} ${r.toFixed(1)} 0 1 1 ${(cx - r * 0.15).toFixed(1)} ${(cy - r * 0.99).toFixed(1)}"/>` +
-      `<path d="M ${(cx - r * 0.15).toFixed(1)} ${(cy - r * 0.99).toFixed(1)} A ${(r * 0.55).toFixed(1)} ${(r * 0.55).toFixed(1)} 0 1 0 ${(cx + r * 0.5).toFixed(1)} ${(cy - r * 0.08).toFixed(1)}"/>` +
+    `<g fill="none" stroke="${fill}" stroke-width="${sw.toFixed(
+      1
+    )}" stroke-linecap="round" opacity="0.95">` +
+      `<path d="M ${(cx + r).toFixed(1)} ${cy.toFixed(1)} A ${r.toFixed(
+        1
+      )} ${r.toFixed(1)} 0 1 1 ${(cx - r * 0.15).toFixed(1)} ${(
+        cy -
+        r * 0.99
+      ).toFixed(1)}"/>` +
+      `<path d="M ${(cx - r * 0.15).toFixed(1)} ${(cy - r * 0.99).toFixed(
+        1
+      )} A ${(r * 0.55).toFixed(1)} ${(r * 0.55).toFixed(1)} 0 1 0 ${(
+        cx +
+        r * 0.5
+      ).toFixed(1)} ${(cy - r * 0.08).toFixed(1)}"/>` +
       `</g>` +
-      `<circle cx="${(cx + r).toFixed(1)}" cy="${cy.toFixed(1)}" r="${(sw * 0.75).toFixed(1)}" fill="${fill}"/>`
+      `<circle cx="${(cx + r).toFixed(1)}" cy="${cy.toFixed(1)}" r="${(
+        sw * 0.75
+      ).toFixed(1)}" fill="${fill}"/>`
   );
 }
 // Lambda glyph (Emacs / Scheme).
 function lambdaGlyph(c, cx, cy, r, fill, sw = null) {
   const w = sw || r * 0.16;
   c.body.push(
-    `<g fill="none" stroke="${fill}" stroke-width="${w.toFixed(1)}" stroke-linecap="round" stroke-linejoin="round" opacity="0.95">` +
-      `<path d="M ${(cx - r * 0.5).toFixed(1)} ${(cy + r).toFixed(1)} L ${(cx + r * 0.1).toFixed(1)} ${(cy - r).toFixed(1)}"/>` +
-      `<path d="M ${(cx - r * 0.1).toFixed(1)} ${(cy - r * 0.27).toFixed(1)} L ${(cx + r * 0.5).toFixed(1)} ${(cy + r).toFixed(1)}"/>` +
+    `<g fill="none" stroke="${fill}" stroke-width="${w.toFixed(
+      1
+    )}" stroke-linecap="round" stroke-linejoin="round" opacity="0.95">` +
+      `<path d="M ${(cx - r * 0.5).toFixed(1)} ${(cy + r).toFixed(1)} L ${(
+        cx +
+        r * 0.1
+      ).toFixed(1)} ${(cy - r).toFixed(1)}"/>` +
+      `<path d="M ${(cx - r * 0.1).toFixed(1)} ${(cy - r * 0.27).toFixed(
+        1
+      )} L ${(cx + r * 0.5).toFixed(1)} ${(cy + r).toFixed(1)}"/>` +
       `</g>`
   );
 }
@@ -1383,9 +2349,19 @@ function lambdaGlyph(c, cx, cy, r, fill, sw = null) {
 function parensGlyph(c, cx, cy, r, fill, sw = null) {
   const w = sw || r * 0.1;
   c.body.push(
-    `<g fill="none" stroke="${fill}" stroke-width="${w.toFixed(1)}" stroke-linecap="round" opacity="0.8">` +
-      `<path d="M ${(cx - r * 1.0).toFixed(1)} ${(cy - r).toFixed(1)} A ${(r * 1.3).toFixed(1)} ${(r * 1.3).toFixed(1)} 0 0 0 ${(cx - r * 1.0).toFixed(1)} ${(cy + r).toFixed(1)}"/>` +
-      `<path d="M ${(cx + r * 1.0).toFixed(1)} ${(cy - r).toFixed(1)} A ${(r * 1.3).toFixed(1)} ${(r * 1.3).toFixed(1)} 0 0 1 ${(cx + r * 1.0).toFixed(1)} ${(cy + r).toFixed(1)}"/>` +
+    `<g fill="none" stroke="${fill}" stroke-width="${w.toFixed(
+      1
+    )}" stroke-linecap="round" opacity="0.8">` +
+      `<path d="M ${(cx - r * 1.0).toFixed(1)} ${(cy - r).toFixed(1)} A ${(
+        r * 1.3
+      ).toFixed(1)} ${(r * 1.3).toFixed(1)} 0 0 0 ${(cx - r * 1.0).toFixed(
+        1
+      )} ${(cy + r).toFixed(1)}"/>` +
+      `<path d="M ${(cx + r * 1.0).toFixed(1)} ${(cy - r).toFixed(1)} A ${(
+        r * 1.3
+      ).toFixed(1)} ${(r * 1.3).toFixed(1)} 0 0 1 ${(cx + r * 1.0).toFixed(
+        1
+      )} ${(cy + r).toFixed(1)}"/>` +
       `</g>`
   );
 }
@@ -1397,8 +2373,20 @@ function guixMark(c, cx, cy, r, fill) {
     blades +=
       `<g transform="rotate(${a} ${cx} ${cy})">` +
       `<path d="M ${cx} ${(cy - r * 0.12).toFixed(1)} ` +
-      `C ${(cx + r * 0.85).toFixed(1)} ${(cy - r * 0.45).toFixed(1)}, ${(cx + r * 0.62).toFixed(1)} ${(cy - r * 1.02).toFixed(1)}, ${cx} ${(cy - r * 0.98).toFixed(1)} ` +
-      `C ${(cx - r * 0.34).toFixed(1)} ${(cy - r * 0.95).toFixed(1)}, ${(cx - r * 0.3).toFixed(1)} ${(cy - r * 0.5).toFixed(1)}, ${cx} ${(cy - r * 0.12).toFixed(1)} Z"/>` +
+      `C ${(cx + r * 0.85).toFixed(1)} ${(cy - r * 0.45).toFixed(1)}, ${(
+        cx +
+        r * 0.62
+      ).toFixed(1)} ${(cy - r * 1.02).toFixed(1)}, ${cx} ${(
+        cy -
+        r * 0.98
+      ).toFixed(1)} ` +
+      `C ${(cx - r * 0.34).toFixed(1)} ${(cy - r * 0.95).toFixed(1)}, ${(
+        cx -
+        r * 0.3
+      ).toFixed(1)} ${(cy - r * 0.5).toFixed(1)}, ${cx} ${(
+        cy -
+        r * 0.12
+      ).toFixed(1)} Z"/>` +
       `</g>`;
   }
   c.body.push(`<g fill="${fill}" opacity="0.92">${blades}</g>`);

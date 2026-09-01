@@ -119,10 +119,7 @@ const IRC: FC<ComponentProcessProps> = () => {
     // Messages are mutated in place, so key off the NEWEST line's id (globally
     // incrementing) — length alone pins at MAX_LINES once the scrollback cap is hit
     // and would then stop firing. activeId re-scrolls on buffer switch.
-  }, [
-    activeBuffer?.messages[activeBuffer.messages.length - 1]?.id,
-    activeId,
-  ]);
+  }, [activeBuffer?.messages[activeBuffer.messages.length - 1]?.id, activeId]);
 
   const dotClass =
     status === "error" ? "dot error" : status === "online" ? "dot" : "dot busy";
@@ -211,17 +208,25 @@ const IRC: FC<ComponentProcessProps> = () => {
                 <button
                   key={buffer.id}
                   className={
-                    buffer.id === activeId ? "buffer-item active" : "buffer-item"
+                    buffer.id === activeId
+                      ? "buffer-item active"
+                      : "buffer-item"
                   }
                   onClick={() => selectBuffer(buffer.id)}
                   title={buffer.name}
                   type="button"
                 >
                   <span className="b-name">
-                    {buffer.kind === "channel" ? "" : buffer.kind === "pm" ? "@" : ""}
+                    {buffer.kind === "channel"
+                      ? ""
+                      : buffer.kind === "pm"
+                      ? "@"
+                      : ""}
                     {buffer.name}
                   </span>
-                  <span style={{ alignItems: "center", display: "flex", gap: 4 }}>
+                  <span
+                    style={{ alignItems: "center", display: "flex", gap: 4 }}
+                  >
                     {buffer.unread > 0 && (
                       <span className="badge">{buffer.unread}</span>
                     )}
@@ -429,8 +434,8 @@ const IRC: FC<ComponentProcessProps> = () => {
             </button>
             <p className="hint">
               A first connection over a cold Tor circuit can take 10–30 seconds.
-              Messages, history and any password are forgotten when you close this
-              window.
+              Messages, history and any password are forgotten when you close
+              this window.
             </p>
           </form>
         </div>

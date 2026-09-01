@@ -98,7 +98,9 @@ const WeatherWidget: FC<WeatherWidgetProps> = ({ location, ...props }) => {
 
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-        setForecast(parseForecast((await response.json()) as OpenMeteoForecast));
+        setForecast(
+          parseForecast((await response.json()) as OpenMeteoForecast)
+        );
         setError("");
       } catch (caught) {
         if (controller.signal.aborted) return;

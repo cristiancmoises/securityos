@@ -167,10 +167,9 @@ const StyledEmbed = styled.div<{ $accent: string }>`
   }
 `;
 
-const MessengerEmbed: FC<ComponentProcessProps & { config: MessengerEmbedConfig }> = ({
-  config,
-  id,
-}) => {
+const MessengerEmbed: FC<
+  ComponentProcessProps & { config: MessengerEmbedConfig }
+> = ({ config, id }) => {
   const { accent, name, url } = config;
   const { open } = useProcesses();
   const [loading, setLoading] = useState(true);
@@ -188,7 +187,8 @@ const MessengerEmbed: FC<ComponentProcessProps & { config: MessengerEmbedConfig 
   useEffect(() => {
     setSlow(false);
     if (slowTimer.current) clearTimeout(slowTimer.current);
-    if (loading) slowTimer.current = setTimeout(() => setSlow(true), SLOW_LOAD_MS);
+    if (loading)
+      slowTimer.current = setTimeout(() => setSlow(true), SLOW_LOAD_MS);
 
     return () => {
       if (slowTimer.current) clearTimeout(slowTimer.current);
@@ -214,13 +214,20 @@ const MessengerEmbed: FC<ComponentProcessProps & { config: MessengerEmbedConfig 
     <StyledEmbed $accent={accent}>
       <div className="toolbar">
         <span className="title">{name} — inside SecurityOS, over Tor</span>
-        <span className="badge" title="Fetched server-side over Tor — bypasses network blocks">
+        <span
+          className="badge"
+          title="Fetched server-side over Tor — bypasses network blocks"
+        >
           over Tor
         </span>
         <button onClick={reload} title="Reload over Tor" type="button">
           ↻ Reload
         </button>
-        <button onClick={openInWindow} title="Open the official client in a window" type="button">
+        <button
+          onClick={openInWindow}
+          title="Open the official client in a window"
+          type="button"
+        >
           ⧉ Window
         </button>
       </div>
@@ -240,10 +247,10 @@ const MessengerEmbed: FC<ComponentProcessProps & { config: MessengerEmbedConfig 
             {slow && (
               <>
                 <span className="hint">
-                  {name} is a heavy app and may block Tor exit IPs or need features
-                  the privacy sandbox can&apos;t provide. If it doesn&apos;t finish,
-                  open it in a <b>Window</b> (full client) — run SecurityOS in the Tor
-                  Browser to keep that over Tor.
+                  {name} is a heavy app and may block Tor exit IPs or need
+                  features the privacy sandbox can&apos;t provide. If it
+                  doesn&apos;t finish, open it in a <b>Window</b> (full client)
+                  — run SecurityOS in the Tor Browser to keep that over Tor.
                 </span>
                 <div className="actions">
                   <button onClick={reload} type="button">

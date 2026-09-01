@@ -182,7 +182,11 @@ const CryptPad: FC<ComponentProcessProps> = ({ id }) => {
 
   const openInWindow = (): void => {
     try {
-      window.open(CRYPTPAD_URL, "securityos-cryptpad", "popup,width=1280,height=860");
+      window.open(
+        CRYPTPAD_URL,
+        "securityos-cryptpad",
+        "popup,width=1280,height=860"
+      );
     } catch {
       // ignore pop-up failures
     }
@@ -203,7 +207,11 @@ const CryptPad: FC<ComponentProcessProps> = ({ id }) => {
         <button onClick={reload} title="Reload over Tor" type="button">
           ↻ Reload
         </button>
-        <button onClick={openInWindow} title="Open in a separate window (own origin, full storage)" type="button">
+        <button
+          onClick={openInWindow}
+          title="Open in a separate window (own origin, full storage)"
+          type="button"
+        >
           ⧉ Window
         </button>
         <button
@@ -231,9 +239,10 @@ const CryptPad: FC<ComponentProcessProps> = ({ id }) => {
               <>
                 <span className="hint">
                   A cold Tor circuit plus CryptPad&apos;s encryption can take a
-                  while. If it doesn&apos;t fully load, the privacy sandbox limits
-                  deep document storage — use <b>Window</b> (own origin, full
-                  storage) or <b>Tor Browser</b> below for the complete client.
+                  while. If it doesn&apos;t fully load, the privacy sandbox
+                  limits deep document storage — use <b>Window</b> (own origin,
+                  full storage) or <b>Tor Browser</b> below for the complete
+                  client.
                 </span>
                 <div className="actions">
                   <button onClick={reload} type="button">

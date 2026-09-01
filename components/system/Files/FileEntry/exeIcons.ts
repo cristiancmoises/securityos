@@ -1,8 +1,8 @@
-import type {
-  IconGroupEntry,
-  IconGroupItem,
-  ResourceEntry,
-} from "resedit/dist/resource";
+import type * as ResEditTypes from "resedit";
+
+type IconGroupEntry = Pick<ResEditTypes.Resource.IconGroupEntry, "icons">;
+type IconGroupItem = ResEditTypes.Resource.IconGroupItem;
+type ResourceEntry = ResEditTypes.Resource.ResourceEntry;
 
 const RESERVED = 0;
 const ICON_TYPE = {

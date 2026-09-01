@@ -26,9 +26,7 @@ const CalendarWidget: FC<WidgetProps> = (props) => {
 
   const cells = useMemo(
     () =>
-      today && view
-        ? buildCalendarGrid(view.year, view.month, today)
-        : [],
+      today && view ? buildCalendarGrid(view.year, view.month, today) : [],
     [today, view]
   );
 

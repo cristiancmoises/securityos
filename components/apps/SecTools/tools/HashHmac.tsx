@@ -213,9 +213,7 @@ const HashHmacTool: FC = () => {
         {rows.map((row) => (
           <div className="row" key={row.algo}>
             <div className="head">
-              <strong>
-                {usingHmac ? `HMAC-${row.algo}` : row.algo}
-              </strong>
+              <strong>{usingHmac ? `HMAC-${row.algo}` : row.algo}</strong>
               <span className="muted">
                 {row.hex.length * 4} bits · {row.hex.length / 2} bytes
               </span>

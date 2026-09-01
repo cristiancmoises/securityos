@@ -7,9 +7,10 @@ network, and Tor applies to each separately:
 
 - **The SecurityOS page itself** → anonymized by opening it in the **Tor Browser**
   (ideally via its **.onion**).
-- **The in-OS Browser app** (the iframe browser) → uses *your real browser's*
-  connection. It is only anonymous if you reached SecurityOS over Tor. A web page
-  cannot force its own iframes through Tor.
+- **Tor Browser app** → uses the server-side SOCKS5h privacy proxy and fails closed
+  if Tor is unavailable.
+- **Clearnet Browser and GODS EYE** → deliberately use direct/non-anonymous access
+  and show a persistent warning. Do not open them in a Tor-only session.
 - **The v86 Linux VM** → has its **own** network that exits through a WebSocket
   relay. The **Tor Control** app routes *that* through Tor, independently.
 

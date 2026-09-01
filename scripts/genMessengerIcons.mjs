@@ -11,7 +11,11 @@ const ROOT_SIZE = 96;
 
 // Each glyph is authored in a 24x24 viewBox, centered into the 144 tile by
 // translate(24,24) scale(4) (24*4 = 96, leaving a 24px margin all round).
-const tile = (bg, glyph, extra = "") => `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
+const tile = (
+  bg,
+  glyph,
+  extra = ""
+) => `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
   <defs>${extra}</defs>
   <rect x="4" y="4" width="136" height="136" rx="32" fill="${bg}"/>
   <g transform="translate(24,24) scale(4)">${glyph}</g>
@@ -41,7 +45,10 @@ const ICONS = {
 
 const writeWebp = async (svg, size, outPath) => {
   await mkdir(dirname(outPath), { recursive: true });
-  await sharp(Buffer.from(svg)).resize(size, size).webp({ quality: 92 }).toFile(outPath);
+  await sharp(Buffer.from(svg))
+    .resize(size, size)
+    .webp({ quality: 92 })
+    .toFile(outPath);
 };
 
 for (const [name, svg] of Object.entries(ICONS)) {
@@ -50,7 +57,11 @@ for (const [name, svg] of Object.entries(ICONS)) {
   await writeWebp(svg, ROOT_SIZE, join(ICONS_DIR, `${name}.webp`));
   for (const size of SIZES) {
     // eslint-disable-next-line no-await-in-loop
-    await writeWebp(svg, size, join(ICONS_DIR, `${size}x${size}`, `${name}.webp`));
+    await writeWebp(
+      svg,
+      size,
+      join(ICONS_DIR, `${size}x${size}`, `${name}.webp`)
+    );
   }
   // eslint-disable-next-line no-console
   console.log(`generated ${name} icon (root + ${SIZES.join("/")})`);

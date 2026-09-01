@@ -36,9 +36,7 @@ const TorControl: FC<ComponentProcessProps> = () => {
   const { emulatorRelayUrl, setEmulatorRelayUrl } = useSession();
   const { open } = useProcesses();
   const groupName = useId();
-  const [mode, setMode] = useState<Mode>(() =>
-    modeFromRelay(emulatorRelayUrl)
-  );
+  const [mode, setMode] = useState<Mode>(() => modeFromRelay(emulatorRelayUrl));
   const [customUrl, setCustomUrl] = useState(() =>
     modeFromRelay(emulatorRelayUrl) === "custom" ? emulatorRelayUrl : ""
   );
@@ -96,8 +94,9 @@ const TorControl: FC<ComponentProcessProps> = () => {
     <StyledTorControl>
       <h1>🧅 Tor Control</h1>
       <p className="subtitle">
-        Tor is <strong>enabled by default</strong> for in-OS browsing. The status
-        below is live. The relay section controls the separate v86 Linux VM.
+        Tor is <strong>enabled by default</strong> for in-OS browsing. The
+        status below is live. The relay section controls the separate v86 Linux
+        VM.
       </p>
 
       <div className={`status proxy-${proxyTor}`}>
@@ -141,8 +140,9 @@ const TorControl: FC<ComponentProcessProps> = () => {
             <span className="mode-title">Tor ({RELAY_PRESETS.tor})</span>
             <br />
             <span className="mode-desc">
-              Sends the VM&apos;s traffic through a local WebSocket→SOCKS5 bridge
-              that exits via Tor. Requires the bridge to be running (see docs).
+              Sends the VM&apos;s traffic through a local WebSocket→SOCKS5
+              bridge that exits via Tor. Requires the bridge to be running (see
+              docs).
             </span>
           </span>
         </label>
@@ -158,8 +158,8 @@ const TorControl: FC<ComponentProcessProps> = () => {
             <span className="mode-title">Clearnet relay</span>
             <br />
             <span className="mode-desc">
-              Uses a public third-party relay ({RELAY_PRESETS.clearnet}). Traffic
-              exits in the clear through a stranger — not anonymous.
+              Uses a public third-party relay ({RELAY_PRESETS.clearnet}).
+              Traffic exits in the clear through a stranger — not anonymous.
             </span>
           </span>
         </label>
@@ -207,8 +207,8 @@ const TorControl: FC<ComponentProcessProps> = () => {
       </fieldset>
 
       <div className="note">
-        Changes apply the <strong>next time the V86 app boots</strong>. Close and
-        reopen the VM (or start a fresh disk image) for a new relay to take
+        Changes apply the <strong>next time the V86 app boots</strong>. Close
+        and reopen the VM (or start a fresh disk image) for a new relay to take
         effect.
       </div>
 
@@ -230,10 +230,10 @@ const TorControl: FC<ComponentProcessProps> = () => {
       </div>
 
       <div className="note warn">
-        The relay above controls only the <strong>emulated Linux VM</strong>. The
-        in-OS <strong>Browser</strong> and <strong>Tor Browser</strong> already
-        route through Tor server-side (status shown at the top). Only the
-        SecurityOS shell page itself uses your real browser connection — to
+        The relay above controls only the <strong>emulated Linux VM</strong>.
+        The in-OS <strong>Browser</strong> and <strong>Tor Browser</strong>{" "}
+        already route through Tor server-side (status shown at the top). Only
+        the SecurityOS shell page itself uses your real browser connection — to
         anonymize that too, open SecurityOS via its <code>.onion</code> address.
         See docs/TOR.md.
       </div>

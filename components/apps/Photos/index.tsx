@@ -129,7 +129,8 @@ const Photos: FC<ComponentProcessProps> = ({ id }) => {
   }, [prependFileToTitle, readFile, reset, url]);
 
   useEffect(() => {
-    if (url && !src[url] && !closing) loadPhoto().catch(() => setBrokenImage(true));
+    if (url && !src[url] && !closing)
+      loadPhoto().catch(() => setBrokenImage(true));
   }, [closing, loadPhoto, src, url]);
 
   return (

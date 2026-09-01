@@ -4,6 +4,41 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.23.1] — 2026-09-01
+
+- Updated Next.js and all vulnerable JavaScript dependency paths; `yarn audit`
+  now reports zero known advisories for production and development dependencies.
+- Replaced the shipped DOMPurify and TinyMCE browser bundles with patched
+  DOMPurify 3.4.14 and TinyMCE 8.9.0 assets; these vendored runtimes sit outside
+  the package-manager audit graph.
+- Completed the TypeScript 5.9 compatibility pass and re-enabled type validation
+  in production builds.
+- Updated the Rust proxy lockfile and `lol_html`; `cargo audit` reports no known
+  vulnerabilities or unsound transitive crates.
+- Disabled PDF.js expression evaluation for untrusted PDFs, mitigating
+  CVE-2024-4367 in the vendored runtime.
+- Fixed browser routing flags on dynamic fetch/XHR/EventSource requests, bound tab
+  messages to their owning iframe, and made Tor WebSockets fail closed.
+- Added a persistent direct/non-anonymous browser badge and robust address parsing
+  for `.co`, `.com.br`, `.io`, IP addresses, ports, and paths.
+- SecurityOps IRC now embeds its real The Lounge/Socket.IO client over Tor; GODS
+  EYE uses its native cross-origin app with an explicit direct warning.
+- ZUPT Web now has explicit Tor and clearnet modes. A bounded, exact-origin,
+  RAM-only CSRF bridge enables real key generation, multipart compression and
+  attachment downloads without returning upstream cookies to the iframe; Tor and
+  direct GET→POST→download flows were validated against the live service.
+- SecChat is now presented as **Keywave**. Its Tor route is isolated and limited to
+  the landing/control surface because WebRTC cannot safely traverse Tor; the full
+  text/media client opens only after an explicit, IP-visible clearnet action.
+- Embedded-app CSP now confines every active resource to the concrete SecurityOS
+  proxy origin. WebSocket queues and Tor isolation agents are bounded, and Keywave
+  signaling is restricted to its exact TLS Socket.IO endpoint. The tunnel now sends
+  the browser-correct HTTPS Origin, verified with a real Engine.IO WebSocket open.
+- The production web image now uses a locked, multi-stage build and omits source and
+  Next build-cache layers, reducing the tested runtime image from roughly 5.45 GB to
+  1.43 GB. The Rust sidecar also builds from its lockfile and excludes local targets
+  from the Docker context.
+
 ## [2.23.0] — 2026-09-01
 
 - Added a dedicated **Clearnet Browser** with full tabs, history, bookmarks and
@@ -13,14 +48,14 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   clearnet URLs navigate in tabs over isolated Tor circuits; JavaScript remains
   opt-in and sandbox limitations are documented honestly.
 - Added **GODS EYE**, a sandboxed dashboard window for `eye.securityops.co`.
-- Set IRC's default network to **irc.securityops.com.br** and allowlisted its secure
-  WebSocket gateway for the Tor tunnel.
+- Added the **SecurityOps IRC** desktop entry for `irc.securityops.com.br`.
 - Removed WhatsApp and Telegram shortcuts from the desktop (their existing Start
   menu launchers remain available).
 
 ## [2.21.0] — 2026-06-21
 
 ### The embedded apps actually load now — the production sidecar was stripping their runtime shim
+
 - **Root cause (CryptPad / WhatsApp / Telegram all loaded blank/broken in prod).**
   In the Docker deployment the privacy proxy delegates plain `/api/proxy?url=…`
   GETs to the memory-safe **Rust sidecar** (`PROXY_SIDECAR_URL`). The sidecar only
@@ -49,7 +84,8 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   is still rejected).
 
 ### Matrix — the real "stuck on Connecting over Tor…" fix
-- **The label was lying and the state never recovered.** After a *successful* login,
+
+- **The label was lying and the state never recovered.** After a _successful_ login,
   any transient `/sync` error over Tor made the sync handler **revert the status to
   "Connecting over Tor…"** — so a flaky circuit pinned the UI on "connecting"
   forever even though the session was live. It now **stays "Syncing over Tor…"**
@@ -66,6 +102,7 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   login.
 
 ### Security & review
+
 - The whole change set was put through a **multi-agent adversarial review** (security
   / Matrix-correctness / shim edge-cases, each finding independently verified): no
   must-fix issues; one cosmetic message-ordering nit was fixed. The opaque-origin
@@ -74,6 +111,7 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   embed is the accepted trade-off.
 
 ### Honest limits (unchanged ceiling)
+
 - These remain heavy, multi-origin SPAs. **Service Workers cannot register** on an
   opaque origin and the **IndexedDB shim is amnesic**, so offline mode, persistent
   history and (for WhatsApp) multi-device crypto/WebRTC calls **cannot** fully work
@@ -84,6 +122,7 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 ## [2.20.0] — 2026-06-21
 
 ### CryptPad, WhatsApp & Telegram now run INSIDE the OS, over Tor
+
 - **CryptPad "Refused to connect" fixed.** `office.securityops.co` 301-redirects to
   the public `pad.envs.net`, which **refuses framing**, so the direct embed failed.
   CryptPad now loads **through the privacy proxy over Tor** — the proxy follows the
@@ -99,6 +138,7 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   that gate on storage get past their checks in the opaque sandbox.
 
 ### Honest limits
+
 - These are heavy multi-origin SPAs (service workers, IndexedDB, and sometimes
   Tor-exit blocking), so the embed is **best-effort** — it loads in-OS over Tor, but
   deep/persistent functionality can be partial. For guaranteed full use, the in-app
@@ -108,6 +148,7 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 ## [2.19.0] — 2026-06-21
 
 ### Matrix — fixed "stuck on Connecting over Tor…" before login
+
 - Sign-in could hang on "Connecting over Tor…" because the Rust-crypto (E2EE) WASM
   init was `await`ed with **no timeout** — a stalled WASM load froze login forever
   (the login request itself succeeds; the freeze is after it). It's now **bounded
@@ -115,9 +156,10 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   (unencrypted rooms work; encrypted show as locked) instead of hanging.
 
 ### CryptPad — now actually works (storage fix)
+
 - CryptPad needs persistent **storage** (localStorage/IndexedDB) and refuses to run
   without it (the "storage disabled" alert in Chrome/Chromium). The privacy proxy's
-  opaque-origin sandbox has no storage *by design*, so CryptPad now embeds **on its
+  opaque-origin sandbox has no storage _by design_, so CryptPad now embeds **on its
   own origin** — `office.securityops.co` directly, cross-origin to the OS (so still
   isolated, no `allow-top-navigation`) but with `allow-same-origin` so its storage
   and realtime WebSocket work. This is a **direct** connection (badge shown); run
@@ -125,6 +167,7 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   from the OS — a **Window** / **Tor Browser** fallback is in the toolbar otherwise.
 
 ### Messengers — why they stay launchers
+
 - WhatsApp/Telegram **can't** be embedded over the Tor proxy: they send anti-framing
   headers (a direct embed can't strip them), need storage + service workers the
   privacy sandbox can't provide, and block Tor exit IPs. They remain **launchers**
@@ -134,6 +177,7 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 ## [2.18.0] — 2026-06-21
 
 ### Lockscreen fixes
+
 - **A PIN set on the lock screen now takes effect immediately (no refresh).**
   `pinRequired` was memoized on the locked state alone, so after you set a PIN from
   the lock screen the UI stayed in passwordless "swipe/click to unlock" mode — with
@@ -150,12 +194,14 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 ## [2.17.0] — 2026-06-21
 
 ### CryptPad — encrypted office suite, inside the OS over Tor
+
 - New **CryptPad** app: the first-party `office.securityops.co` suite (docs, sheets,
   code, drive) embedded **inside SecurityOS over Tor** (its page is fetched + rendered
   through the privacy proxy in a sandbox). Desktop + Start-Menu shortcuts and a brand
   icon. Toolbar: **Reload**, **Open in Tor Browser**.
 
 ### WebSocket tunnel (real-time apps can run in-OS over Tor)
+
 - SecurityOS now runs on a **custom server (`server.js`)** = Next's production server
   plus a same-origin **WebSocket tunnel at `/api/ws`**. Real-time web apps (CryptPad's
   collaborative engine; Telegram/WhatsApp Web) need a `wss://` connection the plain
@@ -166,6 +212,7 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   `ws` module is ever unavailable, so the desktop always boots.
 
 ### Matrix — completed the post-login sync fix
+
 - v2.16.0 restored the trailing slash in the proxy handler, but Next was **308-
   redirecting `…/pushrules/` → `…/pushrules` before the handler ran**, so the slash
   was still lost and sync stayed stuck. Added **`skipTrailingSlashRedirect`** so Next
@@ -175,8 +222,9 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 ## [2.16.0] — 2026-06-21
 
 ### Matrix — fixed the post-login "stuck syncing" (real root cause)
+
 - The Matrix Tor proxy **dropped the trailing slash** on `GET /_matrix/client/v3/
-  pushrules/` — Next's catch-all matcher strips the empty trailing segment. The SDK
+pushrules/` — Next's catch-all matcher strips the empty trailing segment. The SDK
   calls that endpoint (slash required) BEFORE the first /sync; Synapse 400s the
   slash-less form, the SDK retries it forever, and /sync is never sent — so the app
   hung on "syncing" after a **successful** login. The proxy now restores the trailing
@@ -187,6 +235,7 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   `POST /user/{id}/filter` is now retry-safe over a cold Tor circuit.
 
 ### Security — formal audit fixes
+
 - **WebRTC real-IP leak (high).** With scripts enabled, a malicious proxied page
   could open an `RTCPeerConnection` to a STUN server and exfiltrate the user's real
   IP, fully bypassing Tor. The proxy shim now neutralizes RTCPeerConnection
@@ -208,6 +257,7 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 ## [2.15.0] — 2026-06-21
 
 ### Start Menu — search now works
+
 - The Start Menu's **"Search…"** box was a **non-functional placeholder** (a static
   span — no input, no handler), so nothing happened when you used it. It's now a
   real search with a **results dropdown** (icons + **Enter** opens the top hit):
@@ -217,6 +267,7 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   **files/documents** come from the lunr index. Click a result to launch it.
 
 ### Docs
+
 - README, the in-desktop **Handbook**, and the desktop **Welcome** doc now document
   the new messenger apps and their over-Tor trade-off, the Radio/VaptVupt/Matrix
   changes, and the Start-Menu search — with a **"What's new"** summary surfaced on
@@ -225,6 +276,7 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 ## [2.14.0] — 2026-06-20
 
 ### Matrix — works end-to-end (real bug fixes)
+
 Sign-in, syncing and sending were investigated end-to-end. The login and sync code
 paths were verified correct — a persistent "can't sign in / stuck syncing" is an
 **infrastructure** condition (Tor not running, or the `matrix.securityops.co`
@@ -238,22 +290,23 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
 - **Uploads no longer time out over Tor.** `matrix-js-sdk`'s `uploadContent` uses an
   `XMLHttpRequest` with a hard-coded **30 s idle timeout**; the body flushes
   instantly to the same-origin proxy, then the request waits on the slow Tor leg,
-  so a healthy upload aborted with *"Timeout"*. Uploads now go through a plain
+  so a healthy upload aborted with _"Timeout"_. Uploads now go through a plain
   `fetch` (no idle timer), reliably over Tor.
 - **The Matrix Tor proxy no longer leaks circuits.** When the browser aborts a
   `/sync` long-poll (or the window closes), the proxy now **tears down the upstream
   Tor request** instead of holding the socket/circuit open for up to 90 s — which
   previously accumulated orphaned sockets and degraded Matrix over a session.
-- **No more duplicate rooms / uploads / joins.** The proxy retried *all* failed
+- **No more duplicate rooms / uploads / joins.** The proxy retried _all_ failed
   requests, including non-idempotent `POST`s the homeserver had **already
   processed** — a slow Tor response on create-room/upload/join could duplicate the
   action. Retries are now gated to idempotent methods (and not-yet-sent bodies).
 
 ### Radio — only working stations, exact countries
+
 - **Country filter is now exact.** Picking a country used a fuzzy **name** match
   against stations' inconsistent free-text labels, so results leaked in from the
   wrong place. It now matches the **ISO 3166-1 country code** exactly, so each
-  country shows stations actually *from* that country. (Stale name-based prefs from
+  country shows stations actually _from_ that country. (Stale name-based prefs from
   older builds are migrated away.)
 - **Offline / non-playable stations removed.** The list now keeps only stations
   that actually work here: an **HTTPS** stream (http-only streams can never play on
@@ -261,6 +314,7 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   reachability check**, on top of the API's `hidebroken` filter.
 
 ### Messengers (WhatsApp · Telegram · Session) — honest Tor guidance
+
 - Each launcher now includes an in-app **"Using … over Tor"** explainer: these
   clients can't run through the in-OS Tor proxy (they need WebSockets it blocks;
   WhatsApp/Telegram also forbid framing; Session has no web client), so the window
@@ -268,6 +322,7 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   the Tor Browser / Tails** — documented in-app and in the **SecurityOS Handbook**.
 
 ### Docs
+
 - **README + in-desktop Handbook** updated: messengers + their Tor trade-off, the
   Radio improvements, and a corrected **VaptVupt** description — it embeds the
   share's **`.onion` over the Tor proxy** (uploads to 256 MiB, downloads stream in
@@ -277,9 +332,10 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
 ## [2.13.0] — 2026-06-20
 
 ### New apps
+
 - **WhatsApp, Telegram & Session** launchers. WhatsApp Web and Telegram Web can't
   be iframed (WhatsApp pins `frame-ancestors`, Telegram sends `X-Frame-Options:
-  deny`) and rely on WebSockets the Tor proxy blocks, so each opens its **official
+deny`) and rely on WebSockets the Tor proxy blocks, so each opens its **official
   web client in a real top-level window**, where it's fully functional (chats,
   calls, native uploads/downloads, QR login). **Session has no web client** (it's a
   desktop/mobile app), so its launcher opens the official download page instead. A
@@ -287,6 +343,7 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   trade-off explicit. New brand icons + Desktop/Start-Menu shortcuts.
 
 ### Fixes
+
 - **Matrix: no more silent "Connecting over Tor…".** On open, the app now does a
   real reachability probe of the Tor SOCKS proxy (`/api/tor-status`) and **bounds
   the circuit warm-up with a timeout** so the state always settles instead of
@@ -298,7 +355,7 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   resilient rotation over several known-good mirrors that **remembers the first one
   that answers** and times out dead hosts fast.
 - **Radio: country filter ignored the selection.** Picking a country (or genre)
-  searched the *previous* value because `search()` read stale state set in the same
+  searched the _previous_ value because `search()` read stale state set in the same
   event tick. The chosen value is now passed through explicitly. Stream `error`
   events also surface ("This stream is offline or unsupported").
 - **VaptVupt: upload & download errors.** The privacy proxy capped generic file
@@ -309,16 +366,19 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   toolbar (**Reload**, **Open in Tor Browser**) and an actionable slow-load hint.
 
 ### Tor Browser
+
 - **User Bookmarks.** Save the current page (★ toggle), revisit and remove your own
   bookmarks; persisted in localStorage alongside the built-in onion bookmarks.
 - Validated the Security Ops extension shim + the three-state NoScript control.
 
 ### UI/UX
+
 - **Screen Capture redesign** — a cleaner "capture studio": responsive option grid,
   prominent gradient **Screenshot** / red **Record** actions, a refined recording
   pill and last-capture card, and a roomier default window.
 
 ### Hardening
+
 - The privacy proxy now bounds **total in-flight buffered memory** across all
   upstream responses (and excludes redirects + anchors the attachment check), so a
   hostile page referencing many large "download" sub-resources can't OOM the
@@ -330,8 +390,9 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
 ## [2.12.0] — 2026-06-19
 
 ### Fixes
+
 - **The desktop could get stuck "blinking" / never finish loading.** Root cause: the
-  top-level `ErrorBoundary` reloaded the page on *any* uncaught error with **no
+  top-level `ErrorBoundary` reloaded the page on _any_ uncaught error with **no
   limit and no fallback UI** — so any component that threw during render/effect
   (typically from **corrupted/stale saved data** in IndexedDB / the session file /
   localStorage) reloaded forever. The boundary now **auto-reloads at most once**,
@@ -346,13 +407,15 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   layout. Cards now render straight from state when not being dragged.
 
 ### Docs
+
 - Updated **README.md**, the in-OS **Welcome** (Desktop/README.md) and the
   **SecurityOS Handbook** to cover everything added since: Matrix (E2EE over Tor),
   SecChat, Radio, Cloudmacs (Emacs + telega/whatsappel/org/eww), Screen Capture
   (+ webcam effect themes), desktop Widgets (incl. Calendar + Post-it), the Lock
   screen, master volume, and the new recovery/resilience behavior.
 
-### Boot resilience (from the deep review — these were the *real* causes)
+### Boot resilience (from the deep review — these were the _real_ causes)
+
 - **A second, independent infinite-reload loop in the filesystem layer.** On a
   corrupt IndexedDB overlay, `writeFile` hit `ENOENT '/'` and called
   `window.location.reload()` **unconditionally** — and `resetStorage` couldn't
@@ -373,6 +436,7 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   used as a React `style` (a malformed entry used to throw during render).
 
 ### App robustness (from the deep review)
+
 - Opening a **stale/missing file** from a restored session no longer hangs the
   spinner or shows a blank window in **Marked, TinyMCE, Vim, Terminal, PDF,
   Photos, OpenType, and DevTools** (unhandled promise rejections → graceful
@@ -387,6 +451,7 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
 ## [2.11.0] — 2026-06-18
 
 ### Fixes
+
 - **Matrix "stuck before login" — root-caused with a headless browser.** Reproduced
   the hang in Chromium: the login form renders fine, but the very first request
   (`POST /login`) lands on a **cold Tor circuit**, which takes 16–40s to build, so
@@ -405,6 +470,7 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   (telega state now persists across restarts).
 
 ### New
+
 - **Webcam effects / themes** in Screen Capture — pick a theme for the webcam
   picture-in-picture (and a live preview): **Matrix (digital rain)**, Grayscale,
   Sepia, Neon/Invert, Blur, and a **Background blur** option (best-effort,
@@ -413,6 +479,7 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   sticky note (editable, persisted).
 
 ### Changed
+
 - **Widgets default layout** — on first start the desktop now shows the **Clock
   centered at top** and **News at top-right** (both visible); other widgets stay
   hidden until toggled. Existing saved layouts are untouched.
@@ -421,6 +488,7 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
 ## [2.10.0] — 2026-06-18
 
 ### New
+
 - **Radio** app — listen to internet radio worldwide (radio-browser API), filter
   by country/genre, HTTPS streams, favorites.
 - **Desktop widgets** (Rainmeter-style, draggable, toggleable): clock, weather
@@ -434,12 +502,14 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   games) via per-context master gain nodes, and Webamp's own mixer.
 
 ### Cloudmacs
+
 - **TDLib** built into the image (`libtdjson` 1.8.65) + a C toolchain, so Telega
   is fully functional (`M-x telega-server-build`). Telega + **whatsappel** are
   loaded; **Spacemacs** boots with a **SecurityOps ASCII banner** and auto-installs
   everything on first open. Cloudmacs also appears in **"Open with"** for text/code.
 
 ### Fixes
+
 - **Screen recorder: Stop now actually stops.** With the webcam picture-in-picture
   the recorder was recording the canvas `captureStream` (untracked) and the stop
   path never called `recorder.stop()` — so it kept going. Now it stops the recorder
@@ -457,6 +527,7 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
 ## [2.9.0] — 2026-06-18
 
 ### Cloudmacs — Spacemacs + productivity tools
+
 - Cloudmacs now boots **Spacemacs** with productivity layers (org, git/**magit**,
   helm, treemacs, auto-completion, markdown, shell, syntax-checking,
   version-control, multiple-cursors) plus **EWW**, **Org-mode**, **Telega**
@@ -467,6 +538,7 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   `~/.spacemacs.d/init.el`. Packages install from MELPA on first open.
 
 ### Fixes
+
 - **Video/VLC player bar icons** — the control-bar icons sat on a fixed light
   button and used the theme text color (light on light → invisible). Now a fixed
   dark icon, visible in every theme.
@@ -479,12 +551,14 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   needs share.securityops.co to permit framing (then it can go direct).
 
 ### Screen recording
+
 - Recording countdown, system-audio toggle, webcam PiP position + size, and an
   optional max-duration auto-stop.
 
 ## [2.8.0] — 2026-06-18
 
 ### Cloudmacs — full Emacs in the browser (replaces Emacs + VSCodium)
+
 - Removed the simulated **Emacs** app and the **VSCodium** app; added
   **Cloudmacs** ([karlicoss/cloudmacs](https://github.com/karlicoss/cloudmacs)) —
   real Emacs served to the browser via **Gotty** (`emacsclient --tty`, session
@@ -495,17 +569,20 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   Build context vendored in `deploy/cloudmacs/`. CSP allows the cloudmacs origin.
 
 ### Matrix — fix "Connection Error" on connect
+
 - A transient Tor hiccup during the **initial sync** no longer becomes a hard
   "Connection error" that bounces back to the login screen. The session is kept
   and the SDK auto-retries — the status stays "Connecting over Tor…" until the
   first sync completes. (The login path itself was verified working.)
 
 ### Vaptvupt — full file functionality
+
 - The file-share app now embeds `share.securityops.co` **directly** (like
   SecChat) instead of the Tor-proxied onion, so native **download and upload**
   work (the HTML-rewriting proxy is GET-only and couldn't forward uploads).
 
 ### Screen recording — performance/quality + webcam choice
+
 - Recording **quality presets** (Performance ~720p/2.5 Mbps · Balanced
   ~1080p/6 Mbps · High native/12 Mbps), **codec auto-select** (VP9→VP8→WebM→MP4),
   and a **webcam device picker** for the picture-in-picture overlay.
@@ -513,6 +590,7 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
 ## [2.7.0] — 2026-06-18
 
 ### VSCodium — a real, full VS Code IDE (replaces DevStudio)
+
 - The Monaco-based **DevStudio** is replaced by **VSCodium**: the full VS Code
   (Code-OSS) experience — extensions, integrated terminal, real
   build/test/debug — via a self-hosted **code-server** embedded in-OS (same
@@ -524,11 +602,13 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   server" panel with a Retry if it isn't running yet.
 
 ### Matrix — fixes the "Failed to construct URL" login error
+
 - The SDK requires an **absolute** base URL; the relative `"/api/matrix"` threw
-  *Failed to construct URL*. Now uses `window.location.origin + /api/matrix`
+  _Failed to construct URL_. Now uses `window.location.origin + /api/matrix`
   (still the same-origin Tor proxy) so login/sync work.
 
 ### Screen Capture — even more
+
 - **Pause/Resume** recording (timer pauses too), **PNG/JPEG** screenshot format,
   **24/30/60 fps** selector, **auto-open** the result (Photos/VideoPlayer), and a
   **webcam picture-in-picture** overlay for recordings.
@@ -536,6 +616,7 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
 ## [2.6.0] — 2026-06-18
 
 ### DevStudio — a real in-browser IDE
+
 - New **DevStudio** app: file-tree explorer over the virtual FS, **Monaco** editor
   with tabs (dirty indicator, Ctrl+S save), and a bottom **Output** console.
 - **Run / test / debug** that is CSP-clean (no CDN, nothing leaves Tor):
@@ -546,6 +627,7 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   **Linux VM (V86)** / **Terminal**. Ctrl+Enter / F5 to run.
 
 ### Matrix — connection hardening
+
 - **Encryption init is now non-fatal**: if E2EE/WASM can't start, you still
   connect (unencrypted rooms work; encrypted show as locked) instead of being
   blocked entirely — with a clear in-app notice.
@@ -554,11 +636,13 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   exact homeserver error text on failure.
 
 ### Screen Capture — improvements
+
 - Screenshot **countdown** (Now/3s/5s), **copy to clipboard**, **microphone
   audio** toggle for recordings, a live **recording timer**, and a **last-capture
   preview** thumbnail.
 
 ### Desktop fixes
+
 - **Default wallpaper** is now the **SecurityOps logo** (also added to the
   Background menu).
 - **Fixed desktop icon overlap on load**: icons stay hidden until the session's
@@ -568,6 +652,7 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
 ## [2.5.0] — 2026-06-17
 
 ### Matrix — a full, end-to-end-encrypted client
+
 - **Real E2EE via matrix-js-sdk + Rust crypto (WASM).** Encrypted rooms now
   **decrypt and display** — fixes the previous "can't see my messages" (the old
   hand-rolled client silently dropped every `m.room.encrypted` event). All traffic
@@ -580,6 +665,7 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   upload. Crypto keys are kept **in memory only** (amnesic).
 
 ### Emacs — Spacemacs experience
+
 - Spacemacs-dark theme + **Powerline** mode-line + header-line buffer tabs;
   many more commands & keybindings (M-y kill-ring, query-replace, case ops,
   recenter, comment-line, M-x completion); **SPC leader + which-key** popup.
@@ -588,12 +674,14 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   now open in Emacs.
 
 ### Tor Browser — faster & safer
+
 - **Keep-alive socket pooling** to Tor (big latency win, isolation preserved),
   **async + size-bounded decompression** (fixes event-loop stalls and gzip
   bombs), **lazy-loaded images**, in-memory caching of immutable sub-resources,
   and a strict CSP on non-HTML responses.
 
 ### Desktop
+
 - **Taskbar Volume control** (click slider, scroll to change, mute) wired to a
   persisted global media volume.
 - **Screen Capture** app (+ taskbar/desktop/Start-menu entries): screenshot →
@@ -603,15 +691,17 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   and surfaced the themed library in the Background menu (Emacs, Guix, Matrix,
   Christ, Security, Hacking, Anonymity, Nature, Technology, Forensics, Gentoo) +
   new **BSD / Unix / Space / Art** themes.
-- **Music:** expanded the public-domain (CC0) Bach *Goldberg Variations* set.
+- **Music:** expanded the public-domain (CC0) Bach _Goldberg Variations_ set.
 - **Desktop folders** Documents / Images / Music, and **`dev.md`** + **`terms.md`**
   on the desktop (maintainer info + usage rules & liability).
 
 ### Undercover (Windows 11 disguise)
+
 - Win11 Fluent light tokens, generic (trademark-free) folder/app display names,
   and a stacked clock — toggles cleanly back to the SecurityOS theme.
 
 ### Docs
+
 - README **Disclaimer & liability** section and `docs/TERMS.md` — SecurityOS is
   for lawful, authorized use only; the sole maintainer is not responsible for
   misuse; no warranty.
@@ -619,6 +709,7 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
 ## [2026-06-14]
 
 ### Tor Browser — tabbed browsing
+
 - **Tabs in the Tor Browser.** Tab strip with a
   `＋` new‑tab button and per‑tab close; tabs stay mounted so scroll/state is
   preserved on switch. Per‑tab history (back/forward), address bar and bookmarks
@@ -628,13 +719,14 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   tab; **Ctrl/⌘‑click or middle‑click → new tab**; pop‑ups (`window.open`) → new
   tab. Done via the in‑page proxy shim posting a validated `__sosNewTab` message
   (each browser only accepts its own `/api/proxy` URLs). In the Tor Browser's
-  default no‑JS *Safest* mode the sandbox forbids scripts, so links open in the
+  default no‑JS _Safest_ mode the sandbox forbids scripts, so links open in the
   current tab and new tabs come from `＋`.
 - **UI/UX polish:** larger, clearer toolbar buttons (no longer clipped into a
   fixed box) with proper hover/disabled states, an address bar that flexes to
   fill, and a readable tab strip with an active‑tab accent.
 
 ### Apps
+
 - **Vaptvupt** now opens the SecurityOps **file share** (`share.securityops.co`)
   as a direct first‑party embed (real origin, cookies, full usage) — login,
   upload, manage and download shares. (Requires the site to allow framing from
@@ -643,25 +735,28 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   right‑click menu.
 
 ### Removed
+
 - **The Clearnet Browser app is removed** — SecurityOS is **Tor-only**: all web
   access goes through the Tor Browser. `.html` files now open in the text editors
   (view source); http links / the Run dialog open the Tor Browser.
 
 ### Tor Browser
+
 - Start page + address‑bar search point at the verified live darknet search
   hidden service; bookmarks are the operator's `.onion` services.
-- **NoScript-style 3-state JavaScript control** (toolbar): **Off** — *Safest*,
+- **NoScript-style 3-state JavaScript control** (toolbar): **Off** — _Safest_,
   all JS blocked + `script-src 'none'`; **NoScript** — first-party scripts only,
   third-party stripped server-side by the LibreJS filter; **All** — every script
   runs. Off by default; the iframe drops `allow-scripts` in Off mode.
 
 ### Privacy proxy & security hardening
+
 - **Mode‑aware CSP**: strict same‑origin CSP in no‑JS (anonymity) mode; minimal
   CSP in JS mode so ordinary sites render (fixes "refused to connect" on embeds
   and lazy‑loaded images).
-- **Accurate error pages**: a down `.onion` now reads *"this .onion looks
-  offline (Tor is working)"* instead of blaming Tor; only a genuine SOCKS‑hop
-  failure reports *"Tor is unreachable."*
+- **Accurate error pages**: a down `.onion` now reads _"this .onion looks
+  offline (Tor is working)"_ instead of blaming Tor; only a genuine SOCKS‑hop
+  failure reports _"Tor is unreachable."_
 - **On‑page search forms work**: GET forms are rewritten to carry the target +
   mode flags as hidden inputs (a GET submit no longer drops the proxied URL).
 - **SSRF / anonymity (security audit fixes):** the SSRF guard and Tor routing
@@ -675,11 +770,13 @@ surfaces with an actionable message. Four genuine **code** bugs were found and f
   just an open SOCKS port.
 
 ### Deploy
+
 - **One command:** `docker compose up -d` (web + Tor, hardened & amnesic) → open
   `http://localhost:8088`. The full stack with the memory‑safe Rust proxy
   sidecar remains at `deploy/docker-compose.yml`.
 
 ## Earlier
+
 - Full English UI, Tor active by default, SecurityOS branding, in‑OS Browser /
   Tor Browser, SecChat, SecTube, Vaptvupt (WASM) file encryption, SecTools,
   v86 Linux VM, security‑headers hardening, and the Tor‑routed deployment.

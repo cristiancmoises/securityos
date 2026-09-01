@@ -24,7 +24,9 @@ import type { MatrixClient } from "matrix-js-sdk";
 // can parse it.
 export const MATRIX_API_PATH = "/api/matrix";
 export const matrixBaseUrl = (): string =>
-  `${typeof window === "undefined" ? "" : window.location.origin}${MATRIX_API_PATH}`;
+  `${
+    typeof window === "undefined" ? "" : window.location.origin
+  }${MATRIX_API_PATH}`;
 export const HOMESERVER_LABEL = "matrix.securityops.co";
 
 // PRE-WARM THE TOR CIRCUIT. The single biggest cause of "Matrix is stuck before
@@ -46,7 +48,9 @@ const PREWARM_TIMEOUT_MS = 25_000;
 // on "Connecting over Tor…". On timeout we connect without E2EE rather than freeze.
 const CRYPTO_INIT_TIMEOUT_MS = 20_000;
 
-export const prewarmCircuit = async (signal?: AbortSignal): Promise<boolean> => {
+export const prewarmCircuit = async (
+  signal?: AbortSignal
+): Promise<boolean> => {
   const controller = new AbortController();
   const onAbort = (): void => controller.abort();
 
@@ -222,7 +226,9 @@ export const uploadMedia = async (
   );
 
   if (!response.ok) {
-    throw new Error(`Upload failed (${response.status}) — the file may be too large or Tor is slow.`);
+    throw new Error(
+      `Upload failed (${response.status}) — the file may be too large or Tor is slow.`
+    );
   }
 
   const json = (await response.json()) as { content_uri?: string };
@@ -266,15 +272,20 @@ const bytesToBase64 = (bytes: Uint8Array): string => {
   return btoa(binary);
 };
 
-const base64ToBytes = (value: string): Uint8Array => {
+const base64ToBytes = (value: string): Uint8Array<ArrayBuffer> => {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
   const padded = normalized.padEnd(
     normalized.length + ((4 - (normalized.length % 4)) % 4),
     "="
   );
   const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
 
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.codePointAt(index) ?? 0;
+  }
+
+  return bytes;
 };
 
 const bytesEqual = (a: Uint8Array, b: Uint8Array): boolean => {
@@ -300,7 +311,9 @@ export const decryptAttachment = async (
   const expectedHash = info.hashes?.sha256;
 
   if (!expectedHash) {
-    throw new Error("Encrypted attachment is missing its required SHA-256 hash.");
+    throw new Error(
+      "Encrypted attachment is missing its required SHA-256 hash."
+    );
   }
 
   const digest = new Uint8Array(

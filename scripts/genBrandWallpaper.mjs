@@ -38,22 +38,50 @@ const bg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
   <rect width="${W}" height="${H}" fill="url(#cyan)"/>
   <rect width="${W}" height="${H}" fill="url(#mag)"/>
   <g stroke="#10e0ff" stroke-opacity="0.05" stroke-width="1">
-    ${Array.from({ length: 33 }, (_, i) => `<line x1="${i * 80}" y1="0" x2="${i * 80}" y2="${H}"/>`).join("")}
-    ${Array.from({ length: 19 }, (_, i) => `<line x1="0" y1="${i * 80}" x2="${W}" y2="${i * 80}"/>`).join("")}
+    ${Array.from(
+      { length: 33 },
+      (_, i) => `<line x1="${i * 80}" y1="0" x2="${i * 80}" y2="${H}"/>`
+    ).join("")}
+    ${Array.from(
+      { length: 19 },
+      (_, i) => `<line x1="0" y1="${i * 80}" x2="${W}" y2="${i * 80}"/>`
+    ).join("")}
   </g>
-  <circle cx="${W / 2}" cy="${H * 0.46}" r="430" fill="none" stroke="#10e0ff" stroke-opacity="0.18" stroke-width="2" stroke-dasharray="2 12"/>
-  <circle cx="${W / 2}" cy="${H * 0.46}" r="510" fill="none" stroke="#10e0ff" stroke-opacity="0.08" stroke-width="1"/>
-  <text x="${W / 2}" y="${H * 0.86}" text-anchor="middle" font-family="'Orbitron',sans-serif" font-weight="700" font-size="74" letter-spacing="26" fill="#dffaff" opacity="0.92">SECURITY OS</text>
-  <text x="${W / 2}" y="${H * 0.905}" text-anchor="middle" font-family="monospace" font-size="26" letter-spacing="10" fill="#10e0ff" opacity="0.7">privacy &#183; anonymity &#183; security</text>
+  <circle cx="${W / 2}" cy="${
+  H * 0.46
+}" r="430" fill="none" stroke="#10e0ff" stroke-opacity="0.18" stroke-width="2" stroke-dasharray="2 12"/>
+  <circle cx="${W / 2}" cy="${
+  H * 0.46
+}" r="510" fill="none" stroke="#10e0ff" stroke-opacity="0.08" stroke-width="1"/>
+  <text x="${W / 2}" y="${
+  H * 0.86
+}" text-anchor="middle" font-family="'Orbitron',sans-serif" font-weight="700" font-size="74" letter-spacing="26" fill="#dffaff" opacity="0.92">SECURITY OS</text>
+  <text x="${W / 2}" y="${
+  H * 0.905
+}" text-anchor="middle" font-family="monospace" font-size="26" letter-spacing="10" fill="#10e0ff" opacity="0.7">privacy &#183; anonymity &#183; security</text>
 </svg>`;
 
 writeFileSync("/tmp/brandbg.svg", bg);
-execFileSync("rsvg-convert", ["-w", String(W), "-h", String(H), "/tmp/brandbg.svg", "-o", "/tmp/brandbg.png"]);
+execFileSync("rsvg-convert", [
+  "-w",
+  String(W),
+  "-h",
+  String(H),
+  "/tmp/brandbg.svg",
+  "-o",
+  "/tmp/brandbg.png",
+]);
 
 const logo = await sharp(SRC)
-  .resize(Math.round(W * 0.62), Math.round(H * 0.62), { fit: "contain", background: "#000000" })
+  .resize(Math.round(W * 0.62), Math.round(H * 0.62), {
+    fit: "contain",
+    background: "#000000",
+  })
   .toBuffer();
-const halo = await sharp(logo).tint({ r: 16, g: 224, b: 255 }).blur(28).toBuffer();
+const halo = await sharp(logo)
+  .tint({ r: 16, g: 224, b: 255 })
+  .blur(28)
+  .toBuffer();
 const core = await sharp(logo).tint({ r: 225, g: 248, b: 255 }).toBuffer();
 
 const ox = Math.round((W - W * 0.62) / 2);
@@ -68,4 +96,9 @@ const info = await sharp("/tmp/brandbg.png")
   .webp({ quality: 90 })
   .toFile(OUT);
 
-console.log("brand wallpaper ->", OUT, `${info.width}x${info.height}`, `${Math.round(info.size / 1024)}KB`);
+console.log(
+  "brand wallpaper ->",
+  OUT,
+  `${info.width}x${info.height}`,
+  `${Math.round(info.size / 1024)}KB`
+);

@@ -102,7 +102,10 @@ const decodeHtml = (text: string): string =>
   text.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
     if (entity[0] === "#") {
       const isHex = entity[1] === "x" || entity[1] === "X";
-      const code = Number.parseInt(entity.slice(isHex ? 2 : 1), isHex ? 16 : 10);
+      const code = Number.parseInt(
+        entity.slice(isHex ? 2 : 1),
+        isHex ? 16 : 10
+      );
       if (!Number.isFinite(code) || code < 0 || code > 0x10ffff) {
         throw new Error(`Invalid numeric HTML entity: "${match}".`);
       }
@@ -183,9 +186,7 @@ const EncoderDecoderTool: FC = () => {
     }
     try {
       const output =
-        direction === "encode"
-          ? encode(input, format)
-          : decode(input, format);
+        direction === "encode" ? encode(input, format) : decode(input, format);
 
       return { output, error: "" };
     } catch (error) {

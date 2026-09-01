@@ -140,7 +140,8 @@ const Run: FC<ComponentProcessProps> = () => {
 
             if (basePid) {
               open(basePid, {
-                url: basePid === "TorBrowser" && isIpfs ? resource : resourcePath,
+                url:
+                  basePid === "TorBrowser" && isIpfs ? resource : resourcePath,
               });
             }
           }

@@ -331,7 +331,8 @@ const useFolderContextMenu = (
                           try {
                             const { protocol } = new URL(value);
 
-                            valid = protocol === "http:" || protocol === "https:";
+                            valid =
+                              protocol === "http:" || protocol === "https:";
                           } catch {
                             valid = false;
                           }
