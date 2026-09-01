@@ -160,6 +160,24 @@ const StyledBrowser = styled.div<StyledBrowserProps>`
         outline: 2px solid hsla(190, 100%, 62%, 90%);
       }
     }
+    .mode-badge {
+      border: 1px solid;
+      border-radius: 999px;
+      flex: 0 0 auto;
+      font-family: ${({ theme }) => theme.formats.systemFont};
+      font-size: 9px;
+      letter-spacing: 0.4px;
+      padding: 3px 7px;
+      white-space: nowrap;
+    }
+    .mode-badge.tor {
+      border-color: rgba(185, 139, 224, 60%);
+      color: #cfafea;
+    }
+    .mode-badge.direct {
+      border-color: rgba(225, 168, 92, 75%);
+      color: #f0bd78;
+    }
   }
 
   nav.bookmarks {

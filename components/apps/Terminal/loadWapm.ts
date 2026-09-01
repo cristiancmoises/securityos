@@ -31,7 +31,14 @@ const loadWapm = async (
     if (moduleResponse !== undefined && moduleResponse instanceof Uint8Array) {
       bindings ||= (await import("wasi-js/dist/bindings/browser")).default;
 
-      const wasmModule = await WebAssembly.compile(moduleResponse);
+      // TS 5.9 correctly models a transformed view as potentially backed by a
+      // SharedArrayBuffer. WebAssembly.compile requires an ordinary, owned
+      // ArrayBuffer, so make that ownership explicit instead of casting it.
+      const wasmBytes = new Uint8Array(moduleResponse.byteLength);
+
+      wasmBytes.set(moduleResponse);
+
+      const wasmModule = await WebAssembly.compile(wasmBytes);
       const wasi = new WASI({
         args: commandArgs,
         bindings,

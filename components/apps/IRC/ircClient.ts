@@ -23,12 +23,6 @@ export type IrcNetwork = {
 
 export const IRC_NETWORKS: IrcNetwork[] = [
   {
-    gateway: "wss://irc.securityops.com.br/",
-    host: "irc.securityops.com.br",
-    id: "securityops",
-    label: "SecurityOps IRC",
-  },
-  {
     gateway: "wss://web.libera.chat/webirc/websocket/",
     host: "irc.libera.chat",
     id: "libera",
@@ -36,8 +30,8 @@ export const IRC_NETWORKS: IrcNetwork[] = [
   },
 ];
 
-export const DEFAULT_NETWORK_ID = "securityops";
-export const DEFAULT_CHANNELS = "#securityops";
+export const DEFAULT_NETWORK_ID = "libera";
+export const DEFAULT_CHANNELS = "#libera";
 
 export const findNetwork = (id: string): IrcNetwork =>
   IRC_NETWORKS.find((n) => n.id === id) || IRC_NETWORKS[0];

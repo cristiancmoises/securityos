@@ -58,11 +58,7 @@ const StyledLockscreen = styled.div`
   }
 
   .scrim {
-    background: linear-gradient(
-      180deg,
-      rgb(0 0 0 / 35%),
-      rgb(0 0 0 / 55%)
-    );
+    background: linear-gradient(180deg, rgb(0 0 0 / 35%), rgb(0 0 0 / 55%));
     inset: 0;
     pointer-events: none;
     position: absolute;
@@ -97,7 +93,8 @@ const StyledLockscreen = styled.div`
 
   .card {
     align-items: center;
-    backdrop-filter: blur(${({ theme }) => theme.sizes.taskbar.blur}) saturate(160%);
+    backdrop-filter: blur(${({ theme }) => theme.sizes.taskbar.blur})
+      saturate(160%);
     background-color: ${({ theme }) => theme.colors.taskbar.background};
     border: 1px solid ${({ theme }) => theme.colors.window.outlineInactive};
     border-radius: 14px;

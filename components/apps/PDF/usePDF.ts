@@ -4,7 +4,10 @@ import { useFileSystem } from "contexts/fileSystem";
 import { useProcesses } from "contexts/process";
 import { basename } from "path";
 import type * as PdfjsLib from "pdfjs-dist";
-import type { PDFDocumentProxy } from "pdfjs-dist/types/src/display/api";
+import type {
+  DocumentInitParameters,
+  PDFDocumentProxy,
+} from "pdfjs-dist/types/src/display/api";
 import { useCallback, useEffect, useState } from "react";
 import {
   BASE_2D_CONTEXT_OPTIONS,
@@ -73,7 +76,7 @@ const usePDF = (
       canvas.height = viewport.height;
       canvas.width = viewport.width;
 
-      await page.render({ canvasContext, viewport }).promise;
+      await page.render({ canvas, canvasContext, viewport }).promise;
 
       return canvas;
     },
@@ -85,7 +88,16 @@ const usePDF = (
       setLoading(true);
 
       try {
-        const doc = await window.pdfjsLib.getDocument(await readFile(url))
+        // The bundled PDF.js runtime is intentionally prevented from evaluating
+        // PDF-supplied JavaScript/font expressions. This closes CVE-2024-4367 for
+        // untrusted PDFs even if the vendored viewer assets lag the npm type package.
+        const documentParameters: DocumentInitParameters & {
+          isEvalSupported: false;
+        } = {
+          data: await readFile(url),
+          isEvalSupported: false,
+        };
+        const doc = await window.pdfjsLib.getDocument(documentParameters)
           .promise;
 
         argument(id, "count", doc.numPages);

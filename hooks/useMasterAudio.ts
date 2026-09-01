@@ -39,24 +39,49 @@ let currentLevel = 1;
 const FLAG = "__securityOsMasterAudioInstalled__";
 
 type PatchableWindow = Window & {
-  [FLAG]?: boolean;
   AudioContext?: typeof AudioContext;
+  [FLAG]?: boolean;
   webkitAudioContext?: typeof AudioContext;
-  WebampGlobal?: {
-    store?: { dispatch: (action: { type: string; volume?: number }) => void };
-  };
 };
 
 // ---------------------------------------------------------------------------
 // WebAudio master-gain plumbing.
 // ---------------------------------------------------------------------------
 
+const invokeOriginalConnect = (
+  originalConnect: unknown,
+  source: AudioNode,
+  destination: AudioNode | AudioParam,
+  output?: number,
+  input?: number
+): AudioNode | void => {
+  if (typeof originalConnect !== "function") return undefined;
+
+  let result: unknown;
+
+  if (output === undefined) {
+    result = Reflect.apply(originalConnect, source, [destination]);
+  } else if (input === undefined) {
+    result = Reflect.apply(originalConnect, source, [destination, output]);
+  } else {
+    result = Reflect.apply(originalConnect, source, [
+      destination,
+      output,
+      input,
+    ]);
+  }
+
+  return typeof AudioNode !== "undefined" && result instanceof AudioNode
+    ? result
+    : undefined;
+};
+
 // Lazily create (or fetch) the master gain for a context. The master is wired
 // directly to the *real* destination via the original (unpatched) connect, so we
 // never recurse through our own override.
 const getMasterGain = (
   context: BaseAudioContext,
-  originalConnect: typeof AudioNode.prototype.connect
+  originalConnect: unknown
 ): GainNode | undefined => {
   const existing = masterGains.get(context);
 
@@ -77,7 +102,7 @@ const getMasterGain = (
   // Connect master -> real destination using the ORIGINAL connect so this very
   // wire isn't itself rerouted (which would create a self-loop).
   try {
-    originalConnect.call(master, context.destination);
+    invokeOriginalConnect(originalConnect, master, context.destination);
   } catch {
     // If we somehow can't reach the destination, abandon this master rather
     // than break the app's audio graph.
@@ -97,7 +122,9 @@ const installWebAudioPatch = (win: PatchableWindow): void => {
   if (!Ctx || typeof AudioNode === "undefined") return;
 
   const proto = AudioNode.prototype;
-  const originalConnect = proto.connect;
+  const originalConnect: unknown = Reflect.get(proto, "connect");
+
+  if (typeof originalConnect !== "function") return;
 
   // connect() has two overloads (AudioNode target / AudioParam target). We only
   // ever reroute the AudioNode-target form when the target is the context's real
@@ -110,7 +137,7 @@ const installWebAudioPatch = (win: PatchableWindow): void => {
     input?: number
   ): AudioNode | void {
     try {
-      const context = this.context;
+      const { context } = this;
       const isDestinationNode =
         typeof AudioDestinationNode !== "undefined" &&
         destination instanceof AudioDestinationNode &&
@@ -123,11 +150,7 @@ const installWebAudioPatch = (win: PatchableWindow): void => {
         if (master && master !== this) {
           // Route this node into the master instead of the real destination.
           // Preserve the optional output index; master always uses input 0.
-          if (output === undefined) {
-            originalConnect.call(this, master);
-          } else {
-            originalConnect.call(this, master, output);
-          }
+          invokeOriginalConnect(originalConnect, this, master, output);
 
           // Per spec, connect(AudioNode) returns the destination node. We hand
           // back the master so chained `.connect(dest).connect(...)` keeps
@@ -140,14 +163,13 @@ const installWebAudioPatch = (win: PatchableWindow): void => {
     }
 
     // Default: forward exactly the args we received and return the real result.
-    if (output === undefined) {
-      return originalConnect.call(this, destination as AudioNode);
-    }
-    if (input === undefined) {
-      return originalConnect.call(this, destination as AudioNode, output);
-    }
-
-    return originalConnect.call(this, destination as AudioNode, output, input);
+    return invokeOriginalConnect(
+      originalConnect,
+      this,
+      destination,
+      output,
+      input
+    );
   }
 
   // eslint-disable-next-line no-param-reassign
@@ -183,25 +205,33 @@ const applyToMedia = (
   volume: number,
   muted: boolean
 ): void => {
-  root
-    .querySelectorAll<HTMLMediaElement>("video, audio")
-    .forEach((element) => {
-      try {
-        element.volume = volume;
-        element.muted = muted;
-      } catch {
-        // Ignore elements that reject volume/muted (e.g. cross-origin media).
-      }
-    });
+  root.querySelectorAll<HTMLMediaElement>("video, audio").forEach((element) => {
+    try {
+      element.volume = volume;
+      element.muted = muted;
+    } catch {
+      // Ignore elements that reject volume/muted (e.g. cross-origin media).
+    }
+  });
 };
 
 const applyToWebamp = (win: PatchableWindow, level: number): void => {
-  const store = win.WebampGlobal?.store;
+  const webamp: unknown = Reflect.get(win, "WebampGlobal");
 
-  if (!store?.dispatch) return;
+  if (!webamp || typeof webamp !== "object") return;
+
+  const store: unknown = Reflect.get(webamp, "store");
+
+  if (!store || typeof store !== "object") return;
+
+  const dispatch: unknown = Reflect.get(store, "dispatch");
+
+  if (typeof dispatch !== "function") return;
 
   try {
-    store.dispatch({ type: "SET_VOLUME", volume: Math.round(level * 100) });
+    Reflect.apply(dispatch, store, [
+      { type: "SET_VOLUME", volume: Math.round(level * 100) },
+    ]);
   } catch {
     // Best-effort only.
   }
@@ -217,7 +247,7 @@ const useMasterAudio = (): void => {
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
 
-    const win = window as PatchableWindow;
+    const win: PatchableWindow = window;
     const level = muted ? 0 : clamp01(volume);
 
     currentLevel = level;

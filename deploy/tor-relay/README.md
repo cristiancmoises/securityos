@@ -13,11 +13,11 @@ docker compose up -d --build
 
 ## Files
 
-| File | Purpose |
-| ---- | ------- |
-| `docker-compose.yml` | `tor` + `relay` services on an isolated bridge network |
-| `torrc` | Tor `SocksPort`/`TransPort`/`DNSPort` (+ optional `.onion` mirror) |
-| `relay/Dockerfile` | Builds the v86 websockproxy relay |
+| File                  | Purpose                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------- |
+| `docker-compose.yml`  | `tor` + `relay` services on an isolated bridge network                                                  |
+| `torrc`               | Tor `SocksPort`/`TransPort`/`DNSPort` (+ optional `.onion` mirror)                                      |
+| `relay/Dockerfile`    | Builds the v86 websockproxy relay                                                                       |
 | `relay/entrypoint.sh` | iptables rules: redirect the relay's TCP→Tor TransPort, DNS→DNSPort, **fail closed** on everything else |
 
 ## Production hardening

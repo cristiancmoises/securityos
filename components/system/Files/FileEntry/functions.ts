@@ -473,28 +473,26 @@ export const getInfoWithExtension = (
         (signal) =>
           fs.readFile(path, (error, contents = Buffer.from("")) => {
             if (!error && !signal.aborted) {
-              import("music-metadata").then(
-                ({ parseBuffer, selectCover }) => {
+              import("music-metadata").then(({ parseBuffer, selectCover }) => {
+                if (signal.aborted) return;
+
+                parseBuffer(
+                  contents,
+                  {
+                    mimeType: MP3_MIME_TYPE,
+                    size: contents.length,
+                  },
+                  { skipPostHeaders: true }
+                ).then(({ common: { picture } = {} }) => {
                   if (signal.aborted) return;
 
-                  parseBuffer(
-                    contents,
-                    {
-                      mimeType: MP3_MIME_TYPE,
-                      size: contents.length,
-                    },
-                    { skipPostHeaders: true }
-                  ).then(({ common: { picture } = {} }) => {
-                    if (signal.aborted) return;
+                  const { data: coverPicture } = selectCover(picture) || {};
 
-                    const { data: coverPicture } = selectCover(picture) || {};
-
-                    if (coverPicture) {
-                      getInfoByFileExtension(bufferToUrl(coverPicture));
-                    }
-                  });
-                }
-              );
+                  if (coverPicture) {
+                    getInfoByFileExtension(bufferToUrl(coverPicture));
+                  }
+                });
+              });
             }
           })
       );

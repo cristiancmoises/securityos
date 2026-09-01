@@ -17,7 +17,9 @@ const wipeIndexedDb = async (): Promise<void> => {
     // SecurityOS/daedalOS/BrowserFS are known to use.
     const names =
       typeof idb.databases === "function"
-        ? (await idb.databases()).map((database) => database.name).filter(Boolean)
+        ? (await idb.databases())
+            .map((database) => database.name)
+            .filter(Boolean)
         : ["browserfs", "keyval-store", "IDBFS", "FileSystem"];
 
     await Promise.all(
@@ -99,10 +101,10 @@ const RecoveryScreen: FC = () => {
           maxWidth: "440px",
         }}
       >
-        Something kept the desktop from starting. This is almost always caused by
-        corrupted saved data from a previous version. Try reloading first — if it
-        keeps happening, reset to clear saved data (your files in the cloud apps
-        are unaffected; local desktop layout/state is cleared).
+        Something kept the desktop from starting. This is almost always caused
+        by corrupted saved data from a previous version. Try reloading first —
+        if it keeps happening, reset to clear saved data (your files in the
+        cloud apps are unaffected; local desktop layout/state is cleared).
       </p>
       <div style={{ display: "flex", gap: "12px" }}>
         <button

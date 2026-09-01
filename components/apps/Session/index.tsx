@@ -27,12 +27,12 @@ const SESSION: MessengerConfig = {
   steps: (
     <>
       <li>
-        Session is a <b>desktop &amp; mobile app</b> — it has no web client, so it
-        can&apos;t run inside a browser tab.
+        Session is a <b>desktop &amp; mobile app</b> — it has no web client, so
+        it can&apos;t run inside a browser tab.
       </li>
       <li>
-        Click <b>Get Session</b> above to open the official downloads in a window,
-        then install it on this device.
+        Click <b>Get Session</b> above to open the official downloads in a
+        window, then install it on this device.
       </li>
       <li>
         No phone number or email needed — Session messages are onion-routed over

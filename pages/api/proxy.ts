@@ -6,6 +6,10 @@ import { lookup } from "dns/promises";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { SocksProxyAgent } from "socks-proxy-agent";
 import { ADBLOCK_COSMETIC_CSS, isAdUrl } from "utils/adblock";
+import {
+  EphemeralCsrfCookieJar,
+  proxyCookieSessionKey,
+} from "utils/proxyCookieJar";
 
 /**
  * SecurityOS privacy proxy.
@@ -25,7 +29,9 @@ import { ADBLOCK_COSMETIC_CSS, isAdUrl } from "utils/adblock";
  *    mode Tor itself cannot reach the LAN, so the (leaky) local lookup is skipped.
  *    .onion is always allowed (a hidden service is never a private IP).
  *  - Response headers use an ALLOWLIST (only content-type/-language/-disposition);
- *    we then force no-store + no-referrer. No cookies forwarded either direction.
+ *    we then force no-store + no-referrer. The general proxy is cookie-less. A
+ *    narrow server-memory bridge keeps only ZUPT's CSRF cookie inside a random
+ *    app+isolation session; it is never returned to the browser or sent elsewhere.
  *  - HTML is rewritten so sub-resources/links route back through the proxy, and a
  *    runtime shim wraps fetch/XHR/EventSource/sendBeacon + blocks raw WebSocket so
  *    script-generated requests also go through Tor. Residual JS edge cases remain
@@ -100,7 +106,9 @@ const AGENT_OPTS = {
 // load. A bad/absent agent degrades to "Tor unreachable", reported clearly below.
 let socksAgent: SocksProxyAgent | undefined;
 try {
-  socksAgent = TOR_PROXY ? new SocksProxyAgent(TOR_PROXY, AGENT_OPTS) : undefined;
+  socksAgent = TOR_PROXY
+    ? new SocksProxyAgent(TOR_PROXY, AGENT_OPTS)
+    : undefined;
 } catch {
   socksAgent = undefined;
 }
@@ -122,6 +130,17 @@ try {
 // session with many tab rotations can't grow memory without bound.
 const MAX_ISO_AGENTS = 256;
 const isoAgents = new Map<string, SocksProxyAgent>();
+const ZUPT_WEB_ORIGIN = "https://share.securityops.co";
+
+// ZUPT's multipart tools bind the hidden CSRF form field to an HttpOnly cookie.
+// Because the privacy proxy intentionally strips browser cookies, that otherwise
+// makes every operation fail with 403. Preserve ONLY that one cookie, ONLY for the
+// exact first-party tool host, and ONLY inside a valid app+iso session. The store is
+// bounded, in-memory, mode-separated (Tor/direct), and never forwards Set-Cookie to
+// the browser. The general browser proxy remains entirely credential-less.
+const zuptCsrfCookies = new EphemeralCsrfCookieJar({
+  allowedOrigins: [ZUPT_WEB_ORIGIN],
+});
 
 // Build the per-token SOCKS proxy URL from TOR_PROXY, injecting <token>:<token> as
 // userinfo so Tor isolates the stream. Returns undefined if TOR_PROXY is unset or
@@ -188,9 +207,7 @@ const agentForToken = (token?: string): SocksProxyAgent | undefined => {
 const sanitizeIsoToken = (raw: string | string[] | undefined): string => {
   const value = Array.isArray(raw) ? raw[0] : raw;
 
-  return typeof value === "string" && /^[a-z0-9]{8,64}$/i.test(value)
-    ? value
-    : "";
+  return typeof value === "string" && /^[\da-f]{32}$/.test(value) ? value : "";
 };
 
 // Optional memory-safe Rust sidecar (see sidecar/). When PROXY_SIDECAR_URL is set,
@@ -230,10 +247,11 @@ const FORWARD_RESPONSE_HEADERS = new Set([
 // STRICTLY the bytes needed to interpret the body: the content-type (with its
 // multipart boundary), and content-language. We deliberately do NOT forward
 // cookies, authorization, referer, origin, the real user-agent or ANY other client
-// header — the proxy stays cookie-less / identity-less in BOTH directions, exactly
-// like the GET path. content-length is recomputed in httpRequest from the buffer we
-// actually send (never trusted from the client). content-encoding is NOT forwarded:
-// we send the body verbatim and label it as-is.
+// header. The caller may separately add the server-owned ZUPT CSRF cookie for an
+// exact, isolated app session; no browser cookie is ever accepted. content-length
+// is recomputed in httpRequest from the buffer we actually send (never trusted from
+// the client). content-encoding is NOT forwarded: we send the body verbatim and
+// label it as-is.
 const FORWARD_REQUEST_HEADERS = new Set(["content-type", "content-language"]);
 
 // Build the upstream request headers for a forwarded body from the allowlist above.
@@ -454,7 +472,9 @@ const httpRequest = (
     // `bodyToSend` is the definite Buffer to write (undefined => no body), which also
     // lets TypeScript narrow it cleanly at both use sites below.
     const bodyToSend =
-      body !== undefined && body.length > 0 && !BODYLESS_METHODS.has(upperMethod)
+      body !== undefined &&
+      body.length > 0 &&
+      !BODYLESS_METHODS.has(upperMethod)
         ? body
         : undefined;
     // Global buffered-bytes accounting for THIS request: subtract exactly what we
@@ -545,7 +565,8 @@ const httpRequest = (
         let cap = maxBytes;
 
         if (!isRedirect) {
-          if (status === 206 || isMedia) cap = Math.max(maxBytes, MAX_BIN_BYTES);
+          if (status === 206 || isMedia)
+            cap = Math.max(maxBytes, MAX_BIN_BYTES);
           else if (isAttachment || isBinaryDownloadType) {
             cap = Math.max(maxBytes, MAX_DOWNLOAD_BYTES);
           }
@@ -688,6 +709,8 @@ const ourOrigin = (req: NextApiRequest): string => {
 
 const SKIP_URL =
   /^(?:#|data:|blob:|javascript:|vbscript:|view-source:|mhtml:|mailto:|tel:|about:|\{)/i;
+const KEYWAVE_ORIGINS = new Set(["https://chat.securityops.co"]);
+const isKeywaveUrl = (url: URL): boolean => KEYWAVE_ORIGINS.has(url.origin);
 
 // CSP for proxied HTML.
 //
@@ -706,8 +729,9 @@ const SKIP_URL =
 // no-JS / Tor Browser path (the strict policy below).
 const proxiedCsp = (
   noJs: boolean,
-  app = false,
-  origin = "'self'"
+  confinedApp = false,
+  origin = "'self'",
+  isDirect = false
 ): string =>
   noJs
     ? [
@@ -722,37 +746,52 @@ const proxiedCsp = (
         "object-src 'none'",
         "form-action 'self'",
       ].join("; ")
-    : app
-    ? // Embedded-app mode (&app=1): the page renders in an OPAQUE-origin sandbox and
-      // CAN still load a CROSS-ORIGIN child frame or worker. The clientShim rewrites
-      // fetch/XHR/WS but NOT a dynamically-set iframe.src, so an app that injects its
-      // own sandbox subframe on another origin (CryptPad) would otherwise fetch it
-      // DIRECTLY — off Tor — leaking the real IP. Pin frames/workers to our OWN proxy
-      // origin (which routes back through /api/proxy over Tor), so any such request
-      // FAILS CLOSED instead of leaking. `origin` is the concrete scheme://host (NOT
-      // 'self', which would mean the opaque origin and match nothing), so our own
-      // statically-rewritten same-origin frames still load. connect-src stays open for
-      // the shim's fetch/XHR/WebSocket re-proxy (WebRTC is blocked in the shim).
-      `frame-src ${origin} blob: data:; child-src ${origin} blob:; worker-src ${origin} blob:; object-src 'none'`
+    : confinedApp || !isDirect
+    ? [
+        // The document has an opaque sandbox origin, so use the concrete SecurityOS
+        // origin instead of 'self'. Every executable/network-capable resource must
+        // return through the proxy. This applies to Tor browsing and to embedded
+        // apps (including direct ZUPT): a dynamically-created raw remote URL fails
+        // closed instead of bypassing the rewriting shim or leaking an IP.
+        `default-src ${origin} data: blob:`,
+        `script-src ${origin} 'unsafe-inline' 'unsafe-eval' blob:`,
+        `style-src ${origin} 'unsafe-inline'`,
+        `img-src ${origin} data: blob:`,
+        `media-src ${origin} data: blob:`,
+        `font-src ${origin} data:`,
+        `connect-src ${origin}`,
+        `frame-src ${origin} blob: data:`,
+        `child-src ${origin} blob:`,
+        `worker-src ${origin} blob:`,
+        "object-src 'none'",
+        `form-action ${origin}`,
+      ].join("; ")
     : "object-src 'none'";
 
 // Mode flags carried on every rewritten URL so that navigating a link/resource
 // keeps the exact same proxy mode (no-JS, extension, adblock, LibreJS, direct/Tor).
 type ProxyFlags = {
-  noJs: boolean;
-  injectExt: boolean;
   adblock: boolean;
-  libreJs: boolean;
-  isDirect: boolean;
   // Embedded-app mode (&app=1, set by CryptPad/WhatsApp/Telegram): forces the Node
   // path so the clientShim is injected (the Rust sidecar injects none), and turns on
   // the extra in-memory IndexedDB shim. Carried on every rewritten URL so the app's
   // own sub-resources/sub-iframes stay on the shimmed Node path too. Does NOT change
   // circuit selection / SSRF / fail-closed — only sidecar-bypass + shim injection.
   app: boolean;
+  injectExt: boolean;
+  isDirect: boolean;
   // Per-tab Tor stream-isolation token: carried on every rewritten URL so links,
   // sub-resources and GET-form submits stay on the SAME tab circuit. Empty -> none.
   iso: string;
+  // Exact-host Keywave compatibility: preserve the Tor text/control route on
+  // rewritten assets and give its same-origin Socket.IO client the real upstream
+  // origin. This never enables WebRTC, direct egress, or a generic relay.
+  keywave: boolean;
+  libreJs: boolean;
+  noJs: boolean;
+  // Exact-origin ZUPT mode: forces the Node path and carries the isolated,
+  // server-owned CSRF session across rewritten forms/resources.
+  zupt: boolean;
 };
 
 const flagQuery = (f: ProxyFlags): string =>
@@ -760,7 +799,9 @@ const flagQuery = (f: ProxyFlags): string =>
     f.adblock ? "&adblock=1" : ""
   }${f.libreJs ? "&librejs=1" : ""}${f.isDirect ? "&direct=1" : ""}${
     f.app ? "&app=1" : ""
-  }${f.iso ? `&iso=${f.iso}` : ""}`;
+  }${f.keywave ? "&keywave=1" : ""}${f.zupt ? "&zupt=1" : ""}${
+    f.iso ? `&iso=${f.iso}` : ""
+  }`;
 
 const proxify = (
   rawUrl: string,
@@ -792,13 +833,18 @@ const proxify = (
 const clientShim = (
   proxyPrefix: string,
   base: string,
-  isDirect: boolean,
-  isApp: boolean
+  flags: ProxyFlags
 ): string =>
   `<script>(function(){if(window.__sosShimmed)return;window.__sosShimmed=1;var P=${JSON.stringify(
     proxyPrefix
-  )},B=${JSON.stringify(base)};function abs(u){try{return new URL(u,B).href}catch(e){return u}}function px(u){if(u==null)return u;var s=String(u);if(/^(data:|blob:|javascript:|about:|#|mailto:|tel:)/i.test(s))return u;if(s.indexOf(P)===0)return u;var a=abs(s);if(!/^https?:/i.test(a))return u;return P+encodeURIComponent(a)}try{var of=window.fetch;if(of)window.fetch=function(i,init){try{if(typeof i==="string")i=px(i);else if(i&&i.url)i=new Request(px(i.url),i)}catch(e){}return of.call(this,i,init)};var xo=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u){var a=[].slice.call(arguments);try{a[1]=px(u)}catch(e){}return xo.apply(this,a)};if(navigator.sendBeacon){var sb=navigator.sendBeacon.bind(navigator);navigator.sendBeacon=function(u,d){try{u=px(u)}catch(e){}return sb(u,d)}}var ES=window.EventSource;if(ES){window.EventSource=function(u,c){try{u=px(u)}catch(e){}return new ES(u,c)};window.EventSource.prototype=ES.prototype}window.open=function(u){try{if(u)parent.postMessage({__sosNewTab:px(String(u))},"*")}catch(e){}return null};document.addEventListener("click",function(e){var t=e.target;while(t&&t.tagName!=="A")t=t.parentNode;if(t&&t.href&&(e.ctrlKey||e.metaKey||e.button===1)){e.preventDefault();try{parent.postMessage({__sosNewTab:t.href},"*")}catch(x){}}},true);function _pt(){try{parent.postMessage({__sosTitle:document.title||"",__sosHref:location.href},"*")}catch(e){}}document.addEventListener("DOMContentLoaded",_pt);addEventListener("load",_pt);setTimeout(_pt,1200);var _D=${isDirect ? "1" : "0"};var _OWS=window.WebSocket;var _WSP=(location.protocol==="https:"?"wss://":"ws://")+location.host+"/api/ws?url=";function _SWS(u,p){try{var s=String(u);if(/^wss?:/i.test(s)){var t=_WSP+encodeURIComponent(s)+(_D?"&direct=1":"");return p!==undefined?new _OWS(t,p):new _OWS(t)}}catch(e){}return p!==undefined?new _OWS(u,p):new _OWS(u)}try{_SWS.prototype=_OWS.prototype;_SWS.CONNECTING=0;_SWS.OPEN=1;_SWS.CLOSING=2;_SWS.CLOSED=3;window.WebSocket=_SWS}catch(e){}var _rtc=function(){throw new Error("WebRTC blocked by SecurityOS privacy proxy (would leak your real IP, bypassing Tor)")};try{window.RTCPeerConnection=_rtc;window.webkitRTCPeerConnection=_rtc;window.mozRTCPeerConnection=_rtc;window.RTCDataChannel=_rtc;if(navigator.mediaDevices){navigator.mediaDevices.getUserMedia=function(){return Promise.reject(new Error("blocked"))}}}catch(e){}var _MEM=function(){var d={};var o={getItem:function(k){return Object.prototype.hasOwnProperty.call(d,k)?d[k]:null},setItem:function(k,v){d[k]=String(v)},removeItem:function(k){delete d[k]},clear:function(){for(var k in d){delete d[k]}},key:function(i){return Object.keys(d)[i]||null}};try{Object.defineProperty(o,"length",{get:function(){return Object.keys(d).length}})}catch(e){}return o};function _shimStore(n){try{void window[n].length}catch(e){try{Object.defineProperty(window,n,{configurable:true,value:_MEM()})}catch(e2){}}}_shimStore("localStorage");_shimStore("sessionStorage");${
-    isApp
+  )},B=${JSON.stringify(base)},F=${JSON.stringify(
+    flagQuery(flags)
+  )};function abs(u){try{return new URL(u,B).href}catch(e){return u}}function px(u){if(u==null)return u;var s=String(u);if(/^(data:|blob:|javascript:|about:|#|mailto:|tel:)/i.test(s))return u;if(s.indexOf(P)===0)return u;var a=abs(s);if(!/^https?:/i.test(a))return u;return P+encodeURIComponent(a)+F}try{var of=window.fetch;if(of)window.fetch=function(i,init){try{if(typeof i==="string")i=px(i);else if(i&&i.url)i=new Request(px(i.url),i)}catch(e){}return of.call(this,i,init)};var xo=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u){var a=[].slice.call(arguments);try{a[1]=px(u)}catch(e){}return xo.apply(this,a)};if(navigator.sendBeacon){var sb=navigator.sendBeacon.bind(navigator);navigator.sendBeacon=function(u,d){try{u=px(u)}catch(e){}return sb(u,d)}}var ES=window.EventSource;if(ES){window.EventSource=function(u,c){try{u=px(u)}catch(e){}return new ES(u,c)};window.EventSource.prototype=ES.prototype}window.open=function(u){try{if(u)parent.postMessage({__sosNewTab:px(String(u))},"*")}catch(e){}return null};document.addEventListener("click",function(e){var t=e.target;while(t&&t.tagName!=="A")t=t.parentNode;if(t&&t.href&&(e.ctrlKey||e.metaKey||e.button===1)){e.preventDefault();try{parent.postMessage({__sosNewTab:t.href},"*")}catch(x){}}},true);function _pt(){try{parent.postMessage({__sosTitle:document.title||"",__sosHref:location.href},"*")}catch(e){}}document.addEventListener("DOMContentLoaded",_pt);addEventListener("load",_pt);setTimeout(_pt,1200);var _D=${
+    flags.isDirect ? "1" : "0"
+  };var _I=${JSON.stringify(
+    flags.iso
+  )};var _OWS=window.WebSocket;var _WSP=(location.protocol==="https:"?"wss://":"ws://")+location.host+"/api/ws?url=";function _SWS(u,p){try{var s=String(u);if(/^wss?:/i.test(s)){var t=_WSP+encodeURIComponent(s)+(_D?"&direct=1":"")+(_I?"&iso="+encodeURIComponent(_I):"");return p!==undefined?new _OWS(t,p):new _OWS(t)}}catch(e){}return p!==undefined?new _OWS(u,p):new _OWS(u)}try{_SWS.prototype=_OWS.prototype;_SWS.CONNECTING=0;_SWS.OPEN=1;_SWS.CLOSING=2;_SWS.CLOSED=3;window.WebSocket=_SWS}catch(e){}var _rtc=function(){throw new Error("WebRTC blocked by SecurityOS privacy proxy (would leak your real IP, bypassing Tor)")};try{window.RTCPeerConnection=_rtc;window.webkitRTCPeerConnection=_rtc;window.mozRTCPeerConnection=_rtc;window.RTCDataChannel=_rtc;if(navigator.mediaDevices){navigator.mediaDevices.getUserMedia=function(){return Promise.reject(new Error("blocked"))}}}catch(e){}var _MEM=function(){var d={};var o={getItem:function(k){return Object.prototype.hasOwnProperty.call(d,k)?d[k]:null},setItem:function(k,v){d[k]=String(v)},removeItem:function(k){delete d[k]},clear:function(){for(var k in d){delete d[k]}},key:function(i){return Object.keys(d)[i]||null}};try{Object.defineProperty(o,"length",{get:function(){return Object.keys(d).length}})}catch(e){}return o};function _shimStore(n){try{void window[n].length}catch(e){try{Object.defineProperty(window,n,{configurable:true,value:_MEM()})}catch(e2){}}}_shimStore("localStorage");_shimStore("sessionStorage");${
+    flags.app
       ? 'try{try{void navigator.serviceWorker}catch(e){try{Object.defineProperty(navigator,"serviceWorker",{configurable:true,value:{controller:null,oncontrollerchange:null,onmessage:null,ready:new Promise(function(){}),register:function(){return Promise.reject(new Error("SecurityOS: service workers are disabled in the privacy sandbox"))},getRegistration:function(){return Promise.resolve(undefined)},getRegistrations:function(){return Promise.resolve([])},startMessages:function(){},addEventListener:function(){},removeEventListener:function(){}}})}catch(e2){}}}catch(x){}try{try{void window.caches}catch(e){try{var _nc={match:function(){return Promise.resolve(undefined)},add:function(){return Promise.resolve()},addAll:function(){return Promise.resolve()},put:function(){return Promise.resolve()},"delete":function(){return Promise.resolve(false)},keys:function(){return Promise.resolve([])}};Object.defineProperty(window,"caches",{configurable:true,value:{open:function(){return Promise.resolve(_nc)},match:function(){return Promise.resolve(undefined)},has:function(){return Promise.resolve(false)},"delete":function(){return Promise.resolve(false)},keys:function(){return Promise.resolve([])}}})}catch(e2){}}}catch(x){}function _idbShim(){var S={};function dsl(a){a.contains=function(x){return a.indexOf(x)>-1};a.item=function(i){return a[i]};return a}function rq(v){return{result:v,error:null,onsuccess:null,onerror:null,onupgradeneeded:null,readyState:"pending",addEventListener:function(t,f){this["on"+t]=f},removeEventListener:function(){}}}function done(r,e){setTimeout(function(){r.readyState="done";var h=r["on"+e];if(h){try{h.call(r,{target:r,type:e})}catch(x){}}},0);return r}function res(v){return done(rq(v),"success")}function idx(){return{get:function(){return res(undefined)},getAll:function(){return res([])},getAllKeys:function(){return res([])},count:function(){return res(0)},openCursor:function(){return res(null)},openKeyCursor:function(){return res(null)}}}function st(n){if(!S[n])S[n]=new Map();var m=S[n];var s={name:n,keyPath:null,autoIncrement:false,indexNames:dsl([]),get:function(k){return res(m.has(k)?m.get(k):undefined)},getAll:function(){return res(Array.from(m.values()))},getAllKeys:function(){return res(Array.from(m.keys()))},put:function(v,k){var key=k!==undefined?k:v&&v.key;m.set(key,v);return res(key)},add:function(v,k){var key=k!==undefined?k:v&&v.key;m.set(key,v);return res(key)},delete:function(k){m.delete(k);return res(undefined)},clear:function(){m.clear();return res(undefined)},count:function(){return res(m.size)},openCursor:function(){return res(null)},openKeyCursor:function(){return res(null)},index:function(){return idx()},createIndex:function(){return idx()},deleteIndex:function(){}};return s}function tx(){var t={objectStore:function(n){return st(n)},abort:function(){},oncomplete:null,onerror:null,onabort:null,addEventListener:function(e,f){this["on"+e]=f},removeEventListener:function(){}};setTimeout(function(){if(t.oncomplete){try{t.oncomplete({target:t,type:"complete"})}catch(x){}}},0);return t}function db(n){var d={name:n,version:1,objectStoreNames:dsl(Object.keys(S)),createObjectStore:function(nm){var s=st(nm);d.objectStoreNames=dsl(Object.keys(S));return s},deleteObjectStore:function(nm){delete S[nm];d.objectStoreNames=dsl(Object.keys(S))},transaction:function(){return tx()},close:function(){},addEventListener:function(){},removeEventListener:function(){},onversionchange:null,onerror:null,onabort:null,onclose:null};return d}var F={open:function(n,v){var r=rq(null);setTimeout(function(){var d=db(n);r.result=d;if(r.onupgradeneeded){r.transaction=tx();try{r.onupgradeneeded({target:r,type:"upgradeneeded",oldVersion:0,newVersion:v||1})}catch(x){}}r.readyState="done";if(r.onsuccess){try{r.onsuccess({target:r,type:"success"})}catch(x){}}},0);return r},deleteDatabase:function(){return res(undefined)},databases:function(){return Promise.resolve([])},cmp:function(a,b){return a<b?-1:a>b?1:0}};try{Object.defineProperty(window,"indexedDB",{configurable:true,value:F})}catch(x){try{window.indexedDB=F}catch(y){}}var KR={bound:function(){return{}},lowerBound:function(){return{}},upperBound:function(){return{}},only:function(){return{}}};try{if(!window.IDBKeyRange)window.IDBKeyRange=KR}catch(x){}try{console.warn("SecurityOS: in-memory IndexedDB shim active (amnesic) - non-persistent in this sandbox.")}catch(x){}}try{var _ni=false;try{if(!window.indexedDB)_ni=true;else void window.indexedDB.cmp}catch(x){_ni=true}if(_ni)_idbShim()}catch(x){}'
       : ""
   }}catch(e){}})();</script>`;
@@ -912,17 +958,21 @@ const rewriteHtml = (
   adblock: boolean,
   isDirect: boolean,
   app: boolean,
+  keywave: boolean,
+  zupt: boolean,
   iso: string
 ): string => {
   const proxyPrefix = `${origin}/api/proxy?url=`;
   const flags: ProxyFlags = {
-    noJs,
-    injectExt,
     adblock,
-    libreJs,
-    isDirect,
     app,
+    injectExt,
+    isDirect,
     iso,
+    keywave,
+    libreJs,
+    noJs,
+    zupt,
   };
   const px = (u: string): string => proxify(u, base, origin, flags);
   let out = html;
@@ -1062,6 +1112,7 @@ const rewriteHtml = (
       (adblock ? `<input type="hidden" name="adblock" value="1">` : "") +
       (isDirect ? `<input type="hidden" name="direct" value="1">` : "") +
       (app ? `<input type="hidden" name="app" value="1">` : "") +
+      (zupt ? `<input type="hidden" name="zupt" value="1">` : "") +
       (iso ? `<input type="hidden" name="iso" value="${esc(iso)}">` : "");
 
     return `<form${newAttrs}>${hidden}`;
@@ -1152,8 +1203,43 @@ const rewriteHtml = (
   // network requests are blocked). Works even with scripts stripped.
   const adblockStyle = adblock ? `<style>${ADBLOCK_COSMETIC_CSS}</style>` : "";
 
+  // Keywave calls `io({...})` without an origin because its normal document lives
+  // at chat.securityops.co. A rewritten document lives at /api/proxy instead, so
+  // Socket.IO would otherwise target the SecurityOS origin and never reach the
+  // service. Rewrite only that exact assignment, and only for the exact-host,
+  // Tor-only `keywave` mode validated by the request handler below. XHR then goes
+  // back through /api/proxy and WebSocket through the narrow /api/ws allowlist.
+  if (keywave) {
+    const signalingOrigin = new URL(base).origin;
+    let signalingRewritten = false;
+
+    out = out.replace(
+      /(\bS\.socket\s*=\s*io)\(\s*{\s*transports\s*:/,
+      (_match, assignment: string) => {
+        signalingRewritten = true;
+
+        return `${assignment}(${JSON.stringify(
+          signalingOrigin
+        )}, { transports:`;
+      }
+    );
+
+    if (!signalingRewritten) {
+      const notice =
+        '<div role="alert" style="background:#19090d;border:2px solid #ff4d6d;color:#ffe8ed;' +
+        'font:600 14px/1.5 system-ui,sans-serif;inset:16px;padding:18px;position:fixed;z-index:2147483647">' +
+        "Keywave compatibility check failed: its signaling bootstrap changed. " +
+        "SecurityOS stopped the Tor integration instead of silently showing a disconnected client. " +
+        "Use the explicitly marked direct full-client action while the proxy adapter is updated.</div>";
+
+      out = /<body\b[^>]*>/i.test(out)
+        ? out.replace(/(<body\b[^>]*>)/i, `$1${notice}`)
+        : `${notice}${out}`;
+    }
+  }
+
   const head = `${
-    noJs ? "" : clientShim(proxyPrefix, base, isDirect, app)
+    noJs ? "" : clientShim(proxyPrefix, base, flags)
   }<base href="${base.replace(
     /"/g,
     "&quot;"
@@ -1253,6 +1339,12 @@ const handler = async (
   const isApp =
     req.query.app === "1" ||
     (Array.isArray(req.query.app) && req.query.app.includes("1"));
+  const requestedKeywave =
+    req.query.keywave === "1" ||
+    (Array.isArray(req.query.keywave) && req.query.keywave.includes("1"));
+  const requestedZupt =
+    req.query.zupt === "1" ||
+    (Array.isArray(req.query.zupt) && req.query.zupt.includes("1"));
   // Tor stream isolation: an opaque per-tab token (&iso=<token>) routes this fetch
   // through its own Tor circuit (separate exit IP), so different tabs can't be
   // correlated by a shared exit and "New Tor circuit" rotates a tab's token for a
@@ -1284,6 +1376,8 @@ const handler = async (
         "librejs",
         "adblock",
         "app",
+        "keywave",
+        "zupt",
         "iso",
       ]);
 
@@ -1307,6 +1401,15 @@ const handler = async (
     res.status(400).setHeader("Content-Type", "text/plain").end("Invalid url");
     return;
   }
+
+  // The signaling rewrite is accepted only for the live first-party Keywave
+  // origin and never on direct egress. A forged `keywave=1` elsewhere is inert.
+  const isKeywave = requestedKeywave && !isDirect && isKeywaveUrl(target);
+  // ZUPT's privileged compatibility mode is exact-origin only. A forged zupt=1
+  // on any other target is inert and receives neither cookies nor special routing.
+  const isZupt = requestedZupt && target.origin === ZUPT_WEB_ORIGIN && !isBin;
+  const cookieSession =
+    isZupt && isoToken ? proxyCookieSessionKey(isoToken, isDirect) : "";
 
   res.setHeader("Referrer-Policy", "no-referrer");
   res.setHeader("X-Robots-Tag", "noindex, nofollow");
@@ -1368,6 +1471,8 @@ const handler = async (
     // the in-memory storage + IndexedDB shim and the fetch/XHR/WebSocket re-proxy —
     // which the Rust sidecar does NOT inject. Keep them on the Node path.
     !isApp &&
+    !isKeywave &&
+    !isZupt &&
     // Stream-isolation requests must use the Node path so they route through the
     // per-token Tor circuit (the sidecar has its own non-isolated circuit).
     !isoToken &&
@@ -1404,6 +1509,7 @@ const handler = async (
   try {
     let current = target;
     let response: ProxyResponse | undefined;
+    const isZuptCookieSession = Boolean(cookieSession);
     // Byte budget is CUMULATIVE across redirect hops, so a redirect chain can't
     // multiply the per-hop cap (6 hops * 512 MB) into an OOM. Each hop is capped at
     // whatever budget remains.
@@ -1420,16 +1526,36 @@ const handler = async (
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
       // eslint-disable-next-line no-await-in-loop
       const pinnedIp = await assertAllowedUrl(current, isDirect);
+      // Recompute the server-owned cookie for EVERY hop. The jar itself requires
+      // exact share.securityops.co + HTTPS, so a redirect can never carry ZUPT's
+      // CSRF credential onto another host (or onto plaintext HTTP).
+      const csrfCookie = isZuptCookieSession
+        ? zuptCsrfCookies.getCookieHeader(cookieSession, current)
+        : undefined;
       // eslint-disable-next-line no-await-in-loop
       response = await httpRequest(current.href, {
         maxBytes: budget,
         useTor: !isDirect,
         pinnedIp,
-        extraHeaders: hopHeaders,
+        extraHeaders: {
+          ...hopHeaders,
+          ...(csrfCookie ? { Cookie: csrfCookie } : {}),
+        },
         torAgent,
         method: hopMethod,
         body: hopBody,
       });
+
+      // Capture a rotated/new CSRF cookie before processing a redirect or returning
+      // the body. Set-Cookie is still absent from FORWARD_RESPONSE_HEADERS, so this
+      // value remains server-side and inaccessible to the sandboxed page.
+      if (isZuptCookieSession) {
+        zuptCsrfCookies.storeSetCookie(
+          cookieSession,
+          current,
+          response.headers["set-cookie"]
+        );
+      }
 
       budget -= response.body.length;
       if (budget <= 0 && response.status >= 300 && response.status < 400) {
@@ -1443,7 +1569,16 @@ const handler = async (
         // Re-validate EVERY hop (the new URL is run through assertAllowedUrl at the
         // top of the next iteration), so a redirect can't bounce a POST onto a
         // private/loopback/metadata host (SSRF) any more than a GET can.
-        current = new URL(location, current);
+        const next = new URL(location, current);
+
+        // A credentialed ZUPT operation may redirect only within the exact HTTPS
+        // origin. This is stricter than ordinary cookie rules and removes even the
+        // possibility of cross-origin redirect confusion in jar mode.
+        if (isZuptCookieSession && next.origin !== ZUPT_WEB_ORIGIN) {
+          throw new Error("credentialed-cross-origin-redirect");
+        }
+
+        current = next;
 
         // Method/body preservation per RFC 7231 / browser behaviour:
         //   • 307 / 308 — repeat the request UNCHANGED (same method + body): we
@@ -1500,12 +1635,12 @@ const handler = async (
     if (/\b(text\/html|application\/xhtml\+xml)\b/i.test(contentType)) {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       // Same-origin CSP so anything the rewriter missed still can't reach a remote
-      // host (no-JS also gets script-src 'none'; the iframe drops allow-scripts). In
-      // &app=1 mode we also pin frame/worker-src to our concrete origin so a
-      // dynamically-injected cross-origin subframe fails closed instead of leaking.
+      // host (no-JS also gets script-src 'none'; the iframe drops allow-scripts).
+      // Confined app modes pin every active resource to our concrete origin so a
+      // dynamically-created remote request fails closed instead of leaking.
       res.setHeader(
         "Content-Security-Policy",
-        proxiedCsp(noJs, isApp, ourOrigin(req))
+        proxiedCsp(noJs, isApp || isZupt, ourOrigin(req), isDirect)
       );
       res.end(
         rewriteHtml(
@@ -1518,6 +1653,8 @@ const handler = async (
           adblock,
           isDirect,
           isApp,
+          isKeywave && isKeywaveUrl(current),
+          isZupt && current.origin === ZUPT_WEB_ORIGIN,
           isoToken
         )
       );
@@ -1525,10 +1662,7 @@ const handler = async (
       // Defense in depth on non-HTML/binary bodies: even if a body is mislabeled or
       // content-sniffed, an empty default-src + sandbox means it can't execute or
       // pull in anything. X-Content-Type-Options: nosniff is already set above.
-      res.setHeader(
-        "Content-Security-Policy",
-        "default-src 'none'; sandbox"
-      );
+      res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
 
       // Immutable sub-resources (images, fonts, CSS, JS) are safe to keep in the
       // BROWSER's memory cache: a short private max-age lets back/forward and revisits

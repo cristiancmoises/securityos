@@ -77,8 +77,9 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
   const [webcamPosition, setWebcamPosition] =
     useState<PipPosition>("bottom-right");
   const [webcamSize, setWebcamSize] = useState<PipSize>("medium");
-  const [webcamEffect, setWebcamEffect] =
-    useState<WebcamEffect>(DEFAULT_WEBCAM_EFFECT);
+  const [webcamEffect, setWebcamEffect] = useState<WebcamEffect>(
+    DEFAULT_WEBCAM_EFFECT
+  );
   const [frameRate, setFrameRate] = useState<RecordFrameRate>(30);
   const [quality, setQuality] = useState<QualityPreset>("balanced");
   // Pre-recording countdown (seconds) before the recorder starts.
@@ -129,8 +130,7 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
   // Whether the small live webcam-effect preview should be active: the overlay
   // is enabled and we're idle (not counting/recording — the recorder owns the
   // camera then, and most browsers won't open it twice).
-  const showWebcamPreview =
-    canWebcam && webcam && !isRecording && !counting;
+  const showWebcamPreview = canWebcam && webcam && !isRecording && !counting;
 
   // Live preview of the chosen webcam theme. Opens a low-res webcam stream and
   // runs the same effect renderer used by the recording draw loop, so the user
@@ -540,7 +540,11 @@ const ScreenCapture: FC<ComponentProcessProps> = () => {
           {recordButtonLabel}
         </button>
         {isRecording && (
-          <button className="pause" onClick={pauseResumeRecording} type="button">
+          <button
+            className="pause"
+            onClick={pauseResumeRecording}
+            type="button"
+          >
             {isPaused ? "▶ Resume" : "⏸ Pause"}
           </button>
         )}

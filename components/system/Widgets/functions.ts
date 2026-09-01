@@ -71,9 +71,7 @@ export const weatherCodeToInfo = (
 
 /** A readable, single-line label for a location. */
 export const formatLocation = (location: WeatherLocation): string =>
-  [location.name, location.admin1, location.country]
-    .filter(Boolean)
-    .join(", ");
+  [location.name, location.admin1, location.country].filter(Boolean).join(", ");
 
 /** Short weekday label (e.g. "Mon") for a `YYYY-MM-DD` date string. */
 export const shortDay = (isoDate: string): string => {

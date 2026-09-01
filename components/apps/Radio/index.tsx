@@ -353,10 +353,10 @@ const Radio: FC<ComponentProcessProps> = ({ id }) => {
             {streamError
               ? streamError
               : current
-                ? playing
-                  ? `● Live${current.country ? ` · ${current.country}` : ""}`
-                  : "Paused"
-                : "Pick a station to start listening"}
+              ? playing
+                ? `● Live${current.country ? ` · ${current.country}` : ""}`
+                : "Paused"
+              : "Pick a station to start listening"}
           </div>
         </div>
         <div className="volume">

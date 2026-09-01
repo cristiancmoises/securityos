@@ -15,7 +15,7 @@ axum = "0.7"
 serde = { version = "1", features = ["derive"] }
 # rustls (not OpenSSL) keeps the build self-contained; socks enables Tor SOCKS5h.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "socks", "gzip", "brotli", "deflate"] }
-lol_html = "1"
+lol_html = "2.9"
 url = "2"
 percent-encoding = "2"
 bytes = "1"

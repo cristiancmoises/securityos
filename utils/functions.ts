@@ -25,12 +25,14 @@ import {
 export const SEARCH_QUERY =
   "http://torchdeedp3i2jigzjdmfpn5ttjhthh5wbmda2rr3jvqjg5p77c54dqd.onion/search?query=";
 
-export const bufferToBlob = (buffer: Buffer, type?: string): Blob =>
-  new Blob([buffer], type ? { type } : undefined);
+export const bufferToBlob = (buffer: Uint8Array, type?: string): Blob =>
+  // Copy into a browser-owned ArrayBuffer. Node's Buffer type may be backed by a
+  // SharedArrayBuffer under modern TypeScript definitions, which BlobPart rejects.
+  new Blob([new Uint8Array(buffer)], type ? { type } : undefined);
 
-export const bufferToUrl = (buffer: Buffer, mimeType?: string): string =>
+export const bufferToUrl = (buffer: Uint8Array, mimeType?: string): string =>
   mimeType
-    ? `data:${mimeType};base64,${buffer.toString("base64")}`
+    ? `data:${mimeType};base64,${Buffer.from(buffer).toString("base64")}`
     : URL.createObjectURL(bufferToBlob(buffer));
 
 let dpi: number;
@@ -518,27 +520,57 @@ export const getTZOffsetISOString = (): string => {
   ).toISOString();
 };
 
+type BrowserHistoryState = {
+  history: string[];
+  position: number;
+};
+
+export const updateBrowserHistory = (
+  history: string[],
+  position: number,
+  address: string,
+  replaceCurrent = false
+): BrowserHistoryState => {
+  if (history[position] === address) return { history, position };
+
+  if (replaceCurrent && position >= 0) {
+    const replacementHistory = [...history];
+
+    replacementHistory[position] = address;
+
+    return { history: replacementHistory, position };
+  }
+
+  const appendedHistory = [...history.slice(0, position + 1), address];
+
+  return { history: appendedHistory, position: appendedHistory.length - 1 };
+};
+
 export const getUrlOrSearch = async (
   input: string,
   searchQuery: string = SEARCH_QUERY
 ): Promise<string> => {
-  const isIpfs = input.startsWith("ipfs://");
+  const value = input.trim();
+  const isIpfs = value.startsWith("ipfs://");
   const hasHttpSchema =
-    input.startsWith("http://") || input.startsWith("https://");
-  const host = input.split("/")[0].toLowerCase();
+    value.startsWith("http://") || value.startsWith("https://");
+  const authority = value.split(/[#/?]/, 1)[0].toLowerCase();
+  const host = authority.replace(/^\[|]$/g, "").replace(/:\d+$/, "");
   // Tor hidden services use http:// (they rarely have TLS); navigate, don't search.
   const isOnion = host.endsWith(".onion");
-  const hasTld =
-    input.endsWith(".com") ||
-    input.endsWith(".ca") ||
-    input.endsWith(".net") ||
-    input.endsWith(".org");
+  const isIpv4 = /^(?:\d{1,3}\.){3}\d{1,3}$/.test(host);
+  const isIpv6 = authority.startsWith("[") && authority.includes("]");
+  const isHostname =
+    host === "localhost" ||
+    /^(?=.{1,253}$)(?:[\da-z](?:[\da-z-]{0,61}[\da-z])?\.)+[\da-z](?:[\da-z-]{0,61}[\da-z])?$/i.test(
+      host
+    );
 
-  let candidate = input;
+  let candidate = value;
 
   if (!hasHttpSchema && !isIpfs) {
-    if (isOnion) candidate = `http://${input}`;
-    else if (hasTld) candidate = `https://${input}`;
+    if (isOnion) candidate = `http://${value}`;
+    else if (isHostname || isIpv4 || isIpv6) candidate = `https://${value}`;
   }
 
   try {
@@ -554,12 +586,12 @@ export const getUrlOrSearch = async (
     // (javascript:, data:, blob:, file:, vbscript:, …) is treated as a search
     // query so the address bar can never be used to script the embedder.
     if (url.protocol !== "http:" && url.protocol !== "https:") {
-      return `${searchQuery}${input}`;
+      return `${searchQuery}${encodeURIComponent(value)}`;
     }
 
     return url.href;
   } catch {
-    return `${searchQuery}${input}`;
+    return `${searchQuery}${encodeURIComponent(value)}`;
   }
 };
 

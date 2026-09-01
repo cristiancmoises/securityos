@@ -366,7 +366,8 @@ const StyledMatrix = styled.div`
 
   /* Sidebar tabs */
   .tabs {
-    border-bottom: 1px solid ${({ theme }) => theme.colors.window.outlineInactive};
+    border-bottom: 1px solid
+      ${({ theme }) => theme.colors.window.outlineInactive};
     display: flex;
     flex: 0 0 auto;
   }
@@ -410,7 +411,8 @@ const StyledMatrix = styled.div`
 
   /* Invites */
   .invites {
-    border-bottom: 1px solid ${({ theme }) => theme.colors.window.outlineInactive};
+    border-bottom: 1px solid
+      ${({ theme }) => theme.colors.window.outlineInactive};
   }
 
   .invite {
@@ -488,7 +490,8 @@ const StyledMatrix = styled.div`
 
   .result {
     align-items: center;
-    border-bottom: 1px solid ${({ theme }) => theme.colors.window.outlineInactive};
+    border-bottom: 1px solid
+      ${({ theme }) => theme.colors.window.outlineInactive};
     display: flex;
     gap: 6px;
     justify-content: space-between;

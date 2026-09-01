@@ -25,7 +25,10 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" vi
 
 const writeWebp = async (size, outPath) => {
   await mkdir(dirname(outPath), { recursive: true });
-  await sharp(Buffer.from(svg)).resize(size, size).webp({ quality: 92 }).toFile(outPath);
+  await sharp(Buffer.from(svg))
+    .resize(size, size)
+    .webp({ quality: 92 })
+    .toFile(outPath);
 };
 
 await writeWebp(ROOT_SIZE, join(ICONS_DIR, "cryptpad.webp"));

@@ -27,15 +27,18 @@ that runs entirely in your browser. No install, no tracking, no logs.
 - 💬 **Private chat & calls.** **Matrix** is a full end-to-end-encrypted chat
   client with every request tunneled over Tor to `matrix.securityops.co` — it
   decrypts encrypted rooms, joins federated rooms, and keeps your keys **in memory
-  only** (amnesic). **SecChat** is end-to-end-encrypted video chat.
+  only** (amnesic). **Keywave** offers a Tor-safe landing/control view and an explicit
+  direct full client for end-to-end-encrypted text and video calls.
 - 🟢 **Private messaging.** **Session** stays on the desktop; WhatsApp and Telegram
   remain available from the Start menu. Their official clients need a real window;
   use Tor Browser or Tails for anonymous access.
 - 🔎 **Instant search.** Open the **Start menu** and just start typing — it searches
   every app and file and launches the match (Enter opens the top hit).
-- 📁 **Encrypted file sharing over Tor.** **VaptVupt** opens the SecurityOps file
-  share's `.onion` through the privacy proxy — upload and download files in the
-  window (with an *Open in Tor Browser* fallback for script-heavy actions).
+- 📁 **ZUPT compression and encryption.** **VaptVupt** supports key generation,
+  uploads and downloads with an explicit **Tor** or **Clearnet** route. Tor is the
+  fail-closed default; Clearnet and the native full-client fallback are visibly
+  marked as not anonymous. Web operations run on the ZUPT server (which receives
+  uploaded plaintext/passwords/keys); use local Vaptvupt for on-device-only secrets.
 - 🔐 **Encrypted office suite, over Tor.** **CryptPad** (`office.securityops.co` —
   docs, sheets, code, drive) runs **inside the OS over Tor**, with real-time
   collaboration carried by a built-in WebSocket tunnel; upload/download in the window.
@@ -64,9 +67,9 @@ that runs entirely in your browser. No install, no tracking, no logs.
 | Join SecurityOps IRC over Tor | **IRC** |
 | Chat end-to-end encrypted (over Tor) | **Matrix** |
 | Message privately | **Session** (desktop) · WhatsApp / Telegram (Start menu) |
-| Share files (encrypted, over Tor) | **VaptVupt** |
+| Compress, encrypt or recover files | **VaptVupt** (Tor / Clearnet selector) |
 | Edit docs/sheets (encrypted, over Tor) | **CryptPad** |
-| Encrypted video chat | **SecChat** |
+| Encrypted video chat | **Keywave** (full client is direct, not anonymous) |
 | Listen to internet radio | **Radio** |
 | Edit code/text in real Emacs | **Cloudmacs** |
 | Record your screen | **Screen Capture** |

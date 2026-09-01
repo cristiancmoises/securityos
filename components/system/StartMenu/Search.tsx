@@ -84,7 +84,9 @@ const StartMenuSearch: FC<StartMenuSearchProps> = ({ toggleStartMenu }) => {
         key: `file:${path}`,
         label: basename(path),
         open: () => {
-          open(getProcessByFileExtension(ext) || TEXT_EDITORS[0], { url: path });
+          open(getProcessByFileExtension(ext) || TEXT_EDITORS[0], {
+            url: path,
+          });
           close();
         },
       });

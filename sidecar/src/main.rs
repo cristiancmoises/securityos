@@ -28,7 +28,10 @@ use axum::{
     routing::get,
     Router,
 };
-use lol_html::{element, rewrite_str, ElementContentHandlers, RewriteStrSettings, Selector};
+use lol_html::{
+    element, html_content::Element, rewrite_str, ElementContentHandlers, RewriteStrSettings,
+    Selector,
+};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::Deserialize;
 use std::borrow::Cow;
@@ -69,7 +72,9 @@ async fn main() {
 }
 
 fn tor_enabled() -> bool {
-    std::env::var("TOR_PROXY").map(|v| !v.is_empty()).unwrap_or(false)
+    std::env::var("TOR_PROXY")
+        .map(|v| !v.is_empty())
+        .unwrap_or(false)
 }
 
 fn build_client(pin: Option<(&str, &[SocketAddr])>) -> reqwest::Result<reqwest::Client> {
@@ -232,7 +237,7 @@ fn rewrite_html(html: &str, base: &Url, nojs: bool) -> Result<String, ()> {
                 let base = base.clone();
                 let handler: (Cow<Selector>, ElementContentHandlers) = (
                     Cow::Owned(format!("[{attr}]").parse().unwrap()),
-                    ElementContentHandlers::default().element(move |el| {
+                    ElementContentHandlers::default().element(move |el: &mut Element| {
                         if let Some(val) = el.get_attribute(&attr) {
                             let _ = el.set_attribute(&attr, &proxify(&val, &base, nojs));
                         }
@@ -263,7 +268,11 @@ fn rewrite_html(html: &str, base: &Url, nojs: bool) -> Result<String, ()> {
             .unwrap_or_default()
             .to_ascii_lowercase();
         let action_abs = form_base
-            .join(if action_raw.is_empty() { "./" } else { &action_raw })
+            .join(if action_raw.is_empty() {
+                "./"
+            } else {
+                &action_raw
+            })
             .map(|u| u.to_string())
             .unwrap_or_else(|_| form_base.to_string());
 
@@ -357,7 +366,11 @@ async fn handle(Query(q): Query<ProxyQuery>) -> Response {
             if hop == MAX_REDIRECTS {
                 return error_response(false);
             }
-            if let Some(loc) = resp.headers().get(header::LOCATION).and_then(|v| v.to_str().ok()) {
+            if let Some(loc) = resp
+                .headers()
+                .get(header::LOCATION)
+                .and_then(|v| v.to_str().ok())
+            {
                 match current.join(loc) {
                     Ok(next) => {
                         current = next;
@@ -396,13 +409,17 @@ async fn handle(Query(q): Query<ProxyQuery>) -> Response {
         header::CACHE_CONTROL,
         HeaderValue::from_static("no-store, no-cache, must-revalidate"),
     );
-    out_headers.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+    out_headers.insert(
+        header::REFERRER_POLICY,
+        HeaderValue::from_static("no-referrer"),
+    );
     out_headers.insert(
         header::X_CONTENT_TYPE_OPTIONS,
         HeaderValue::from_static("nosniff"),
     );
 
-    let is_html = content_type.contains("text/html") || content_type.contains("application/xhtml+xml");
+    let is_html =
+        content_type.contains("text/html") || content_type.contains("application/xhtml+xml");
 
     // Cap the body size.
     if let Some(len) = resp.content_length() {

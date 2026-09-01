@@ -7,13 +7,7 @@ import useLock, {
   setPin,
 } from "components/system/Lockscreen/useLock";
 import useLockClock from "components/system/Lockscreen/useLockClock";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PREVENT_SCROLL } from "utils/constants";
 import { haltEvent, label } from "utils/functions";
 
@@ -210,7 +204,10 @@ const Lockscreen: FC = () => {
       tabIndex={-1}
       {...label("Locked")}
     >
-      <div className="backdrop" style={background ? { background } : undefined} />
+      <div
+        className="backdrop"
+        style={background ? { background } : undefined}
+      />
       <div className="scrim" />
 
       <div className="clock-area">
@@ -315,7 +312,9 @@ const PinSettings: FC<PinSettingsProps> = ({ onClose }) => {
     // silently no-ops, which would leave the lock passwordless without the user
     // knowing. Surface that instead of pretending the PIN was set.
     if (pin1 && !hasPinStored()) {
-      setMessage("Couldn't save PIN — open SecurityOS over HTTPS (or localhost).");
+      setMessage(
+        "Couldn't save PIN — open SecurityOS over HTTPS (or localhost)."
+      );
 
       return;
     }

@@ -26,11 +26,7 @@ const useFilePaste = (directory: string): void => {
       // Don't hijack paste while the user is editing text somewhere.
       const target = event.target as HTMLElement | null;
 
-      if (
-        target?.closest?.(
-          "input, textarea, [contenteditable], select"
-        )
-      ) {
+      if (target?.closest?.("input, textarea, [contenteditable], select")) {
         return;
       }
 

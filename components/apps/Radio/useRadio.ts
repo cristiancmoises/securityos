@@ -51,7 +51,7 @@ const LS_FAVORITES = "securityos:radio:favorites";
 
 type Prefs = { country: string; tag: string };
 
-const readJson = <T,>(key: string, fallback: T): T => {
+const readJson = <T>(key: string, fallback: T): T => {
   if (typeof window === "undefined") return fallback;
   try {
     const raw = window.localStorage.getItem(key);
@@ -118,7 +118,7 @@ const dedupe = (stations: Station[]): Station[] => {
 
 // One mirror attempt: races the fetch against a per-host timeout and the caller's
 // abort signal, so a dead mirror is abandoned fast instead of hanging the search.
-const fetchHost = async <T,>(
+const fetchHost = async <T>(
   host: string,
   path: string,
   signal: AbortSignal
@@ -147,7 +147,7 @@ const fetchHost = async <T,>(
 // Fetch JSON from radio-browser, trying the remembered-good mirror first and then
 // the rest until one answers (DNS/network/5xx/timeout all fall through). The first
 // mirror that succeeds becomes `preferredHost` so later calls skip the dead ones.
-const apiFetch = async <T,>(path: string, signal: AbortSignal): Promise<T> => {
+const apiFetch = async <T>(path: string, signal: AbortSignal): Promise<T> => {
   const ordered = preferredHost
     ? [preferredHost, ...API_HOSTS.filter((host) => host !== preferredHost)]
     : API_HOSTS;
@@ -183,7 +183,11 @@ export type UseRadio = {
   favorites: Favorite[];
   isFavorite: (uuid: string) => boolean;
   loading: boolean;
-  search: (overrides?: { country?: string; name?: string; tag?: string }) => void;
+  search: (overrides?: {
+    country?: string;
+    name?: string;
+    tag?: string;
+  }) => void;
   searchTerm: string;
   setCountry: (country: string) => void;
   setSearchTerm: (term: string) => void;

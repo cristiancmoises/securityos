@@ -155,14 +155,15 @@ const useTerminal = (
   useEffect(() => {
     if (localEcho && terminal && !prompted) {
       const prompt = (): Promise<void> =>
-        localEcho
-          .read(`\r\n${cd.current}${PROMPT_CHARACTER}`)
-          .then((command) =>
-            processCommand.current?.(command).then(prompt).catch((e) => {
+        localEcho.read(`\r\n${cd.current}${PROMPT_CHARACTER}`).then((command) =>
+          processCommand
+            .current?.(command)
+            .then(prompt)
+            .catch((e) => {
               localEcho.println(String(e?.message || e));
               prompt();
             })
-          );
+        );
 
       localEcho.println(`${alias} [Version ${displayVersion()}]`);
       localEcho.println(`Por ${author.name}. ${displayLicense}.`);

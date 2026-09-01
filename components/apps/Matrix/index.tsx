@@ -386,7 +386,9 @@ const Matrix: FC<ComponentProcessProps> = () => {
           >
             {dragOver && activeRoom && (
               <div className="drop-overlay">
-                <div className="drop-card">📎 Drop to send to {activeRoom.name}</div>
+                <div className="drop-card">
+                  📎 Drop to send to {activeRoom.name}
+                </div>
               </div>
             )}
             {activeRoom ? (
@@ -507,7 +509,9 @@ const Matrix: FC<ComponentProcessProps> = () => {
                 </div>
               </>
             ) : (
-              <div className="empty">Select a chat, or find people to message.</div>
+              <div className="empty">
+                Select a chat, or find people to message.
+              </div>
             )}
           </div>
         </div>
@@ -521,7 +525,9 @@ const Matrix: FC<ComponentProcessProps> = () => {
             }}
           >
             <h1>Matrix</h1>
-            <p className="sub">{HOMESERVER_LABEL} · end-to-end encrypted · over Tor</p>
+            <p className="sub">
+              {HOMESERVER_LABEL} · end-to-end encrypted · over Tor
+            </p>
             <label>
               Username
               <input
@@ -561,9 +567,13 @@ const Matrix: FC<ComponentProcessProps> = () => {
                 while the circuit builds.
               </p>
             ) : circuit === "warming" ? (
-              <p className="hint">⏳ Establishing Tor circuit — makes sign-in fast…</p>
+              <p className="hint">
+                ⏳ Establishing Tor circuit — makes sign-in fast…
+              </p>
             ) : circuit === "ready" ? (
-              <p className="hint">✓ Tor circuit ready — sign-in will be quick.</p>
+              <p className="hint">
+                ✓ Tor circuit ready — sign-in will be quick.
+              </p>
             ) : (
               <p className="hint">
                 Tor circuit is slow right now — sign-in may take up to a minute.

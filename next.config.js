@@ -39,14 +39,8 @@ const nextConfig = {
   // removed — they are Next 12-era keys that Next 16 rejects (the repo was bumped
   // to Next 16 by Dependabot without updating this config).
   //
-  // The repo is mid-migration: Next 16 requires TypeScript >= 5.1 but `typescript`
-  // is still pinned at 4.9.5, so Next's OWN generated `.next/types/validator.ts`
-  // fails the build's type-check under `isolatedModules`. App code is type-clean
-  // (verified separately with `tsc`). Skip the build-time type-check so the image
-  // builds; run `tsc` independently in CI. (Next 16 dropped the `eslint` config
-  // key and no longer lints during build; lint via `yarn eslint` separately.)
-  // PROPER FIX (follow-up): bump `typescript` to ^5.1 and re-enable type-checking.
-  typescript: { ignoreBuildErrors: true },
+  // Next 16 no longer runs ESLint during builds; lint via `yarn eslint` in CI.
+  // TypeScript validation remains enabled and is part of the production build.
   productionBrowserSourceMaps: false,
   reactStrictMode: true,
   // Do NOT auto-redirect "/path/" -> "/path". The Matrix homeserver REQUIRES the

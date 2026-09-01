@@ -200,7 +200,9 @@ const useFileContextMenu = (
             // the old contents. Works on any file/archive. (Browsers abstract the
             // physical medium, so this is best-effort — same caveat as the
             // shutdown CSPRNG wipe — not a guarantee against forensic recovery.)
-            const securePurge = async (mode: "random" | "zero"): Promise<void> => {
+            const securePurge = async (
+              mode: "random" | "zero"
+            ): Promise<void> => {
               if (
                 !window.confirm(
                   `Securely delete "${baseName}"? It will be overwritten (${
@@ -238,7 +240,9 @@ const useFileContextMenu = (
 
               const walk = async (target: string): Promise<void> => {
                 if ((await lstat(target)).isDirectory()) {
-                  await (await readdir(target)).reduce(async (chain, entry) => {
+                  await (
+                    await readdir(target)
+                  ).reduce(async (chain, entry) => {
                     await chain;
                     await walk(join(target, entry));
                   }, Promise.resolve());

@@ -1,8 +1,8 @@
 # Vaptvupt — Dual License (AGPL-3.0 **or** Commercial)
 
 **Vaptvupt** is the encryption / decryption tool bundled with SecurityOS. It
-produces and reads encrypted files in the **`.zupt`** format. (Note: *Vaptvupt*
-is the name of the tool; *`.zupt`* is only the file-format / extension — never a
+produces and reads encrypted files in the **`.zupt`** format. (Note: _Vaptvupt_
+is the name of the tool; _`.zupt`_ is only the file-format / extension — never a
 name for the tool itself.)
 
 Vaptvupt is **dual-licensed**. You may use, copy, modify, and distribute it under

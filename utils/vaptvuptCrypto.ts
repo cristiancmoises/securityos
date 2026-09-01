@@ -100,8 +100,9 @@ const getModule = (): Promise<VaptvuptModule> => {
     modulePromise = (async () => {
       await loadScript();
 
-      const factory = (window as unknown as { VaptvuptModule: () => Promise<VaptvuptModule> })
-        .VaptvuptModule;
+      const factory = (
+        window as unknown as { VaptvuptModule: () => Promise<VaptvuptModule> }
+      ).VaptvuptModule;
 
       return factory();
     })();
@@ -237,7 +238,11 @@ export const generateKeypair = async (): Promise<{
 
 // Short hex fingerprint of a key file (for display).
 export const keyFingerprint = async (keyFile: Buffer): Promise<string> => {
-  const digest = await crypto.subtle.digest("SHA-256", keyFile);
+  const digestInput = new Uint8Array(keyFile.byteLength);
+
+  digestInput.set(keyFile);
+
+  const digest = await crypto.subtle.digest("SHA-256", digestInput);
 
   return [...new Uint8Array(digest).subarray(0, 8)]
     .map((b) => b.toString(16).padStart(2, "0"))

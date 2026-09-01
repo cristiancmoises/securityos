@@ -1,14 +1,25 @@
 import { loadFiles } from "utils/functions";
-import type * as XLSX from "xlsx";
+
+type SheetJs = {
+  read: (data: Buffer) => unknown;
+  write: (
+    workbook: unknown,
+    options: {
+      bookType: string;
+      numbers?: string;
+      type: "buffer";
+    }
+  ) => Uint8Array;
+};
 
 declare global {
   interface Window {
-    XLSX: typeof XLSX;
+    XLSX: SheetJs;
     XLSX_ZAHL_PAYLOAD?: string;
   }
 }
 
-const getSheetJs = async (): Promise<typeof XLSX> => {
+const getSheetJs = async (): Promise<SheetJs> => {
   if (!window.XLSX) {
     await loadFiles(["/Program Files/SheetJS/xlsx.full.min.js"]);
   }
@@ -32,8 +43,8 @@ export const convertSheet = async (
   }
 
   return sheetJs.write(sheetJs.read(fileData), {
-    bookType: extension as XLSX.BookType,
+    bookType: extension,
     numbers,
     type: "buffer",
-  }) as Uint8Array;
+  });
 };

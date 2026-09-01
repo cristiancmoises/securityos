@@ -63,10 +63,14 @@ export const commands: Record<string, string> = {
   wget: "Download a URL through the Tor proxy to a file: wget <url> [-O name].",
   encrypt: "Vaptvupt-encrypt a file/folder → .zupt: encrypt <path> <password>.",
   decrypt: "Decrypt a Vaptvupt .zupt file: decrypt <path.zupt> <password>.",
-  vaptvupt: "Vaptvupt encryption (.zupt): vaptvupt encrypt|decrypt <path> <password>.",
-  evelin: "Evelin post-quantum SSH (info — the native binary runs in the Linux VM).",
-  tails: "Boot a live security ISO in the Linux VM (amnesic). Opens Virtual x86.",
-  liveos: "Boot a live security ISO in the Linux VM (amnesic). Opens Virtual x86.",
+  vaptvupt:
+    "Vaptvupt encryption (.zupt): vaptvupt encrypt|decrypt <path> <password>.",
+  evelin:
+    "Evelin post-quantum SSH (info — the native binary runs in the Linux VM).",
+  tails:
+    "Boot a live security ISO in the Linux VM (amnesic). Opens Virtual x86.",
+  liveos:
+    "Boot a live security ISO in the Linux VM (amnesic). Opens Virtual x86.",
   fish: "The friendly interactive shell (inside a Linux live ISO / the VM).",
   fastfetch: "System info tool (inside a Linux live ISO / the VM).",
   exit: "Quits the command interpreter.",

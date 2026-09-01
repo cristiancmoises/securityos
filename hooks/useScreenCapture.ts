@@ -255,7 +255,9 @@ type UseScreenCapture = {
   // are populated. Safe to call repeatedly; updates `cameras`.
   refreshCameras: (requestPermission?: boolean) => Promise<CameraDevice[]>;
   // Resolves with the saved capture so callers can auto-open it.
-  takeScreenshot: (options?: ScreenshotOptions) => Promise<LastCapture | undefined>;
+  takeScreenshot: (
+    options?: ScreenshotOptions
+  ) => Promise<LastCapture | undefined>;
 };
 
 const canCopyImage = (): boolean =>
@@ -451,10 +453,7 @@ const useScreenCapture = (): UseScreenCapture => {
       // Optional 3-2-1 countdown before recording starts. Show the picker only
       // after it elapses so the user can frame the recording. Cancellable via a
       // second click (recordCountdownRef cleared by the cancel branch above).
-      const recordDelay = Math.max(
-        0,
-        Math.trunc(options?.delaySeconds ?? 0)
-      );
+      const recordDelay = Math.max(0, Math.trunc(options?.delaySeconds ?? 0));
 
       if (recordDelay > 0) {
         recordCountdownRef.current = true;
@@ -591,12 +590,8 @@ const useScreenCapture = (): UseScreenCapture => {
               const camWidth = webcamVideo.videoWidth || 1;
               const camHeight = webcamVideo.videoHeight || 1;
               const pipHeight = Math.round(pipWidth * (camHeight / camWidth));
-              const pipX = isLeft
-                ? PIP_MARGIN
-                : width - pipWidth - PIP_MARGIN;
-              const pipY = isTop
-                ? PIP_MARGIN
-                : height - pipHeight - PIP_MARGIN;
+              const pipX = isLeft ? PIP_MARGIN : width - pipWidth - PIP_MARGIN;
+              const pipY = isTop ? PIP_MARGIN : height - pipHeight - PIP_MARGIN;
 
               // Apply the selected webcam theme. Fail-soft: any effect error
               // falls back to a plain webcam draw so a recording can never break.
@@ -628,13 +623,7 @@ const useScreenCapture = (): UseScreenCapture => {
                   );
                 }
               } else {
-                context.drawImage(
-                  webcamVideo,
-                  pipX,
-                  pipY,
-                  pipWidth,
-                  pipHeight
-                );
+                context.drawImage(webcamVideo, pipX, pipY, pipWidth, pipHeight);
               }
 
               pipRafRef.current = requestAnimationFrame(drawFrame);
@@ -705,7 +694,9 @@ const useScreenCapture = (): UseScreenCapture => {
         );
 
         if (recorder.state === "inactive") {
-          const { default: fixWebmDuration } = await import("fix-webm-duration");
+          const { default: fixWebmDuration } = await import(
+            "fix-webm-duration"
+          );
 
           fixWebmDuration(
             bufferToBlob(await readFile(capturePath)),

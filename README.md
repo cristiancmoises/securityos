@@ -11,8 +11,8 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
 
 ## ✨ Highlights
 
-- **🧅 Tor Browser (anonymous navigation)** — the **Tor Browser** routes every
-  Browser**: a server-side privacy proxy routes every request over Tor (SOCKS5h,
+- **🧅 Tor Browser (anonymous navigation)** — a server-side privacy proxy routes
+  browser requests over Tor (SOCKS5h,
   so `.onion` resolves and clear-net hostnames never leak), with **tabs** and a
   **NoScript-style 3-state JS control** (Off / first-party-only / All). It supports
   full tabbed navigation of `.onion` and clearnet sites; JavaScript is off by
@@ -23,10 +23,10 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
   public websites. It has independent bookmarks for `securityops.com.br`,
   `securityops.co`, and **GODS EYE**. It uses direct egress by design and is **not
   anonymous**.
-- **👁️ GODS EYE** — a dedicated, sandboxed dashboard window for
-  `https://eye.securityops.co`.
-- **💬 SecurityOps IRC** — a first-party, amnesic IRC client configured for
-  `irc.securityops.com.br`, carried through the Tor WebSocket tunnel.
+- **👁️ GODS EYE** — a dedicated cross-origin dashboard window for
+  `https://eye.securityops.co`, clearly marked as a direct/non-anonymous app.
+- **💬 SecurityOps IRC** — embeds the SecurityOps **The Lounge** web client at
+  `irc.securityops.com.br`; its HTTP and Socket.IO transport goes through Tor.
 - **🦀 Memory-safe proxy sidecar** — the untrusted fetch + HTML-rewriting path is also
   available as a Rust sidecar (Tor SOCKS5h, DNS-pinned SSRF guard, `lol_html`
   streaming rewriter); the OS delegates to it and transparently falls back to the
@@ -52,23 +52,27 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
   renders image/file attachments. It **pre-warms the Tor circuit on open** so the
   first login is fast (cold Tor otherwise makes the first request take 15–40s).
   **Amnesic** — keys live in memory only. See [Matrix](#-matrix).
-- **🎥 SecChat** — first-party end-to-end-encrypted video chat
-  (`chat.securityops.co`), embedded in-OS.
+- **🌊 Keywave** — the first-party encrypted chat/call service at
+  `chat.securityops.co`. Its Tor view is deliberately **landing/control only**:
+  WebRTC is blocked because ICE would bypass Tor, and the upstream client does not
+  yet offer a media-less text handshake. The explicit top-level clearnet client is
+  fully functional, but is **direct and not anonymous**.
 - **📻 Radio** — listen to internet radio worldwide (radio-browser API). **Exact**
   country filtering (by ISO country code, not a fuzzy name match), genre filter, and
   **only working HTTPS stations** — offline and non-playable (http-only) ones are
   filtered out — plus favorites and resilient mirror failover.
 - **📝 Cloudmacs** — a full **Emacs** (Spacemacs) in the browser (Gotty serving a
   terminal Emacs), with **telega** (Telegram — TDLib built into the image),
-  **whatsappel** (WhatsApp), **org-mode**, and **eww**. Appears in *Open with* for
+  **whatsappel** (WhatsApp), **org-mode**, and **eww**. Appears in _Open with_ for
   text/code files.
 - **📺 SecTube** — the SecurityOps video frontend, embedded for playback.
-- **📁 VaptVupt file share** — the first-party SecurityOps encrypted file share,
-  embedded in-OS **over Tor** (its `.onion` served through the privacy proxy in an
-  opaque-origin sandbox). Upload and download files in the window (uploads up to
-  256 MiB; downloads stream back in full); a toolbar offers **Reload** and **Open in
-  Tor Browser** for script-heavy actions. Real-time/WebSocket features aren't
-  available through the proxy by design.
+- **📁 ZUPT / VaptVupt web tools** — the first-party compression, encryption,
+  extraction and archive-verification service has explicit **Tor** (default,
+  fail-closed) and **Clearnet** (direct, not anonymous) modes. The cookie-free
+  privacy boundary keeps only ZUPT's Secure, HttpOnly CSRF cookie in a bounded
+  server-memory session, enabling multipart forms and downloads without exposing it
+  to the iframe. The embedded proxy caps individual uploads/downloads at 256 MiB;
+  a clearly labelled **Full client · DIRECT** fallback opens the native site.
 - **🔐 CryptPad · 🟢 WhatsApp · Telegram — embedded INSIDE the OS, over Tor.** These
   run through the privacy proxy (fetched server-side over Tor, anti-framing headers
   stripped, realtime **WebSocket tunneled** via `/api/ws`, storage + an amnesic
@@ -104,7 +108,7 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
   for blending in.
 - **🛟 Resilience / recovery** — if corrupted saved data from an old version would
   otherwise stop the desktop from starting, SecurityOS shows a **recovery screen**
-  (*Try again* / *Reset*) instead of reloading forever.
+  (_Try again_ / _Reset_) instead of reloading forever.
 - **🧰 Security Tools** — an offline suite (hashing, encoding, entropy, UUID, …).
 - **⌨️ Expanded terminal** — UNIX-style commands plus `curl`/`wget` over Tor, `du`,
   `df`, `tree`, `stat`, and more.
@@ -123,13 +127,14 @@ SecurityOS has two deliberately separate browsers. Use **Tor Browser** for
 anonymous browsing; use **Clearnet Browser** only when ordinary, non-anonymous
 access is appropriate. The applications do not silently fall back between modes.
 
-- Every request is routed through **Tor** (SOCKS5h, including DNS) via a
+- Browser-managed HTTP(S), dynamic fetch/XHR and approved WebSocket requests are
+  routed through **Tor** (SOCKS5h, including DNS) via a
   server-side privacy proxy, so `.onion` resolves and your real IP is never
   revealed. Clear-net sites load over Tor too; hostnames never leak to a local
   resolver.
-- **Tabbed** — per-tab history; Ctrl/⌘- or middle-click a link to open it in a
-  new tab; `＋` for a blank tab. Tab labels show the page title.
-- **NoScript-style 3-state JavaScript control** (toolbar): **Off** — *Safest*,
+- **Tabbed** — address-bar/bookmark history per tab; Ctrl/⌘- or middle-click a
+  link opens it with a fresh tab circuit; `＋` opens a new tab.
+- **NoScript-style 3-state JavaScript control** (toolbar): **Off** — _Safest_,
   all JS blocked + `script-src 'none'`; **NoScript** — first-party scripts only,
   third-party stripped server-side by the LibreJS filter; **All** — every script
   runs. Off by default.
@@ -138,28 +143,28 @@ access is appropriate. The applications do not silently fall back between modes.
   SSRF-validated IP** (no DNS rebinding), forwards only an allowlist of response
   headers, rewrites links/forms to stay in-app, and **logs nothing**.
 
-> **Compatibility.** The Tor Browser supports full navigation, tabs, history and
-> opt-in JavaScript, but a site can still reject Tor exits or depend on browser
+> **Compatibility.** The Tor Browser supports tabbed navigation and opt-in
+> JavaScript, but a site can still reject Tor exits or depend on browser
 > features unavailable in an opaque sandbox (such as service workers). Use the
 > Linux VM via Tor Control when a destination needs a native browser environment.
 
 ## 🌐 Clearnet Browser & GODS EYE
 
-The **Clearnet Browser** has the same tab, history, bookmark and JavaScript controls
-as Tor Browser, but uses direct egress (`direct=1`) and is therefore **not an
-anonymity tool**. Its built-in bookmarks are `https://securityops.com.br`,
-`https://securityops.co`, and `https://eye.securityops.co`.
+The **Clearnet Browser** has the same tab, address-bar history, bookmark and
+JavaScript controls as Tor Browser, but uses direct egress (`direct=1`) and is
+therefore **not an anonymity tool**. A persistent badge makes that boundary visible.
+Its built-in bookmarks cover the SecurityOps `.com.br` and `.co` sites.
 
-**GODS EYE** opens the last of those as a dedicated dashboard window. It is rendered
-through the same SSRF-guarded proxy and an opaque iframe sandbox, so the dashboard
-cannot access the SecurityOS origin.
+**GODS EYE** uses a native cross-origin iframe because its Vite/Cesium modules and
+workers require their real origin. Same-origin policy isolates it from SecurityOS;
+its persistent **DIRECT · NOT ANONYMOUS** badge reflects the real network path.
 
 ## 💬 SecurityOps IRC
 
-IRC defaults to **SecurityOps IRC** (`irc.securityops.com.br`) and is amnesic: nicks,
-credentials, channels and message history are kept only in the live window. The
-server must expose an IRC-over-WebSocket endpoint at `wss://irc.securityops.com.br/`;
-the app tunnels that endpoint through `/api/ws` and Tor.
+IRC opens the SecurityOps **The Lounge** web client at `irc.securityops.com.br`.
+The embedded browser state is in-memory, and its Socket.IO endpoint is narrowly
+allowlisted and tunneled through `/api/ws` over Tor. Server-side account/history
+retention is governed by the SecurityOps IRC service, not by this desktop.
 
 ---
 
@@ -188,21 +193,24 @@ talks to Matrix off-Tor.
 
 ## 🆕 New apps & how they work
 
-- **WhatsApp · Telegram · Session (messenger launchers).** One click opens the
-  *official* web client (WhatsApp Web, Telegram Web) in a real top-level browser
-  window, where everything works — chats, voice/video calls, native file
-  uploads/downloads, QR login. They are **launchers, not embeds**, on purpose:
-  WhatsApp/Telegram forbid framing (`frame-ancestors` / `X-Frame-Options`) and rely
-  on **WebSockets the Tor proxy blocks**, and **Session has no web client** (it's a
-  desktop/mobile app). The window therefore shows a clear **"Direct connection —
-  NOT routed through Tor"** badge; to use them over Tor, run SecurityOS itself in
-  the **Tor Browser** / **Tails** (an in-app "Using … over Tor" panel explains how).
-  Session's launcher opens the official download page.
-- **VaptVupt (encrypted file share).** Embeds the SecurityOps share's **`.onion`
-  over the Tor proxy** in an opaque-origin sandbox: **upload** files (forms are
-  rewritten through the proxy, up to 256 MiB) and **download** them in full
-  (attachments stream back). A toolbar adds **Reload** and **Open in Tor Browser**
-  (for script-heavy actions); a slow-load hint appears on a cold circuit.
+- **WhatsApp · Telegram · Session.** WhatsApp and Telegram are best-effort embedded
+  clients over the Tor proxy with a Window fallback for features unavailable in the
+  opaque sandbox. Their shortcuts are intentionally absent from the desktop but
+  remain in Start. Session remains a launcher because it has no web client.
+- **ZUPT / VaptVupt web tools.** The embedded HTTPS service is selectable between
+  fail-closed **Tor** routing and explicit **Clearnet** egress. Both stay inside an
+  opaque-origin sandbox; a random per-mode session lets the proxy retain only the
+  upstream CSRF cookie in memory so key generation, multipart uploads and downloads
+  work. The historical `.onion` currently has no reachable descriptor, so Tor mode
+  reaches `share.securityops.co` through Tor instead of silently going direct.
+  **Trust boundary:** these web operations run on `share.securityops.co`; that
+  service receives uploaded plaintext, passwords, and any supplied private key.
+  Use the bundled local Vaptvupt/WASM workflow when those values must stay on-device.
+- **Keywave.** Tor mode renders only the service landing/control surface through an
+  isolated, fail-closed HTTP/Socket.IO route. Calls and encrypted text currently
+  start only after media permission in the upstream client, while WebRTC cannot be
+  carried anonymously over this HTTP/Tor proxy. Use the explicitly marked direct
+  top-level client for full chat/calls; it exposes your IP to Keywave/STUN/TURN.
 - **Radio (improved).** Internet radio via radio-browser with **exact country**
   selection (ISO code, not a fuzzy name) and **only working stations** shown
   (HTTPS-playable + last-seen-online; offline/non-playable removed), resilient mirror
@@ -215,10 +223,15 @@ talks to Matrix off-Tor.
 
 ## 🛡️ Security model
 
-- **Strict CSP** without `'unsafe-eval'` (WASM uses `'wasm-unsafe-eval'`), `frame-ancestors 'none'`,
+- **Strict OS-shell CSP** without `'unsafe-eval'` (WASM uses `'wasm-unsafe-eval'`), `frame-ancestors 'none'`,
   HSTS, COOP, CORP, and a locked-down **Permissions-Policy**.
-- **Tor egress** for all proxied browsing; the v86 VM defaults to a local Tor relay.
-- **No persistence by design** — see *Amnesia* above.
+- **Explicit egress modes:** Tor Browser fails closed through Tor; Clearnet Browser
+  and GODS EYE are visibly direct. The v86 VM defaults to a local Tor relay.
+- **Confined proxy apps:** proxied executable resources, forms, workers and realtime
+  connections are restricted to the concrete SecurityOS origin. ZUPT's sole cookie
+  exception is exact-origin, 128-bit-session scoped, RAM-only and never returned to
+  the browser.
+- **No persistence by design** — see _Amnesia_ above.
 - Single source of truth for headers: [`scripts/securityHeaders.js`](scripts/securityHeaders.js)
   (mirrored to `next.config.js`, `pages/_document.tsx`, and the `deploy/` reverse-proxy samples).
 
@@ -246,25 +259,27 @@ docker compose -f deploy/docker-compose.yml up -d --build
 docker build -t securityos .
 docker run -d -p 8088:3000 -e TOR_PROXY=socks5h://tor:9050 securityos
 ```
+
 </details>
 
 See [`CHANGELOG.md`](CHANGELOG.md) for what's new, and [`docs/`](docs) for
-[`TOR.md`](docs/TOR.md), [`LIVE-ISO.md`](docs/LIVE-ISO.md),
+[`DEPLOYMENT.md`](docs/DEPLOYMENT.md), [`TOR.md`](docs/TOR.md),
+[`LIVE-ISO.md`](docs/LIVE-ISO.md),
 [`GUIX-SETUP.md`](docs/GUIX-SETUP.md), and [`deploy/SECURITY-HEADERS.md`](deploy/SECURITY-HEADERS.md).
 
 ---
 
 ## 🧱 Architecture
 
-| Layer | What |
-|---|---|
-| **Frontend** | Next.js + TypeScript + styled-components (the desktop, apps, virtual filesystem) |
-| **Privacy proxy** | `pages/api/proxy.ts` — server-side Tor fetch, SSRF guard, header allowlist, HTML rewriting |
-| **Matrix proxy** | same-origin Tor tunnel to `matrix.securityops.co` for the E2EE Matrix client (matrix-js-sdk + Rust crypto/WASM) |
-| **Rust sidecar** | `sidecar/` — memory-safe equivalent of the proxy fetch/rewrite path |
-| **Crypto** | `wasm/vaptvupt/` → `public/Program Files/Vaptvupt/vaptvupt.js` (the WASM engine) |
-| **Emulation** | v86 (x86 Linux), BoxedWine, js-dos, Ruffle — all WebAssembly |
-| **Deploy** | `Dockerfile` + `deploy/` (compose, Tor image, nginx/Caddy, VM bootstrap, TAILS CI) |
+| Layer             | What                                                                                                            |
+| ----------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Frontend**      | Next.js + TypeScript + styled-components (the desktop, apps, virtual filesystem)                                |
+| **Privacy proxy** | `pages/api/proxy.ts` — server-side Tor fetch, SSRF guard, header allowlist, HTML rewriting                      |
+| **Matrix proxy**  | same-origin Tor tunnel to `matrix.securityops.co` for the E2EE Matrix client (matrix-js-sdk + Rust crypto/WASM) |
+| **Rust sidecar**  | `sidecar/` — memory-safe equivalent of the proxy fetch/rewrite path                                             |
+| **Crypto**        | `wasm/vaptvupt/` → `public/Program Files/Vaptvupt/vaptvupt.js` (the WASM engine)                                |
+| **Emulation**     | v86 (x86 Linux), BoxedWine, js-dos, Ruffle — all WebAssembly                                                    |
+| **Deploy**        | `Dockerfile` + `deploy/` (compose, Tor image, nginx/Caddy, VM bootstrap, TAILS CI)                              |
 
 ---
 
@@ -275,13 +290,13 @@ privacy worldwide** and help people be **safer online** — and for the author's
 use. It is **for lawful, authorized use only**.
 
 - **Use it ethically and legally.** The bundled tools (Tor Browser, Matrix chat,
-  Vaptvupt encryption, network utilities) are for securing your *own* systems,
+  Vaptvupt encryption, network utilities) are for securing your _own_ systems,
   **authorized** research/testing with explicit permission, lawful privacy, and
   CTF/labs.
 - **You are solely responsible** for what you do with it. **The project and its
   sole maintainer are NOT responsible or liable for any misuse, illegal,
   unauthorized, or harmful use.**
-- **No warranty.** Provided *"as is"*, without warranty of any kind; to the
+- **No warranty.** Provided _"as is"_, without warranty of any kind; to the
   maximum extent permitted by law the author is **not liable** for any damages
   arising from its use. Tor reduces but does not eliminate deanonymization risk.
 
@@ -300,15 +315,15 @@ Licensing is **per component**:
   [`LICENSE`](LICENSE) carries both copyrights (Cristian Cezar Moisés for SecurityOS,
   Dustin Brett for daedalOS).
 - **Vaptvupt** (the encryption tool, and its **`.zupt`** encrypted-file format /
-  engine) — **dual-licensed: GNU AGPL-3.0-or-later *or* a separate Commercial
+  engine) — **dual-licensed: GNU AGPL-3.0-or-later _or_ a separate Commercial
   license, at your option**. The AGPL's network-use clause (§13) means that if you
-  run a *modified* Vaptvupt as a network service, you must offer its users the
+  run a _modified_ Vaptvupt as a network service, you must offer its users the
   corresponding source; a commercial license is the alternative for proprietary or
   closed-source use. Full terms are in
   [`LICENSE-VAPTVUPT.md`](LICENSE-VAPTVUPT.md), with the AGPL text in
   [`LICENSES/AGPL-3.0.txt`](LICENSES/AGPL-3.0.txt).
 
-> **Naming:** *Vaptvupt* is the tool; *`.zupt`* is **only** its encrypted-file
+> **Naming:** _Vaptvupt_ is the tool; _`.zupt`_ is **only** its encrypted-file
 > format / extension — never a name for the tool itself.
 
 Upstream and bundled third-party components keep their own licenses — see source

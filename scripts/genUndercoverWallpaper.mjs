@@ -59,6 +59,19 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
 </svg>`;
 
 writeFileSync("/tmp/uc.svg", svg);
-execFileSync("rsvg-convert", ["-w", String(W), "-h", String(H), "/tmp/uc.svg", "-o", "/tmp/uc.png"]);
+execFileSync("rsvg-convert", [
+  "-w",
+  String(W),
+  "-h",
+  String(H),
+  "/tmp/uc.svg",
+  "-o",
+  "/tmp/uc.png",
+]);
 const info = await sharp("/tmp/uc.png").webp({ quality: 88 }).toFile(OUT);
-console.log("undercover wallpaper ->", OUT, `${info.width}x${info.height}`, `${Math.round(info.size / 1024)}KB`);
+console.log(
+  "undercover wallpaper ->",
+  OUT,
+  `${info.width}x${info.height}`,
+  `${Math.round(info.size / 1024)}KB`
+);

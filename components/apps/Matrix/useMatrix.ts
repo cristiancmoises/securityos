@@ -202,8 +202,9 @@ const toRoom = (room: Room, myUserId: string): MatrixRoom => {
 
   return {
     encrypted: Boolean(
-      (room as unknown as { hasEncryptionStateEvent?: () => boolean })
-        .hasEncryptionStateEvent?.()
+      (
+        room as unknown as { hasEncryptionStateEvent?: () => boolean }
+      ).hasEncryptionStateEvent?.()
     ),
     id: room.roomId,
     memberCount: room.getJoinedMemberCount(),
@@ -321,16 +322,20 @@ const useMatrix = (): UseMatrix => {
       let loginGuard: ReturnType<typeof setTimeout> | undefined;
 
       try {
-        const { accessToken, client, cryptoReady: ready, userId } =
-          await Promise.race([
-            createMatrixSession(username.trim(), password),
-            new Promise<never>((_resolve, reject) => {
-              loginGuard = setTimeout(
-                () => reject(new Error("login-timeout")),
-                LOGIN_TIMEOUT_MS
-              );
-            }),
-          ]);
+        const {
+          accessToken,
+          client,
+          cryptoReady: ready,
+          userId,
+        } = await Promise.race([
+          createMatrixSession(username.trim(), password),
+          new Promise<never>((_resolve, reject) => {
+            loginGuard = setTimeout(
+              () => reject(new Error("login-timeout")),
+              LOGIN_TIMEOUT_MS
+            );
+          }),
+        ]);
 
         if (loginGuard) clearTimeout(loginGuard);
 
@@ -349,7 +354,11 @@ const useMatrix = (): UseMatrix => {
 
         client.on(
           sdk.ClientEvent.Sync,
-          (state: string, _prev: unknown, data?: { error?: { message?: string } }) => {
+          (
+            state: string,
+            _prev: unknown,
+            data?: { error?: { message?: string } }
+          ) => {
             if (!mountedRef.current) return;
             if (state === "PREPARED" || state === "SYNCING") {
               // We're live (first sync done, or an ongoing one). Clear the
@@ -511,8 +520,9 @@ const useMatrix = (): UseMatrix => {
       try {
         const room = client.getRoom(selectedRoomId);
         const isEncrypted = Boolean(
-          (room as unknown as { hasEncryptionStateEvent?: () => boolean })
-            ?.hasEncryptionStateEvent?.()
+          (
+            room as unknown as { hasEncryptionStateEvent?: () => boolean }
+          )?.hasEncryptionStateEvent?.()
         );
         const info = {
           h: 0,
@@ -612,7 +622,8 @@ const useMatrix = (): UseMatrix => {
         headers: { Authorization: `Bearer ${tokenRef.current}` },
       });
 
-      if (!response.ok) throw new Error(`Media fetch failed (${response.status})`);
+      if (!response.ok)
+        throw new Error(`Media fetch failed (${response.status})`);
 
       let buffer = await response.arrayBuffer();
 

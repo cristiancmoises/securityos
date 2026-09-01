@@ -13,15 +13,32 @@ import { haltEvent, label } from "utils/functions";
 
 const clamp = (value: number): number => Math.min(1, Math.max(0, value));
 
-const VolumeIcon: FC<{ level: number; muted: boolean }> = ({ level, muted }) => (
+const VolumeIcon: FC<{ level: number; muted: boolean }> = ({
+  level,
+  muted,
+}) => (
   <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
     <path d="M4 9v6h4l5 5V4L8 9H4z" />
     {muted || level === 0 ? (
       <path d="M16 8.5l5 5m0-5l-5 5" stroke="currentColor" strokeWidth="2" />
     ) : (
       <>
-        {level > 0.05 && <path d="M15.5 8.5a4.5 4.5 0 0 1 0 7" fill="none" stroke="currentColor" strokeWidth="2" />}
-        {level > 0.5 && <path d="M18 6a8 8 0 0 1 0 12" fill="none" stroke="currentColor" strokeWidth="2" />}
+        {level > 0.05 && (
+          <path
+            d="M15.5 8.5a4.5 4.5 0 0 1 0 7"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          />
+        )}
+        {level > 0.5 && (
+          <path
+            d="M18 6a8 8 0 0 1 0 12"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          />
+        )}
       </>
     )}
   </svg>

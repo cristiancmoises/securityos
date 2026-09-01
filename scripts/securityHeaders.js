@@ -83,14 +83,21 @@ const CSP_DIRECTIVES = {
 /** @param {Record<string, string[]>} directives */
 const buildCsp = (directives) =>
   Object.entries(directives)
-    .map(([key, values]) => (values.length > 0 ? `${key} ${values.join(" ")}` : key))
+    .map(([key, values]) =>
+      values.length > 0 ? `${key} ${values.join(" ")}` : key
+    )
     .join("; ");
 
 /** Full policy (HTTP header form) — includes header-only directives. */
 const CSP_HEADER_VALUE = buildCsp(CSP_DIRECTIVES);
 
 /** Directives the spec ignores inside <meta http-equiv="Content-Security-Policy">. */
-const META_IGNORED = new Set(["frame-ancestors", "report-uri", "report-to", "sandbox"]);
+const META_IGNORED = new Set([
+  "frame-ancestors",
+  "report-uri",
+  "report-to",
+  "sandbox",
+]);
 
 /** Meta-tag form — used only as a fallback when no server/host can set real headers. */
 const CSP_META_CONTENT = buildCsp(

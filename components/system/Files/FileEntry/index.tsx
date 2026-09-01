@@ -572,7 +572,8 @@ const FileEntry: FC<FileEntryProps> = ({
             />
           ) : (
             <figcaption>
-              {!isOnlyFocusedEntry || displayName.length === truncatedName.length
+              {!isOnlyFocusedEntry ||
+              displayName.length === truncatedName.length
                 ? truncatedName
                 : displayName}
             </figcaption>

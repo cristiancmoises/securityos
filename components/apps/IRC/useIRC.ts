@@ -258,9 +258,7 @@ const useIRC = (): UseIrc => {
 
       buffersRef.current.forEach((buffer) => {
         if (buffer.kind !== "channel") return;
-        const idx = buffer.users.findIndex(
-          (u) => userSortKey(u) === fromKey
-        );
+        const idx = buffer.users.findIndex((u) => userSortKey(u) === fromKey);
 
         if (idx !== -1) {
           const prefix = buffer.users[idx].match(/^[~&@%+]*/)?.[0] || "";
@@ -363,7 +361,8 @@ const useIRC = (): UseIrc => {
           if (msg.params[0] === "+") {
             const opts = optsRef.current;
 
-            if (opts) send(`AUTHENTICATE ${saslPlain(opts.account, opts.password)}`);
+            if (opts)
+              send(`AUTHENTICATE ${saslPlain(opts.account, opts.password)}`);
           }
           return;
         }
@@ -399,7 +398,10 @@ const useIRC = (): UseIrc => {
           return;
 
         case "433": // ERR_NICKNAMEINUSE
-          if (statusRef.current !== "online" && nickTriesRef.current < MAX_NICK_RETRIES) {
+          if (
+            statusRef.current !== "online" &&
+            nickTriesRef.current < MAX_NICK_RETRIES
+          ) {
             nickTriesRef.current += 1;
             nickRef.current = `${nickRef.current}_`;
             addServer(`Nick in use — trying ${nickRef.current}…`);
@@ -441,7 +443,9 @@ const useIRC = (): UseIrc => {
           } else {
             const buf = ensureBuffer(chan, "channel");
 
-            if (!buf.users.some((u) => userSortKey(u) === msg.nick.toLowerCase())) {
+            if (
+              !buf.users.some((u) => userSortKey(u) === msg.nick.toLowerCase())
+            ) {
               buf.users = sortUsers([...buf.users, msg.nick]);
             }
             addLine(chan, "channel", {
@@ -508,7 +512,9 @@ const useIRC = (): UseIrc => {
               from: "",
               kind: "part",
               mine: false,
-              text: `You were kicked from ${chan}${reason ? ` (${reason})` : ""}`,
+              text: `You were kicked from ${chan}${
+                reason ? ` (${reason})` : ""
+              }`,
               ts,
             });
             const buf = buffersRef.current.get(chan.toLowerCase());
@@ -552,7 +558,9 @@ const useIRC = (): UseIrc => {
           const isNotice = msg.command === "NOTICE";
           // CTCP ACTION ("/me") arrives as \x01ACTION …\x01.
           let kind: LineKind = isNotice ? "notice" : "message";
-          const action = /^\x01ACTION ([\s\S]*)\x01?$/.exec(msg.params[1] || "");
+          const action = /^\x01ACTION ([\s\S]*)\x01?$/.exec(
+            msg.params[1] || ""
+          );
 
           if (action) {
             text = stripFormatting(action[1]);
@@ -617,7 +625,10 @@ const useIRC = (): UseIrc => {
           const names = (msg.params[3] || "").split(" ").filter(Boolean);
           const acc = namesAccRef.current.get(chan?.toLowerCase() || "") || [];
 
-          namesAccRef.current.set(chan?.toLowerCase() || "", [...acc, ...names]);
+          namesAccRef.current.set(chan?.toLowerCase() || "", [
+            ...acc,
+            ...names,
+          ]);
           return;
         }
 
@@ -653,7 +664,17 @@ const useIRC = (): UseIrc => {
             q: "~",
             v: "+",
           };
-          const ARG_ALWAYS = new Set(["q", "a", "o", "h", "v", "b", "e", "I", "k"]);
+          const ARG_ALWAYS = new Set([
+            "q",
+            "a",
+            "o",
+            "h",
+            "v",
+            "b",
+            "e",
+            "I",
+            "k",
+          ]);
           const rank = "~&@%+";
           let adding = true;
           let ai = 0;
@@ -694,7 +715,9 @@ const useIRC = (): UseIrc => {
             from: "",
             kind: "system",
             mine: false,
-            text: `${msg.nick || "Server"} sets mode ${[modeStr, ...args].join(" ")}`,
+            text: `${msg.nick || "Server"} sets mode ${[modeStr, ...args].join(
+              " "
+            )}`,
             ts,
           });
           scheduleRender();
@@ -898,7 +921,9 @@ const useIRC = (): UseIrc => {
       }
 
       const spaceIdx = text.indexOf(" ");
-      const cmd = (spaceIdx === -1 ? text.slice(1) : text.slice(1, spaceIdx)).toLowerCase();
+      const cmd = (
+        spaceIdx === -1 ? text.slice(1) : text.slice(1, spaceIdx)
+      ).toLowerCase();
       const rest = spaceIdx === -1 ? "" : text.slice(spaceIdx + 1);
 
       switch (cmd) {

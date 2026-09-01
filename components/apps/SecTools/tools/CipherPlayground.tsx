@@ -70,7 +70,7 @@ const MORSE: Record<string, string> = {
   "=": "-...-",
   "+": ".-.-.",
   "-": "-....-",
-  "_": "..--.-",
+  _: "..--.-",
   '"': ".-..-.",
   $: "...-..-",
   "@": ".--.-.",
@@ -81,7 +81,7 @@ const MORSE_REVERSE: Record<string, string> = Object.fromEntries(
 );
 
 const shiftChar = (code: number, base: number, shift: number): string =>
-  String.fromCharCode(base + (((code - base + shift) % 26) + 26) % 26);
+  String.fromCharCode(base + ((((code - base + shift) % 26) + 26) % 26));
 
 const caesar = (text: string, shift: number): string => {
   const normalized = ((Math.trunc(shift) % 26) + 26) % 26;
@@ -116,8 +116,10 @@ const parseKey = (key: string, asHex: boolean): Uint8Array => {
   const clean = key.replace(/\s+/g, "");
 
   if (clean.length === 0) return new Uint8Array();
-  if (clean.length % 2 !== 0) throw new Error("Hex key needs an even number of digits.");
-  if (!HEX_RE.test(clean)) throw new Error("Hex key contains non-hex characters.");
+  if (clean.length % 2 !== 0)
+    throw new Error("Hex key needs an even number of digits.");
+  if (!HEX_RE.test(clean))
+    throw new Error("Hex key contains non-hex characters.");
 
   const bytes = new Uint8Array(clean.length / 2);
 
@@ -135,8 +137,10 @@ const hexToBytes = (hex: string): Uint8Array => {
   const clean = hex.replace(/\s+/g, "");
 
   if (clean.length === 0) return new Uint8Array();
-  if (clean.length % 2 !== 0) throw new Error("Hex input needs an even number of digits.");
-  if (!HEX_RE.test(clean)) throw new Error("Hex input contains non-hex characters.");
+  if (clean.length % 2 !== 0)
+    throw new Error("Hex input needs an even number of digits.");
+  if (!HEX_RE.test(clean))
+    throw new Error("Hex input contains non-hex characters.");
 
   const bytes = new Uint8Array(clean.length / 2);
 
@@ -159,7 +163,12 @@ const xorBytes = (data: Uint8Array, key: Uint8Array): Uint8Array => {
 
 // Encode: input is UTF-8 text, output is hex of XORed bytes.
 // Decode: input is hex of XORed bytes, output is the recovered UTF-8 text.
-const xor = (text: string, key: string, keyAsHex: boolean, dir: Direction): string => {
+const xor = (
+  text: string,
+  key: string,
+  keyAsHex: boolean,
+  dir: Direction
+): string => {
   const keyBytes = parseKey(key, keyAsHex);
 
   if (keyBytes.length === 0) throw new Error("XOR key cannot be empty.");
@@ -171,7 +180,9 @@ const xor = (text: string, key: string, keyAsHex: boolean, dir: Direction): stri
   }
 
   const data = hexToBytes(text);
-  const decoded = new TextDecoder("utf-8", { fatal: false }).decode(xorBytes(data, keyBytes));
+  const decoded = new TextDecoder("utf-8", { fatal: false }).decode(
+    xorBytes(data, keyBytes)
+  );
 
   return decoded;
 };
@@ -206,10 +217,13 @@ const morse = (text: string, dir: Direction): string => {
 };
 
 const DESCRIPTIONS: Record<Cipher, string> = {
-  atbash: "Mirror the alphabet (a<->z, b<->y). Self-inverse; non-letters untouched.",
-  caesar: "Shift letters by N positions, wrapping a-z / A-Z. Non-letters untouched.",
+  atbash:
+    "Mirror the alphabet (a<->z, b<->y). Self-inverse; non-letters untouched.",
+  caesar:
+    "Shift letters by N positions, wrapping a-z / A-Z. Non-letters untouched.",
   morse: "Text <-> Morse. Letters split by spaces, words by ' / '.",
-  rot13: "Caesar with a fixed shift of 13. Apply twice to recover the original.",
+  rot13:
+    "Caesar with a fixed shift of 13. Apply twice to recover the original.",
   xor: "XOR bytes against a repeating key. Output/input use hex.",
 };
 
@@ -249,7 +263,8 @@ const CipherPlaygroundTool: FC = () => {
       }
     } catch (caught) {
       return {
-        error: caught instanceof Error ? caught.message : "Could not process input.",
+        error:
+          caught instanceof Error ? caught.message : "Could not process input.",
         output: "",
       };
     }
@@ -282,35 +297,57 @@ const CipherPlaygroundTool: FC = () => {
     cipher === "xor" && direction === "decode"
       ? "Input (hex)"
       : cipher === "morse" && direction === "decode"
-        ? "Input (morse)"
-        : "Input (text)";
+      ? "Input (morse)"
+      : "Input (text)";
 
   const outputLabel =
     cipher === "xor" && direction === "encode"
       ? "Output (hex)"
       : cipher === "morse" && direction === "encode"
-        ? "Output (morse)"
-        : "Output (text)";
+      ? "Output (morse)"
+      : "Output (text)";
 
   return (
     <StyledTool>
       <h2>Classic Cipher Playground</h2>
-      <p className="desc">Encode and decode ROT13, Caesar, Atbash, XOR, and Morse — fully offline.</p>
+      <p className="desc">
+        Encode and decode ROT13, Caesar, Atbash, XOR, and Morse — fully offline.
+      </p>
 
       <Tabs>
-        <button className={cipher === "rot13" ? "active" : ""} onClick={() => selectCipher("rot13")} type="button">
+        <button
+          className={cipher === "rot13" ? "active" : ""}
+          onClick={() => selectCipher("rot13")}
+          type="button"
+        >
           ROT13
         </button>
-        <button className={cipher === "caesar" ? "active" : ""} onClick={() => selectCipher("caesar")} type="button">
+        <button
+          className={cipher === "caesar" ? "active" : ""}
+          onClick={() => selectCipher("caesar")}
+          type="button"
+        >
           Caesar
         </button>
-        <button className={cipher === "atbash" ? "active" : ""} onClick={() => selectCipher("atbash")} type="button">
+        <button
+          className={cipher === "atbash" ? "active" : ""}
+          onClick={() => selectCipher("atbash")}
+          type="button"
+        >
           Atbash
         </button>
-        <button className={cipher === "xor" ? "active" : ""} onClick={() => selectCipher("xor")} type="button">
+        <button
+          className={cipher === "xor" ? "active" : ""}
+          onClick={() => selectCipher("xor")}
+          type="button"
+        >
           XOR
         </button>
-        <button className={cipher === "morse" ? "active" : ""} onClick={() => selectCipher("morse")} type="button">
+        <button
+          className={cipher === "morse" ? "active" : ""}
+          onClick={() => selectCipher("morse")}
+          type="button"
+        >
           Morse
         </button>
       </Tabs>
@@ -328,8 +365,12 @@ const CipherPlaygroundTool: FC = () => {
             }}
             value={direction}
           >
-            <option value="encode">Encode (text -&gt; {cipher === "xor" ? "hex" : "morse"})</option>
-            <option value="decode">Decode ({cipher === "xor" ? "hex" : "morse"} -&gt; text)</option>
+            <option value="encode">
+              Encode (text -&gt; {cipher === "xor" ? "hex" : "morse"})
+            </option>
+            <option value="decode">
+              Decode ({cipher === "xor" ? "hex" : "morse"} -&gt; text)
+            </option>
           </select>
         </div>
       ) : null}
@@ -351,7 +392,9 @@ const CipherPlaygroundTool: FC = () => {
           <div>
             <label htmlFor="cp-key">Key ({keyAsHex ? "hex" : "text"})</label>
             <input
-              className={error && error.toLowerCase().includes("key") ? "invalid" : ""}
+              className={
+                error && error.toLowerCase().includes("key") ? "invalid" : ""
+              }
               id="cp-key"
               onChange={(event) => setXorKey(event.target.value)}
               type="text"
@@ -375,7 +418,9 @@ const CipherPlaygroundTool: FC = () => {
       <div>
         <label htmlFor="cp-input">{inputLabel}</label>
         <textarea
-          className={error && error.toLowerCase().includes("input") ? "invalid" : ""}
+          className={
+            error && error.toLowerCase().includes("input") ? "invalid" : ""
+          }
           id="cp-input"
           onChange={(event) => {
             setInput(event.target.value);
@@ -385,8 +430,8 @@ const CipherPlaygroundTool: FC = () => {
             cipher === "xor" && direction === "decode"
               ? "deadbeef..."
               : cipher === "morse" && direction === "decode"
-                ? ".... .. / - .... . .-. ."
-                : "Type something..."
+              ? ".... .. / - .... . .-. ."
+              : "Type something..."
           }
           value={input}
         />
@@ -397,7 +442,12 @@ const CipherPlaygroundTool: FC = () => {
           {copied ? "Copied" : "Copy output"}
         </button>
         {bidirectional ? (
-          <button className="secondary" disabled={!!error || !output} onClick={swap} type="button">
+          <button
+            className="secondary"
+            disabled={!!error || !output}
+            onClick={swap}
+            type="button"
+          >
             Use output as input
           </button>
         ) : null}
@@ -418,7 +468,9 @@ const CipherPlaygroundTool: FC = () => {
       ) : (
         <div>
           <label>{outputLabel}</label>
-          <pre className="output">{output || <span className="muted">Output appears here.</span>}</pre>
+          <pre className="output">
+            {output || <span className="muted">Output appears here.</span>}
+          </pre>
         </div>
       )}
     </StyledTool>

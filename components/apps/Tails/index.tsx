@@ -91,8 +91,8 @@ const Tails: FC<ComponentProcessProps> = () => {
     <StyledTool>
       <h2>🧅 TAILS — Amnesic Incognito Live System</h2>
       <p className="desc">
-        Tails routes everything through Tor and leaves no trace. SecurityOS keeps a
-        signature + SHA-256 verified copy current via CI.
+        Tails routes everything through Tor and leaves no trace. SecurityOS
+        keeps a signature + SHA-256 verified copy current via CI.
       </p>
 
       {verified ? (
@@ -103,8 +103,8 @@ OpenPGP key: ${manifest?.signing_key_fpr || "(pinned Tails key)"}`}
         </pre>
       ) : loaded ? (
         <p className="muted">
-          No verified build published yet — run the <code>tails-iso</code> action
-          (GitHub/Forgejo) to fetch + verify the latest Tails.
+          No verified build published yet — run the <code>tails-iso</code>{" "}
+          action (GitHub/Forgejo) to fetch + verify the latest Tails.
         </p>
       ) : (
         <p className="muted">Checking for a verified build…</p>
@@ -141,9 +141,9 @@ OpenPGP key: ${manifest?.signing_key_fpr || "(pinned Tails key)"}`}
       </div>
 
       <p className="muted">
-        ⚠️ Real Tails is <b>64-bit</b> — run the downloaded <code>.iso</code> in a
-        native VM (QEMU/VirtualBox). The in-browser emulator is 32-bit, so it boots
-        32-bit amnesic/Tor live ISOs but <b>not</b> 64-bit Tails. See{" "}
+        ⚠️ Real Tails is <b>64-bit</b> — run the downloaded <code>.iso</code> in
+        a native VM (QEMU/VirtualBox). The in-browser emulator is 32-bit, so it
+        boots 32-bit amnesic/Tor live ISOs but <b>not</b> 64-bit Tails. See{" "}
         <code>docs/LIVE-ISO.md</code>.
       </p>
     </StyledTool>

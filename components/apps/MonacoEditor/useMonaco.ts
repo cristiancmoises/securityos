@@ -12,7 +12,7 @@ import type { Model } from "components/apps/MonacoEditor/types";
 import useTitle from "components/system/Window/useTitle";
 import { useFileSystem } from "contexts/fileSystem";
 import { useProcesses } from "contexts/process";
-import type * as Monaco from "monaco-editor/esm/vs/editor/editor.api";
+import type * as Monaco from "monaco-editor";
 import { basename, dirname, extname } from "path";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -74,7 +74,7 @@ const useMonaco = (
     if (!monaco) {
       unlockGlobal("define");
       loader.config(config);
-      loader.init().then((monacoInstance) => {
+      loader.init().then((monacoInstance: typeof Monaco) => {
         lockGlobal("define");
         setMonaco(monacoInstance);
       });

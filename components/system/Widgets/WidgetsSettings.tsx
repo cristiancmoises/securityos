@@ -148,7 +148,9 @@ const WidgetsSettings: FC<WidgetsSettingsProps> = ({
           <hr />
 
           <h2>Weather location</h2>
-          <div className="hint">Current: {formatLocation(state.settings.weatherLocation)}</div>
+          <div className="hint">
+            Current: {formatLocation(state.settings.weatherLocation)}
+          </div>
           <label className="field" htmlFor="widget-city">
             <span>Search city</span>
             <input
@@ -193,7 +195,9 @@ const WidgetsSettings: FC<WidgetsSettingsProps> = ({
               }}
             />
           </label>
-          <div className="hint">Fetched over Tor via the same-origin proxy.</div>
+          <div className="hint">
+            Fetched over Tor via the same-origin proxy.
+          </div>
         </StyledGearPanel>
       )}
     </>
