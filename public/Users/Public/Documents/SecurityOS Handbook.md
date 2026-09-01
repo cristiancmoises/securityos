@@ -55,7 +55,7 @@ handbook is your starting point — everything here runs in your browser.
 | **IRC** | Desktop / Start ▸ *IRC* | SecurityOps The Lounge client at `irc.securityops.com.br`; Tor HTTP/Socket.IO is best-effort through the fail-closed proxy, while Clearnet connects natively to the service rather than `/api/ws`. |
 | **Wiki** | Desktop / Start ▸ *Wiki* | SecurityOps knowledge base at `wiki.securityops.co` with explicit **Tor / Clearnet** routing. |
 | **Zupt** | Start ▸ *Zupt* | First-party compression/encryption tools with selectable **Tor** (default, fail-closed) and **Clearnet** (not anonymous) routes. The ephemeral proxy session supports key generation, uploads and downloads; **Full client · DIRECT** leaves the sandbox. |
-| **Cloudmacs** | Start ▸ *Cloudmacs* | A full **Emacs** (Spacemacs) in the browser, with org-mode and eww. Also in *Open with* for text/code. |
+| **Cloudmacs source** | Optional local profile only | Its Emacs/Gotty source remains in the project, but the launcher, service, and *Open with* entry are excluded from this production image. It is not deployed on the IONOS VPS. |
 | **Screen Capture** | Start ▸ *Screen Capture* | Screen recording + screenshots (mic/system audio, presets) with an optional webcam overlay and effect themes. |
 | **Tor Control** | Start ▸ *Tor Control* | Route the emulated Linux VM through Tor. See `TOR.md`. |
 | **Curated web tools** | Start ▸ *Security* (folder) | Vetted external references (CyberChef, ATT&CK, GTFOBins, …) opened in the in-OS Browser. |
@@ -98,8 +98,9 @@ leaves your machine:
   Use local Vaptvupt/WASM for secrets that must never leave this device. Embedded
   uploads/downloads are capped at 256 MiB; use **Full client · DIRECT** for work that
   exceeds the sandbox compatibility limits.
-- **Cloudmacs** is a full **Emacs** (Spacemacs) in the browser — org-mode and eww —
-  and it shows up in *Open with* for text/code files.
+- **Cloudmacs is not deployed here.** Its full Emacs/Gotty source is retained for
+  separately authorized local builds, but normal images omit its launcher,
+  shortcuts, and *Open with* entry.
 - **Radio** plays internet radio worldwide; **Webamp** plays the bundled music.
 - **Screen Capture** records or screenshots your screen (mic + system audio,
   quality/format/codec presets, a countdown and max-duration) with an optional

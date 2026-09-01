@@ -175,6 +175,49 @@ describe("SecurityOS application catalog", () => {
     );
   });
 
+  it("keeps Cloudmacs source opt-in and out of the default Compose stack", () => {
+    const composeSource = readProjectFile("docker-compose.yml");
+    const hardenedComposeSource = readProjectFile("deploy/docker-compose.yml");
+    const ionosOverrideSource = readProjectFile(
+      "deploy/ionos-no-cloudmacs.override.yml"
+    );
+    const nextConfigSource = readProjectFile("next.config.js");
+
+    expect(existsSync(projectPath("components/apps/Cloudmacs/index.tsx"))).toBe(
+      true
+    );
+    expect(existsSync(projectPath("deploy/cloudmacs/Dockerfile"))).toBe(true);
+    expect(composeSource).toMatch(
+      /^ {2}cloudmacs:\n {4}profiles: \["cloudmacs"]$/m
+    );
+    expect(composeSource).toMatch(
+      /NEXT_PUBLIC_ENABLE_CLOUDMACS: \${NEXT_PUBLIC_ENABLE_CLOUDMACS:-false}/
+    );
+    expect(hardenedComposeSource).toContain(
+      'NEXT_PUBLIC_ENABLE_CLOUDMACS: "false"'
+    );
+    expect(ionosOverrideSource).toMatch(
+      /^ {2}cloudmacs:\n {4}profiles: \["retired-cloudmacs-do-not-enable"]$/m
+    );
+    expect(dockerfileSource).toContain(
+      "ARG NEXT_PUBLIC_ENABLE_CLOUDMACS=false"
+    );
+    expect(nextConfigSource).toContain('"contexts/process/cloudmacs$"');
+    expect(nextConfigSource).toContain(
+      "./contexts/process/cloudmacs.disabled.ts"
+    );
+    for (const shortcutDirectory of SHORTCUT_DIRECTORIES) {
+      expect(dockerfileSource).toContain(
+        `/SecurityOS/${shortcutDirectory}/Cloudmacs.url`
+      );
+    }
+    for (const size of ICON_SIZES) {
+      expect(dockerfileSource).toContain(
+        `/SecurityOS/public/System/Icons/${size}x${size}/emacs.webp`
+      );
+    }
+  });
+
   it("keeps the production runtime on the unprivileged node user", () => {
     const runtimeUserDirectives = [
       ...dockerfileSource.matchAll(/^USER\s+(\S+)\s*$/gm),

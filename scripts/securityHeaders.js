@@ -36,6 +36,10 @@
 // Emscripten apps that need them (Pyodide / Ruffle / SpaceCadet) can run, at the
 // cost of weaker XSS protection. Keep this UNSET on hardened/public deployments.
 const ALLOW_EVAL = process.env.SECURITYOS_ALLOW_EVAL === "1";
+const CLOUDMACS_ENABLED = process.env.NEXT_PUBLIC_ENABLE_CLOUDMACS === "true";
+const CLOUDMACS_LOOPBACK_ORIGINS = CLOUDMACS_ENABLED
+  ? ["http://localhost:8090", "http://127.0.0.1:8090"]
+  : [];
 
 /** @type {Record<string, string[]>} */
 const CSP_DIRECTIVES = {
@@ -54,28 +58,19 @@ const CSP_DIRECTIVES = {
   "img-src": ["'self'", "data:", "blob:", "https:"],
   "font-src": ["'self'", "data:"],
   "media-src": ["'self'", "data:", "blob:", "https:"],
-  // http://localhost:8090 + 127.0.0.1:8090 = the local self-hosted Cloudmacs
-  // (Gotty + Emacs) the Cloudmacs app embeds for local testing; loopback is a
-  // trustworthy origin (not upgraded/blocked). On a server it lives at an https
-  // origin (e.g. https://emacs.securityops.co), already covered by `https:`.
+  // The local Cloudmacs origins are present only in an explicitly enabled build.
+  // On a server it lives at an HTTPS origin, already covered by `https:`.
   "connect-src": [
     "'self'",
     "data:",
     "blob:",
     "https:",
     "wss:",
-    "http://localhost:8090",
-    "http://127.0.0.1:8090",
+    ...CLOUDMACS_LOOPBACK_ORIGINS,
   ],
   "worker-src": ["'self'", "blob:"],
   "child-src": ["'self'", "blob:"],
-  "frame-src": [
-    "'self'",
-    "https:",
-    "blob:",
-    "http://localhost:8090",
-    "http://127.0.0.1:8090",
-  ],
+  "frame-src": ["'self'", "https:", "blob:", ...CLOUDMACS_LOOPBACK_ORIGINS],
   "manifest-src": ["'self'"],
   "upgrade-insecure-requests": [],
 };

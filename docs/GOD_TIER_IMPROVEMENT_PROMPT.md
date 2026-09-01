@@ -139,18 +139,22 @@ checkout as immutable evidence. Capture a timestamped root-only rollback state a
 tag the exact old web image before touching production.
 
 Replace only the Compose-owned `securityos` web container with `--no-deps`,
-`--no-build`, and `--pull never`. Never recreate Tor, Cloudmacs, reverse-proxy
-attachments, networks, volumes, or bind mounts. Automatically restore the old web
-image if identity, topology, local HTTP, Tor exit, public HTTPS, Matrix, Zupt,
-Wiki, IRC, GODS EYE, browser, or WebSocket validation fails. Keep both candidate
-and rollback tags throughout the observation window.
+`--no-build`, and `--pull never`. Never recreate Tor or Cloudmacs, or mutate
+reverse-proxy attachments, networks, volumes, or bind mounts. Automatically
+restore the old web image if identity, topology, local HTTP, Tor exit, public
+HTTPS, Matrix, Zupt, Wiki, IRC, GODS EYE, browser, or WebSocket validation fails.
+Keep both candidate and rollback tags throughout the observation window.
 
-After the web release passes, perform the separately authorized, rollback-protected
-Cloudmacs migration: deploy the verified messenger-free Cloudmacs image, replace
-its volume list with only the Emacs configuration and data mounts, and recreate
-only that container. Prove Tor, web, reverse proxy, and networks were untouched.
-Detach retired integration mounts but retain their host directories as rollback
-data; destructive data deletion requires separate authorization.
+Cloudmacs source remains in the repository as an optional, profile-gated local
+deployment, but the IONOS production state must have no Cloudmacs container, no
+dedicated Cloudmacs network, and no reverse-proxy attachment to such a network.
+The default production image must also omit its catalog entry, shortcuts, editor
+association, icon assets, and loopback CSP allowances. Prove those absences before
+and after every cutover. Always combine the preserved production Compose file with
+the reviewed root-only IONOS exclusion override so ordinary operations cannot
+recreate it. Retain dormant Cloudmacs host directories as unmounted user/rollback
+data; destructive deletion or re-enabling Cloudmacs requires separate
+authorization.
 
 The work is complete only when the clean repository, all real remotes, the
 verified artifact, and the live public deployment agree on the reviewed release.

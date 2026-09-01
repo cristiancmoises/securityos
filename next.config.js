@@ -1,6 +1,7 @@
 // @ts-check
 
 const isProduction = process.env.NODE_ENV === "production";
+const cloudmacsEnabled = process.env.NEXT_PUBLIC_ENABLE_CLOUDMACS === "true";
 
 const bundleAnalyzer = process.env.npm_config_argv?.includes(
   "build:bundle-analyzer"
@@ -83,7 +84,17 @@ const nextConfig = {
     // XML playlist formats (XSPF/WPL) in Webamp degrade — M3U/PLS still work. For
     // full support, add `@xmldom/xmldom` and alias `xmldom` to it instead.
     config.resolve = config.resolve || {};
-    config.resolve.alias = { ...config.resolve.alias, xmldom: false };
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      ...(cloudmacsEnabled
+        ? {}
+        : {
+            "contexts/process/cloudmacs$": require.resolve(
+              "./contexts/process/cloudmacs.disabled.ts"
+            ),
+          }),
+      xmldom: false,
+    };
 
     // matrix-js-sdk's Rust crypto (@matrix-org/matrix-sdk-crypto-wasm) ships a
     // .wasm; let webpack emit it as a same-origin async chunk under /_next/static

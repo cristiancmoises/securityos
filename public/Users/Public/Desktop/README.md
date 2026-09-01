@@ -56,8 +56,9 @@ that runs entirely in your browser. No install and no app telemetry.
   has the same explicit **Tor / Clearnet** switch as Zupt. IRC/GODS EYE Tor views
   are best-effort; their Clearnet views connect natively to the service origin and
   are direct/not anonymous.
-- 📝 **A real Emacs, in the browser.** **Cloudmacs** runs a full Spacemacs (with
-  org-mode and eww) — and shows up in *Open with* for text/code.
+- 📝 **Cloudmacs is optional source only.** Its Spacemacs/Gotty integration stays
+  in the repository for separately authorized local builds, but this production
+  image omits its launcher, shortcuts, service, and *Open with* entry.
 - ⏺️ **Capture your screen.** **Screen Capture** records or screenshots everything
   on screen (countdown, mic + system audio, quality/format presets) with an
   optional **webcam overlay** and fun effect themes (Matrix rain, sepia, blur…).
@@ -83,7 +84,7 @@ that runs entirely in your browser. No install and no app telemetry.
 | Compress, encrypt or recover files | **Zupt** (Tor / Clearnet selector) |
 | Encrypted video chat | **Keywave** (full client is direct, not anonymous) |
 | Listen to internet radio | **Radio** |
-| Edit code/text in real Emacs | **Cloudmacs** |
+| Edit code/text | **Monaco Editor** or **Vim** (Cloudmacs is not deployed) |
 | Record your screen | **Screen Capture** |
 | Lock the desktop | Start menu → **Lock** |
 | Configure Tor / route the Linux VM | **Tor Control** |

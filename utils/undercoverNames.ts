@@ -1,3 +1,5 @@
+import { CLOUDMACS_ENABLED } from "utils/featureFlags";
+
 /**
  * Undercover enterprise-workspace display-name overlay.
  *
@@ -13,7 +15,7 @@
  */
 const UNDERCOVER_DISPLAY_NAMES: Readonly<Record<string, string>> = {
   // Neutral workspace, app, library, and note labels.
-  Cloudmacs: "Text Editor",
+  ...(CLOUDMACS_ENABLED ? { Cloudmacs: "Text Editor" } : {}),
   Computer: "Workspace",
   Documents: "Documents",
   Images: "Pictures",

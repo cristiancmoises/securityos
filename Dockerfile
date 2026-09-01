@@ -23,9 +23,25 @@ RUN yarn install --frozen-lockfile --non-interactive
 # dependency layer so toggling it doesn't trigger a full reinstall.
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Cloudmacs source remains in Git, but normal production images omit every launch
+# surface. An explicitly authorized local build can opt in with
+# `--build-arg NEXT_PUBLIC_ENABLE_CLOUDMACS=true` and the matching Compose profile.
+ARG NEXT_PUBLIC_ENABLE_CLOUDMACS=false
+ENV NEXT_PUBLIC_ENABLE_CLOUDMACS=${NEXT_PUBLIC_ENABLE_CLOUDMACS}
+
 # Then bring in the app source and build.
 COPY . .
-RUN yarn build
+RUN if [ "$NEXT_PUBLIC_ENABLE_CLOUDMACS" != "true" ]; then \
+      rm -f \
+        "/SecurityOS/public/Users/Public/Desktop/Cloudmacs.url" \
+        "/SecurityOS/public/Users/Public/Start Menu/Cloudmacs.url" \
+        /SecurityOS/public/System/Icons/16x16/emacs.webp \
+        /SecurityOS/public/System/Icons/32x32/emacs.webp \
+        /SecurityOS/public/System/Icons/48x48/emacs.webp \
+        /SecurityOS/public/System/Icons/96x96/emacs.webp \
+        /SecurityOS/public/System/Icons/144x144/emacs.webp; \
+    fi && \
+    yarn build
 
 # Keep build tooling, source files and the Next build cache out of the deployable
 # image. Runtime still receives the complete tested dependency tree because the
@@ -36,6 +52,10 @@ FROM node:26-alpine AS runtime
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_OPTIONS=--openssl-legacy-provider
+
+# Keep the runtime header policy aligned with the feature set compiled above.
+ARG NEXT_PUBLIC_ENABLE_CLOUDMACS=false
+ENV NEXT_PUBLIC_ENABLE_CLOUDMACS=${NEXT_PUBLIC_ENABLE_CLOUDMACS}
 
 ENV NODE_ENV=production
 

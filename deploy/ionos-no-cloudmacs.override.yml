@@ -1,0 +1,5 @@
+# Durable IONOS production exclusion. Always combine this file with the preserved
+# production Compose file so an unqualified `up` cannot recreate Cloudmacs.
+services:
+  cloudmacs:
+    profiles: ["retired-cloudmacs-do-not-enable"]

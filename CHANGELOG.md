@@ -44,6 +44,12 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   Browser icon family so `.webp` assets contain genuine WebP data.
 - Pinned Cloudmacs to its reviewed upstream image digest and upgraded the base
   Alpine runtime packages before adding the minimal Spacemacs toolchain.
+- Retired Cloudmacs from the IONOS runtime: removed its container, active image
+  tag, dedicated network, reverse-proxy attachment and host, production launcher,
+  shortcuts, editor association, icon assets, and loopback CSP allowances. Its
+  source remains in the repository behind an explicit build flag and Compose
+  profile; a root-only production override prevents accidental recreation, while
+  dormant bind-mount data is preserved unmounted for recovery.
 - Updated the root README, in-OS welcome and handbook, Tor model, release notes,
   and execution prompt. Current JavaScript and Rust advisory databases report zero
   known vulnerabilities in the audited dependency graphs. Matrix SDK/Rust crypto,

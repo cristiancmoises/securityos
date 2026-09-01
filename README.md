@@ -66,9 +66,11 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
   country filtering (by ISO country code, not a fuzzy name match), genre filter, and
   **only working HTTPS stations** — offline and non-playable (http-only) ones are
   filtered out — plus favorites and resilient mirror failover.
-- **📝 Cloudmacs** — a full **Emacs** (Spacemacs) in the browser (Gotty serving a
-  terminal Emacs), with **org-mode** and **eww**. Appears in _Open with_ for
-  text/code files.
+- **📝 Cloudmacs (optional source)** — the full **Emacs** (Spacemacs) and Gotty
+  integration remains available for explicitly authorized local deployments via
+  the `cloudmacs` Compose profile. Its launcher and shortcuts are excluded from
+  normal production images, and it is intentionally not deployed on the
+  SecurityOS IONOS VPS.
 - **📺 SecTube** — the SecurityOps video frontend, embedded for playback.
 - **📁 Zupt web tools** — the renamed first-party compression, encryption,
   extraction and archive-verification service has explicit **Tor** (default,
@@ -276,11 +278,22 @@ docker compose up -d
 Two containers, no host networking, no manual flags, Tor on by default.
 `docker compose down` leaves no residue.
 
+The audited Cloudmacs exclusion applies to Dockerfile-built production images:
+the build removes its optional static launch assets as well as compiling out its
+catalog integration. Raw/non-Docker Next.js builds retain repository assets and
+are not the supported IONOS release path. Production also layers
+`deploy/ionos-no-cloudmacs.override.yml` over the preserved VPS Compose file so a
+future broad `up` cannot recreate the retired service.
+
 <details><summary>Other options</summary>
 
 ```bash
 # Full stack — adds the memory-safe Rust proxy sidecar:
 docker compose -f deploy/docker-compose.yml up -d --build
+
+# Optional local Cloudmacs source (not part of the IONOS deployment):
+NEXT_PUBLIC_ENABLE_CLOUDMACS=true \
+  docker compose --profile cloudmacs up -d --build web cloudmacs
 
 # Web image alone (bring your own Tor SOCKS at TOR_PROXY):
 docker build -t securityos .
