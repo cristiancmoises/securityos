@@ -1,5 +1,6 @@
-# Durable IONOS production exclusion. Always combine this file with the preserved
-# production Compose file so an unqualified `up` cannot recreate Cloudmacs.
+# Durable IONOS production exclusion. Always apply this file last, after the
+# preserved base and selected per-release web override. It is not auto-loaded:
+# omitting it from a Compose command can recreate Cloudmacs.
 services:
   cloudmacs:
     profiles: ["retired-cloudmacs-do-not-enable"]

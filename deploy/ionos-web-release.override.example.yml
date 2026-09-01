@@ -1,0 +1,17 @@
+# Non-secret template for one immutable IONOS web release.
+#
+# Render REVIEWED-COMMIT-12HEX before transfer, install the rendered file as
+# /root/securityos-runtime/docker-compose.release-<sha>.yml with mode 0600, and
+# always apply it between the preserved production base file and the durable
+# no-Cloudmacs override. The referenced env file is provisioned separately and
+# must remain root-owned mode 0600; never put its secret values in this YAML.
+services:
+  web:
+    build: !reset null
+    image: securityos:REVIEWED-COMMIT-12HEX
+    env_file:
+      - /root/securityos-runtime/securityos.env
+    tmpfs: !override
+      - /tmp
+      - /SecurityOS/.next/cache
+      - /home/node/.cache
