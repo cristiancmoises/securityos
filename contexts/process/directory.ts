@@ -1,6 +1,8 @@
+import cloudmacsProcesses from "contexts/process/cloudmacs";
 import type { Processes } from "contexts/process/types";
 import dynamic from "next/dynamic";
 import { FOLDER_ICON, TASKBAR_HEIGHT } from "utils/constants";
+import { CLOUDMACS_ENABLED } from "utils/featureFlags";
 
 const directory: Processes = {
   BoxedWine: {
@@ -79,17 +81,7 @@ const directory: Processes = {
     lockAspectRatio: true,
     title: "DX-Ball",
   },
-  Cloudmacs: {
-    Component: dynamic(() => import("components/apps/Cloudmacs")),
-    backgroundColor: "#1d1f21",
-    defaultSize: {
-      height: 640,
-      width: 940,
-    },
-    icon: "/System/Icons/emacs.webp",
-    singleton: true,
-    title: "Cloudmacs",
-  },
+  ...(CLOUDMACS_ENABLED ? cloudmacsProcesses : {}),
   DevTools: {
     Component: dynamic(() => import("components/apps/DevTools")),
     backgroundColor: "#242424",

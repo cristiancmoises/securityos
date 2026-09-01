@@ -36,6 +36,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_ENABLE_CLOUDMACS: ${NEXT_PUBLIC_ENABLE_CLOUDMACS:-false}
     container_name: securityos
     restart: unless-stopped
     init: true
@@ -66,14 +68,17 @@ services:
       - "8088:3000"
     networks: [securenet]
 
-  # Cloudmacs — full Emacs in the browser (karlicoss/cloudmacs): Gotty serves
-  # `emacsclient --tty` as a web TTY, so the session persists across reloads.
-  # Embedded by the in-OS Cloudmacs app. Bound to LOOPBACK only (127.0.0.1:8090).
+  # Optional Cloudmacs profile — full Emacs in the browser. It is excluded from
+  # the default stack and from the IONOS production deployment. To run it in an
+  # explicitly authorized local environment, use:
+  #   NEXT_PUBLIC_ENABLE_CLOUDMACS=true docker compose --profile cloudmacs \
+  #     up -d --build web cloudmacs
+  # Gotty serves `emacsclient --tty` as a web TTY. Bound to loopback only.
   # asEnvUser runs Emacs as uid/gid 1000 so the mounted host dirs (owned by the
   # host user, uid 1000) are writable. Config persists to ~/.cloudmacs.d, files to
-  # ~/cloudmacs-data. The build context is vendored in deploy/cloudmacs/ — swap
-  # `image:` for `build: { context: deploy/cloudmacs }` to build from source.
+  # ~/cloudmacs-data. The build context is vendored in deploy/cloudmacs/.
   cloudmacs:
+    profiles: ["cloudmacs"]
     build:
       context: deploy/cloudmacs
       dockerfile: Dockerfile

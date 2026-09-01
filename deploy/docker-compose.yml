@@ -89,6 +89,8 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_ENABLE_CLOUDMACS: "false"
     container_name: securityos-web
     restart: unless-stopped
     init: true

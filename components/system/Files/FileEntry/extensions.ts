@@ -1,5 +1,6 @@
 import { emulatorCores } from "components/apps/Emulator/config";
 import { EDITABLE_IMAGE_FILE_EXTENSIONS } from "utils/constants";
+import { CLOUDMACS_ENABLED } from "utils/featureFlags";
 
 type Extension = {
   command?: string;
@@ -8,10 +9,13 @@ type Extension = {
   type?: string;
 };
 
-// Cloudmacs (full Emacs in the browser) appears in "Open with" for text/code
-// files. It opens the editor window (the container has its own filesystem, so it
-// doesn't load the specific web-OS file — it launches the editor).
-export const TEXT_EDITORS = ["MonacoEditor", "Vim", "Cloudmacs"];
+// Optional local Cloudmacs builds add the full browser-hosted Emacs to "Open
+// with". The default production build exposes only the bundled editors.
+export const TEXT_EDITORS = [
+  "MonacoEditor",
+  "Vim",
+  ...(CLOUDMACS_ENABLED ? ["Cloudmacs"] : []),
+];
 
 const types = {
   Application: {

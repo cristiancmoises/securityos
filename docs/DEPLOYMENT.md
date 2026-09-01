@@ -1,10 +1,9 @@
 # Production deployment
 
 This runbook covers the audited SecurityOS topology on the IONOS VPS. A normal
-release replaces the **web container only**. Tor, Cloudmacs, their data, and the
-reverse-proxy network attachments stay running throughout the deployment. The
-separately authorized, one-time Cloudmacs retired-integration migration is
-documented after the standard web cutover and must not be folded into it.
+release replaces the **web container only**. Tor and the reverse proxy stay
+running throughout the deployment. Cloudmacs remains available in the repository
+for optional deployments, but is intentionally absent from this VPS.
 
 The VPS has limited free disk space. Build the multi-stage runtime image on a
 compatible local machine, validate it, transfer the compressed Docker image, and
@@ -25,14 +24,19 @@ load it on the VPS. Do not run a Docker build on the VPS.
 - Keep the web container named `securityos`, published as `3002:3000`, and
   attached to `securityos_securenet`.
 - Keep `securityos-tor-1` running and healthy on `securityos_securenet`.
-- Keep `securityos-cloudmacs` running on `securityos_cloudmacs-net`, without a
-  published host port. Preserve all current data mounts during normal releases.
-  The one-time migration may detach retired integration mounts, but must preserve
-  their host directories as rollback data unless deletion is separately approved.
-- Keep the `npm-attachment` reverse proxy attached to both networks.
+- Keep `securityos-cloudmacs` and `securityos_cloudmacs-net` absent. Do not run an
+  unqualified `docker compose up`: the immutable production Compose evidence still
+  defines the optional service and could recreate it.
+- Build the web image with `NEXT_PUBLIC_ENABLE_CLOUDMACS=false` (the Dockerfile
+  default). Its process entry, shortcuts, editor integration, icon assets, and
+  loopback CSP allowances must be absent from the production artifact.
+- Keep `npm-attachment` running on `securityos_securenet`; it must not be attached
+  to the removed Cloudmacs network.
+- Preserve the dormant Cloudmacs bind-mount directories as user/rollback data.
+  Their existence does not authorize mounting or deleting them.
 - The audited VPS platform is `linux/amd64`.
 - Never deploy with the release's Compose file, run `docker compose down`, or
-  select Tor or Cloudmacs in a release command.
+  select Tor or Cloudmacs in a release command. Always select `web` explicitly.
 
 At the 2026-09-01 audit, the active production Compose file had SHA-256
 `337229790ed2bcdc91bbd4286141f1390b63dfedfa0afe5a056c0fc31cb9b181`.
@@ -299,32 +303,45 @@ docker_available="$(df -PB1 "$docker_root" | awk 'NR == 2 { print $4 }')"
 
 Use the active production Compose file, not a Compose file from the release
 artifact. The `--no-build` cutover later ensures its build context is never used.
+Separately transfer `deploy/ionos-no-cloudmacs.override.yml`, verify its release
+checksum, and install it root-only at
+`/root/securityos-runtime/ionos-no-cloudmacs.override.yml` (owner root, mode
+`0600`). Every production Compose command combines that durable exclusion with
+the preserved base file; this prevents a broad future `up` from resurrecting the
+retired service without modifying the dirty checkout.
 
 ```sh
 prod_root="/root/secos/securityos"
 prod_compose="$prod_root/docker-compose.yml"
+prod_exclusion="/root/securityos-runtime/ionos-no-cloudmacs.override.yml"
 rollback_id="$(date -u +%Y%m%dT%H%M%SZ)"
 rollback_root="/root/securityos-rollbacks/${rollback_id}"
 [[ "$rollback_id" =~ ^[0-9]{8}T[0-9]{6}Z$ ]]
 
 test -f "$prod_compose"
+test "$(stat --format='%u:%a' "$prod_exclusion")" = "0:600"
+test "$(sha256sum "$prod_exclusion" | awk '{ print $1 }')" = \
+  "48f14a2132d4f735b5f3297db3b06c73ed43ad05020214f6880028a3743b5a8e"
 expected_compose_sha256="337229790ed2bcdc91bbd4286141f1390b63dfedfa0afe5a056c0fc31cb9b181"
 actual_compose_sha256="$(sha256sum "$prod_compose" | awk '{ print $1 }')"
 test "$actual_compose_sha256" = "$expected_compose_sha256"
 prod_compose_sha256="$actual_compose_sha256"
-docker compose -p securityos -f "$prod_compose" config -q
+docker compose -p securityos -f "$prod_compose" -f "$prod_exclusion" config -q
 
 # This audited legacy Compose service has `build`, but deliberately no `image`.
 # Compose derives `${project}-${service}` as `securityos-web`; pin that exact
 # effective reference without mutating the dirty production file.
-docker compose -p securityos -f "$prod_compose" config --format json | \
+docker compose -p securityos -f "$prod_compose" -f "$prod_exclusion" \
+  config --format json | \
   jq --exit-status '
     .services.web.image == null and
     .services.web.build.context == "/root/secos/securityos" and
-    .services.web.build.dockerfile == "Dockerfile"
+    .services.web.build.dockerfile == "Dockerfile" and
+    (.services.cloudmacs // null) == null
   ' >/dev/null
 compose_web_image="securityos-web"
-test "$(docker compose -p securityos -f "$prod_compose" config --images | \
+test "$(docker compose -p securityos -f "$prod_compose" -f "$prod_exclusion" \
+  config --images | \
   grep --fixed-strings --line-regexp --count "$compose_web_image")" = "1"
 test "$(docker inspect --format '{{.Config.Image}}' securityos)" = \
   "$compose_web_image"
@@ -338,6 +355,7 @@ test "$(docker inspect --format \
 running_web_hash="$(docker inspect --format \
   '{{index .Config.Labels "com.docker.compose.config-hash"}}' securityos)"
 file_web_hash="$(docker compose -p securityos -f "$prod_compose" \
+  -f "$prod_exclusion" \
   config --hash web | awk '$1 == "web" { print $2 }')"
 test "$running_web_hash" = "$file_web_hash"
 ```
@@ -345,7 +363,8 @@ test "$running_web_hash" = "$file_web_hash"
 Validate the host-specific topology without displaying environment values:
 
 ```sh
-docker compose -p securityos -f "$prod_compose" config --format json | \
+docker compose -p securityos -f "$prod_compose" -f "$prod_exclusion" \
+  config --format json | \
   jq --exit-status '
     .name == "securityos" and
     .services.web.container_name == "securityos" and
@@ -357,22 +376,28 @@ docker compose -p securityos -f "$prod_compose" config --format json | \
     .services.web.ports[0].published == "3002" and
     .services.web.ports[0].protocol == "tcp" and
     ((.services.web.networks | keys | sort) == ["securenet"]) and
-    .networks.securenet.name == "securityos_securenet" and
-    .services.cloudmacs.container_name == "securityos-cloudmacs" and
-    ((.services.cloudmacs.ports // []) | length == 0) and
-    ((.services.cloudmacs.networks | keys | sort) == ["cloudmacs-net"]) and
-    .networks["cloudmacs-net"].name == "securityos_cloudmacs-net"
+    .networks.securenet.name == "securityos_securenet"
   ' >/dev/null
 
 test "$(docker inspect --format '{{.State.Health.Status}}' \
   securityos-tor-1)" = "healthy"
 docker network inspect securityos_securenet >/dev/null
-docker network inspect securityos_cloudmacs-net >/dev/null
+if docker container inspect securityos-cloudmacs >/dev/null 2>&1; then
+  printf '%s\n' "Cloudmacs must remain absent from production" >&2
+  exit 1
+fi
+if docker network inspect securityos_cloudmacs-net >/dev/null 2>&1; then
+  printf '%s\n' "The retired Cloudmacs network must remain absent" >&2
+  exit 1
+fi
 
 proxy_networks="$(docker inspect --format \
   '{{json .NetworkSettings.Networks}}' npm-attachment)"
 printf '%s\n' "$proxy_networks" | grep -q 'securityos_securenet'
-printf '%s\n' "$proxy_networks" | grep -q 'securityos_cloudmacs-net'
+if printf '%s\n' "$proxy_networks" | grep -q 'securityos_cloudmacs-net'; then
+  printf '%s\n' "Reverse proxy still has a retired network attachment" >&2
+  exit 1
+fi
 curl --fail --silent --show-error --output /dev/null \
   http://127.0.0.1:3002/
 ```
@@ -380,29 +405,25 @@ curl --fail --silent --show-error --output /dev/null \
 Record the exact companion container IDs so post-cutover checks can prove they
 were not recreated. Preserve the dirty production Compose file and patch as
 rollback evidence, then give the running web image a cheap rollback tag. Do not
-tag or replace Tor or Cloudmacs images.
+tag or replace Tor images, and do not recreate Cloudmacs.
 
 ```sh
 old_web_image="$(docker inspect --format '{{.Image}}' securityos)"
 old_tor_container="$(docker inspect --format '{{.Id}}' securityos-tor-1)"
-old_cloudmacs_container="$(docker inspect --format '{{.Id}}' \
-  securityos-cloudmacs)"
 old_proxy_container="$(docker inspect --format '{{.Id}}' npm-attachment)"
 old_securenet="$(docker network inspect --format '{{.Id}}' \
   securityos_securenet)"
-old_cloudmacs_network="$(docker network inspect --format '{{.Id}}' \
-  securityos_cloudmacs-net)"
 
 [[ "$old_web_image" =~ ^sha256:[0-9a-f]{64}$ ]]
 [[ "$old_tor_container" =~ ^[0-9a-f]{64}$ ]]
-[[ "$old_cloudmacs_container" =~ ^[0-9a-f]{64}$ ]]
 [[ "$old_proxy_container" =~ ^[0-9a-f]{64}$ ]]
 [[ "$old_securenet" =~ ^[0-9a-f]{64}$ ]]
-[[ "$old_cloudmacs_network" =~ ^[0-9a-f]{64}$ ]]
 
 test ! -e "$rollback_root"
 install -d -m 0700 "$rollback_root"
 cp --preserve=all "$prod_compose" "$rollback_root/docker-compose.yml"
+cp --preserve=all "$prod_exclusion" \
+  "$rollback_root/ionos-no-cloudmacs.override.yml"
 test ! -e "$prod_root/old.ymo" || \
   cp --preserve=all "$prod_root/old.ymo" "$rollback_root/old.ymo"
 GIT_OPTIONAL_LOCKS=0 git -C "$prod_root" rev-parse HEAD \
@@ -433,16 +454,15 @@ printf '%s\n' \
   "candidate_image=$(printf '%q' "$candidate_image")" \
   "prod_root=$(printf '%q' "$prod_root")" \
   "prod_compose=$(printf '%q' "$prod_compose")" \
+  "prod_exclusion=$(printf '%q' "$prod_exclusion")" \
   "compose_web_image=$(printf '%q' "$compose_web_image")" \
   "prod_compose_sha256=$(printf '%q' "$prod_compose_sha256")" \
   "rollback_id=$(printf '%q' "$rollback_id")" \
   "rollback_image_ref=$(printf '%q' "$rollback_image_ref")" \
   "old_web_image=$(printf '%q' "$old_web_image")" \
   "old_tor_container=$(printf '%q' "$old_tor_container")" \
-  "old_cloudmacs_container=$(printf '%q' "$old_cloudmacs_container")" \
   "old_proxy_container=$(printf '%q' "$old_proxy_container")" \
   "old_securenet=$(printf '%q' "$old_securenet")" \
-  "old_cloudmacs_network=$(printf '%q' "$old_cloudmacs_network")" \
   "file_web_hash=$(printf '%q' "$file_web_hash")" \
   >"$state_tmp"
 chmod 0600 "$state_tmp"
@@ -504,8 +524,8 @@ docker stop "$smoke" >/dev/null
 trap - EXIT
 ```
 
-If either probe fails, stop here. The production web, Tor, and Cloudmacs
-containers are still untouched.
+If either probe fails, stop here. The production web and Tor containers are
+still untouched, and Cloudmacs remains absent.
 
 ## 5. Replace only the exact web container
 
@@ -536,10 +556,8 @@ source "$state_file"
 [[ "$candidate_image" =~ ^sha256:[0-9a-f]{64}$ ]]
 [[ "$old_web_image" =~ ^sha256:[0-9a-f]{64}$ ]]
 [[ "$old_tor_container" =~ ^[0-9a-f]{64}$ ]]
-[[ "$old_cloudmacs_container" =~ ^[0-9a-f]{64}$ ]]
 [[ "$old_proxy_container" =~ ^[0-9a-f]{64}$ ]]
 [[ "$old_securenet" =~ ^[0-9a-f]{64}$ ]]
-[[ "$old_cloudmacs_network" =~ ^[0-9a-f]{64}$ ]]
 [[ "$file_web_hash" =~ ^[0-9a-f]{64}$ ]]
 [[ "$prod_compose_sha256" =~ ^[0-9a-f]{64}$ ]]
 [[ "$rollback_id" =~ ^[0-9]{8}T[0-9]{6}Z$ ]]
@@ -549,41 +567,57 @@ test "$state_file" = \
   "/root/securityos-rollbacks/${rollback_id}/state.env"
 test "$prod_root" = "/root/secos/securityos"
 test "$prod_compose" = "$prod_root/docker-compose.yml"
+test "$prod_exclusion" = \
+  "/root/securityos-runtime/ionos-no-cloudmacs.override.yml"
+test "$(stat --format='%u:%a' "$prod_exclusion")" = "0:600"
+test "$(sha256sum "$prod_exclusion" | awk '{ print $1 }')" = \
+  "48f14a2132d4f735b5f3297db3b06c73ed43ad05020214f6880028a3743b5a8e"
 test "$compose_web_image" = "securityos-web"
 
 assert_companions_unchanged() {
+  local dormant_path
+  local running_mount_sources
+
   test "$(docker inspect --format '{{.Id}}' securityos-tor-1)" = \
     "$old_tor_container" || return 1
-  test "$(docker inspect --format '{{.Id}}' securityos-cloudmacs)" = \
-    "$old_cloudmacs_container" || return 1
   test "$(docker inspect --format '{{.Id}}' npm-attachment)" = \
     "$old_proxy_container" || return 1
   test "$(docker network inspect --format '{{.Id}}' \
     securityos_securenet)" = "$old_securenet" || return 1
-  test "$(docker network inspect --format '{{.Id}}' \
-    securityos_cloudmacs-net)" = "$old_cloudmacs_network" || return 1
+  ! docker container inspect securityos-cloudmacs >/dev/null 2>&1 || return 1
+  ! docker network inspect securityos_cloudmacs-net >/dev/null 2>&1 || return 1
   test "$(docker inspect --format '{{.State.Running}}' securityos-tor-1)" = \
     "true" || return 1
   test "$(docker inspect --format '{{.State.Health.Status}}' \
     securityos-tor-1)" = "healthy" || return 1
-  test "$(docker inspect --format '{{.State.Running}}' \
-    securityos-cloudmacs)" = "true" || return 1
   test "$(docker inspect --format '{{.State.Running}}' npm-attachment)" = \
     "true" || return 1
   docker inspect --format '{{json .NetworkSettings.Networks}}' \
     npm-attachment | jq --exit-status \
-    'has("securityos_securenet") and has("securityos_cloudmacs-net")' \
+    'has("securityos_securenet") and (has("securityos_cloudmacs-net") | not)' \
     >/dev/null || return 1
   docker inspect --format '{{json .NetworkSettings.Networks}}' \
     securityos-tor-1 | jq --exit-status \
     'has("securityos_securenet")' >/dev/null || return 1
-  docker inspect --format '{{json .NetworkSettings.Networks}}' \
-    securityos-cloudmacs | jq --exit-status \
-    'has("securityos_cloudmacs-net")' >/dev/null || return 1
+  running_mount_sources="$(docker ps --quiet | xargs --no-run-if-empty \
+    docker inspect --format '{{range .Mounts}}{{println .Source}}{{end}}')" || \
+    return 1
+  for dormant_path in \
+    /root/.cloudmacs.d \
+    /root/.spacemacs.d \
+    /root/cloudmacs-data \
+    /root/cloudmacs-telega \
+    /root/whatsappel; do
+    ! printf '%s\n' "$running_mount_sources" | \
+      grep --fixed-strings --line-regexp -- "$dormant_path" || return 1
+  done
 }
 
 assert_web_release() {
   local expected_image="$1"
+  local fs_index
+  local headers
+  local icon_size
 
   test "$(docker inspect --format '{{.Name}}' securityos)" = "/securityos" || \
     return 1
@@ -602,6 +636,10 @@ assert_web_release() {
     "$file_web_hash" || return 1
   test "$(docker inspect --format '{{.State.Running}}' securityos)" = \
     "true" || return 1
+  docker inspect --format '{{json .Config.Env}}' securityos | \
+    jq --exit-status \
+      'map(select(startswith("NEXT_PUBLIC_ENABLE_CLOUDMACS="))) ==
+       ["NEXT_PUBLIC_ENABLE_CLOUDMACS=false"]' >/dev/null || return 1
   docker inspect --format '{{json .NetworkSettings.Ports}}' securityos | \
     jq --exit-status '
       [. | to_entries[] | select(.value != null)] as $published |
@@ -625,6 +663,26 @@ assert_web_release() {
     jq --exit-status '.IsTor == true' >/dev/null || return 1
   curl --fail --silent --show-error --output /dev/null \
     --retry 10 --retry-delay 3 https://os.securityops.co/ || return 1
+  test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+    http://127.0.0.1:3002/Users/Public/Desktop/Cloudmacs.url)" = "404" || \
+    return 1
+  test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+    'http://127.0.0.1:3002/Users/Public/Start%20Menu/Cloudmacs.url')" = \
+    "404" || return 1
+  for icon_size in 16 32 48 96 144; do
+    test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+      "http://127.0.0.1:3002/System/Icons/${icon_size}x${icon_size}/emacs.webp")" = \
+      "404" || return 1
+  done
+  fs_index="$(curl --fail --silent --show-error \
+    http://127.0.0.1:3002/.index/fs.9p.json)" || return 1
+  ! printf '%s\n' "$fs_index" | grep --fixed-strings --quiet 'Cloudmacs.url' || \
+    return 1
+  headers="$(curl --fail --silent --show-error --head \
+    http://127.0.0.1:3002/)" || return 1
+  ! printf '%s\n' "$headers" | \
+    grep --extended-regexp --ignore-case --quiet \
+      'https?://(localhost|127\.0\.0\.1):8090' || return 1
 }
 
 remove_exact_web() {
@@ -645,15 +703,18 @@ remove_exact_web() {
 start_exact_web() {
   test "$(sha256sum "$prod_compose" | awk '{ print $1 }')" = \
     "$prod_compose_sha256" || return 1
-  docker compose -p securityos -f "$prod_compose" config -q || return 1
-  docker compose -p securityos -f "$prod_compose" config --format json | \
+  docker compose -p securityos -f "$prod_compose" -f "$prod_exclusion" \
+    config -q || return 1
+  docker compose -p securityos -f "$prod_compose" -f "$prod_exclusion" \
+    config --format json | \
     jq --exit-status '
       .services.web.image == null and
       .services.web.build.context == "/root/secos/securityos" and
       .services.web.build.dockerfile == "Dockerfile" and
-      .services.web.container_name == "securityos"
+      .services.web.container_name == "securityos" and
+      (.services.cloudmacs // null) == null
     ' >/dev/null || return 1
-  docker compose -p securityos -f "$prod_compose" \
+  docker compose -p securityos -f "$prod_compose" -f "$prod_exclusion" \
     up --detach --no-deps --no-build --pull never web || return 1
 }
 
@@ -749,10 +810,8 @@ source "$state_file"
 
 [[ "$old_web_image" =~ ^sha256:[0-9a-f]{64}$ ]]
 [[ "$old_tor_container" =~ ^[0-9a-f]{64}$ ]]
-[[ "$old_cloudmacs_container" =~ ^[0-9a-f]{64}$ ]]
 [[ "$old_proxy_container" =~ ^[0-9a-f]{64}$ ]]
 [[ "$old_securenet" =~ ^[0-9a-f]{64}$ ]]
-[[ "$old_cloudmacs_network" =~ ^[0-9a-f]{64}$ ]]
 [[ "$file_web_hash" =~ ^[0-9a-f]{64}$ ]]
 [[ "$prod_compose_sha256" =~ ^[0-9a-f]{64}$ ]]
 [[ "$rollback_id" =~ ^[0-9]{8}T[0-9]{6}Z$ ]]
@@ -761,15 +820,22 @@ test "$state_file" = \
   "/root/securityos-rollbacks/${rollback_id}/state.env"
 test "$prod_root" = "/root/secos/securityos"
 test "$prod_compose" = "$prod_root/docker-compose.yml"
+test "$prod_exclusion" = \
+  "/root/securityos-runtime/ionos-no-cloudmacs.override.yml"
+test "$(stat --format='%u:%a' "$prod_exclusion")" = "0:600"
+test "$(sha256sum "$prod_exclusion" | awk '{ print $1 }')" = \
+  "48f14a2132d4f735b5f3297db3b06c73ed43ad05020214f6880028a3743b5a8e"
 test "$compose_web_image" = "securityos-web"
 test "$(sha256sum "$prod_compose" | awk '{ print $1 }')" = \
   "$prod_compose_sha256"
-docker compose -p securityos -f "$prod_compose" config --format json | \
+docker compose -p securityos -f "$prod_compose" -f "$prod_exclusion" \
+  config --format json | \
   jq --exit-status '
     .services.web.image == null and
     .services.web.build.context == "/root/secos/securityos" and
     .services.web.build.dockerfile == "Dockerfile" and
-    .services.web.container_name == "securityos"
+    .services.web.container_name == "securityos" and
+    (.services.cloudmacs // null) == null
   ' >/dev/null
 test "$(docker image inspect --format '{{.Id}}' \
   "$rollback_image_ref")" = "$old_web_image"
@@ -790,7 +856,7 @@ if docker container inspect securityos >/dev/null 2>&1; then
   docker rm securityos
 fi
 
-docker compose -p securityos -f "$prod_compose" \
+docker compose -p securityos -f "$prod_compose" -f "$prod_exclusion" \
   up --detach --no-deps --no-build --pull never web
 
 test "$(docker inspect --format '{{.Name}}' securityos)" = "/securityos"
@@ -810,20 +876,16 @@ test "$(docker inspect --format \
 test "$(docker inspect --format '{{.State.Running}}' securityos)" = "true"
 test "$(docker inspect --format '{{.Id}}' securityos-tor-1)" = \
   "$old_tor_container"
-test "$(docker inspect --format '{{.Id}}' securityos-cloudmacs)" = \
-  "$old_cloudmacs_container"
 test "$(docker inspect --format '{{.Id}}' npm-attachment)" = \
   "$old_proxy_container"
 test "$(docker network inspect --format '{{.Id}}' \
   securityos_securenet)" = "$old_securenet"
-test "$(docker network inspect --format '{{.Id}}' \
-  securityos_cloudmacs-net)" = "$old_cloudmacs_network"
+! docker container inspect securityos-cloudmacs >/dev/null 2>&1
+! docker network inspect securityos_cloudmacs-net >/dev/null 2>&1
 test "$(docker inspect --format '{{.State.Running}}' securityos-tor-1)" = \
   "true"
 test "$(docker inspect --format '{{.State.Health.Status}}' \
   securityos-tor-1)" = "healthy"
-test "$(docker inspect --format '{{.State.Running}}' \
-  securityos-cloudmacs)" = "true"
 test "$(docker inspect --format '{{.State.Running}}' npm-attachment)" = \
   "true"
 
@@ -840,14 +902,11 @@ docker inspect --format '{{json .NetworkSettings.Networks}}' securityos | \
   '(keys | sort) == ["securityos_securenet"]' >/dev/null
 docker inspect --format '{{json .NetworkSettings.Networks}}' npm-attachment | \
   jq --exit-status \
-  'has("securityos_securenet") and has("securityos_cloudmacs-net")' \
+  'has("securityos_securenet") and (has("securityos_cloudmacs-net") | not)' \
   >/dev/null
 docker inspect --format '{{json .NetworkSettings.Networks}}' \
   securityos-tor-1 | jq --exit-status \
   'has("securityos_securenet")' >/dev/null
-docker inspect --format '{{json .NetworkSettings.Networks}}' \
-  securityos-cloudmacs | jq --exit-status \
-  'has("securityos_cloudmacs-net")' >/dev/null
 
 curl --fail --silent --show-error --output /dev/null \
   --retry 20 --retry-delay 2 --retry-connrefused \
@@ -862,47 +921,61 @@ curl --fail --silent --show-error --output /dev/null \
   --retry 10 --retry-delay 3 https://os.securityops.co/
 ```
 
-The production checkout, dirty Compose model, persistent networks, Tor service,
-Cloudmacs service, and Cloudmacs bind mounts remain untouched throughout the
-standard web cutover and rollback.
+The production checkout, dirty Compose model, persistent SecurityOS network, Tor
+service, and dormant Cloudmacs bind-mount directories remain untouched throughout
+the standard web cutover and rollback. The Cloudmacs runtime remains absent.
 
-## One-time retired-integration Cloudmacs migration
+## Cloudmacs exclusion on the IONOS VPS
 
-This migration is authorized only when a release removes integrations that the
-running Cloudmacs container still loads or mounts. Perform it after the web
-cutover has passed every gate. Build and transfer an immutable `linux/amd64`
-Cloudmacs image from `deploy/cloudmacs/` using the same checksum and disk-capacity
-discipline as the web artifact.
+Cloudmacs source stays in this repository for optional, separately authorized
+deployments, but it is not part of the IONOS production topology. Every release
+must prove all of the following:
 
-Before recreation, create a fresh root-only rollback directory, tag the exact
-running Cloudmacs image, and save its container/image inspection plus effective
-Compose configuration. Create a release-scoped Compose override whose `image`
-is the verified candidate and whose `volumes` list uses Compose `!override` to
-contain only these active mounts:
+- no `securityos-cloudmacs` container exists;
+- no `securityos_cloudmacs-net` network exists;
+- `npm-attachment` is connected to `securityos_securenet` and not to a Cloudmacs
+  network; and
+- the known Cloudmacs host directories are not mounted by any running container;
+  and
+- the production web image has no Cloudmacs catalog entry, desktop/Start shortcut,
+  editor association, dedicated icon assets, or loopback CSP allowance.
 
-```yaml
-services:
-  cloudmacs:
-    image: securityos-cloudmacs:candidate-REVIEWED-COMMIT-12HEX
-    volumes: !override
-      - ${HOME}/.cloudmacs.d:/home/emacs/.emacs.d
-      - ${HOME}/.spacemacs.d:/home/emacs/.spacemacs.d
-      - ${HOME}/cloudmacs-data:/home/emacs/data
-```
+The removal rollback directory and exact rollback image tag may be retained
+during the observation window. The dormant host directories are user/recovery
+data: do not mount, modify, or delete them during a SecurityOS release. Re-enabling
+Cloudmacs requires separate authorization and its own rollback-reviewed plan; an
+ordinary web deployment must never recreate it.
 
-First verify the installed Compose version supports `!override`, then render the
-base plus override and assert that the image ID, networks, ports, environment,
-and three mount targets are exact. The rendered service must contain no retired
-integration name or mount. Recreate **only** `cloudmacs` with `--no-deps`,
-`--no-build`, `--pull never`, and `--force-recreate`; never select `web`, Tor, or
-the reverse proxy in this command.
+### One-time transition record
 
-After recreation, require the candidate image ID, zero restarts, the unchanged
-Cloudmacs network, a working local Gotty/Emacs response, and exactly the three
-active mounts above. Also assert that the web, Tor, and reverse-proxy container
-IDs did not change. On any failure, immediately recreate Cloudmacs from the
-captured rollback image and mount model. Detached host directories are retained
-for recovery: do not delete them as part of this migration.
+The authorized transition was completed on 2026-09-01. Do not rerun it against
+the already-clean topology. Before changing production, the operator resolved the
+exact container, image, network, proxy attachment, and mount sources; verified the
+Compose project/service labels; and created the root-only rollback snapshot
+`/root/securityos-rollbacks/20260901T215828Z-cloudmacs-removal`. That snapshot
+contains the redacted container, image, network, reverse-proxy, and effective
+Compose evidence plus the exact rollback image tag.
+
+The transition then detached only `npm-attachment` from
+`securityos_cloudmacs-net`, stopped and removed only `securityos-cloudmacs`,
+removed the now-empty dedicated network, and removed only the active
+`securityos-cloudmacs:latest` tag. It did not prune Docker, touch Tor or web, or
+delete bind data. A later audit found the stale Nginx Proxy Manager host ID 59 for
+`emacs.securityops.co`; its SQLite database and generated configuration were
+copied into the same root-only rollback directory before that exact host was
+disabled/deleted and Nginx was syntax-checked and reloaded. Certificates and
+unrelated hosts were not changed. Post-transition validation proved the web, Tor,
+and proxy container IDs were unchanged; the retired container/network, active
+image tag, proxy-host row/configuration, and public TLS virtual host were absent;
+and no running container mounted the dormant directories. The durable root-only
+Compose override now prevents ordinary production operations from recreating the
+service.
+
+If rollback is separately authorized during the observation window, use only the
+captured snapshot and exact rollback tag. First validate every stored identifier,
+reconstruct only the captured Cloudmacs service/network attachment, and prove the
+web, Tor, and proxy IDs did not change. Never infer a rollback model from a newer
+release file and never delete or rewrite the preserved host directories.
 
 ## Forbidden cleanup operations
 
@@ -912,9 +985,10 @@ release:
 - `docker system prune`, `docker image prune`, `docker builder prune`,
   `docker volume prune`, or broad image deletion;
 - `docker compose down`, `down -v`, `rm -v`, or `--rmi all`;
-- stopping, removing, rebuilding, or recreating `securityos-tor-1` or
-  `securityos-cloudmacs` during a normal web release (the narrowly scoped,
-  separately gated migration above is the only Cloudmacs exception);
+- stopping, removing, rebuilding, or recreating `securityos-tor-1` during a
+  normal web release;
+- recreating `securityos-cloudmacs`, its dedicated network, or its reverse-proxy
+  attachment;
 - deletion of unnamed or apparently unused volumes without documented ownership;
 - deletion of Cloudmacs bind-mount directories;
 - `git pull`, `git reset --hard`, `git clean`, or replacement of
@@ -923,6 +997,7 @@ release:
 - credentials in Git URLs, command arguments, Compose files, artifacts, or
   documentation.
 
-Any later cleanup must resolve exact image tags or paths first, confirm that the
-rollback window has closed, and remain limited to SecurityOS web artifacts. Do
-not remove the rollback tag until rollback is explicitly retired.
+Any later cleanup must resolve exact image tags or paths first and confirm that
+the rollback window has closed. Exact unused SecurityOS web or Cloudmacs image
+tags may then be removed; never use a broad prune. Do not remove a rollback tag
+until rollback is explicitly retired.
