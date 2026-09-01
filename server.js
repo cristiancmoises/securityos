@@ -20,9 +20,20 @@ const port = Number(process.env.PORT) || 3000;
 const hostname = process.env.HOSTNAME || "0.0.0.0";
 const TOR_PROXY = process.env.TOR_PROXY || "";
 const KEYWAVE_CLEARNET_HOST = "chat.securityops.co";
+// Match the HTTP and Matrix proxy ceilings. Cold, stream-isolated Tor circuits
+// can legitimately take more than 30 seconds to establish; aborting the SOCKS or
+// WebSocket handshake earlier made otherwise healthy Keywave/IRC realtime routes
+// fail while their HTTP landing pages succeeded.
+const WS_CONNECT_TIMEOUT_MS = 120_000;
 const MAX_WS_ISO_AGENTS = 256;
 const MAX_WS_QUEUE_BYTES = 8 * 1024 * 1024;
 const MAX_WS_QUEUE_MESSAGES = 256;
+const WS_AGENT_OPTS = {
+  keepAlive: true,
+  maxSockets: 64,
+  maxFreeSockets: 16,
+  timeout: WS_CONNECT_TIMEOUT_MS,
+};
 
 // Optional WS deps — load defensively so a missing module can't break boot.
 let WebSocketServer;
@@ -38,7 +49,9 @@ try {
 let socksAgent;
 try {
   socksAgent =
-    TOR_PROXY && SocksProxyAgent ? new SocksProxyAgent(TOR_PROXY) : undefined;
+    TOR_PROXY && SocksProxyAgent
+      ? new SocksProxyAgent(TOR_PROXY, WS_AGENT_OPTS)
+      : undefined;
 } catch {
   socksAgent = undefined;
 }
@@ -65,7 +78,7 @@ const agentForIso = (iso) => {
     proxyUrl.username = iso;
     proxyUrl.password = iso;
 
-    const agent = new SocksProxyAgent(proxyUrl.href);
+    const agent = new SocksProxyAgent(proxyUrl.href, WS_AGENT_OPTS);
 
     wsIsoAgents.set(iso, agent);
     if (wsIsoAgents.size > MAX_WS_ISO_AGENTS) {
@@ -206,7 +219,7 @@ app
               // Redirects could leave the validated host allowlist. A client must
               // reconnect to an explicitly validated target instead.
               followRedirects: false,
-              handshakeTimeout: 30_000,
+              handshakeTimeout: WS_CONNECT_TIMEOUT_MS,
               headers: {
                 // WebSocket Origin uses the page's HTTP(S) origin, never a
                 // ws(s):// origin. Some Engine.IO servers accept the upgrade
