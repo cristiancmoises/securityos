@@ -64,6 +64,7 @@ COPY --from=build /SecurityOS/node_modules ./node_modules
 COPY --from=build /SecurityOS/public ./public
 COPY --from=build /SecurityOS/next.config.js ./next.config.js
 COPY --from=build /SecurityOS/package.json ./package.json
+COPY --from=build /SecurityOS/scripts/securityHeaders.js ./scripts/securityHeaders.js
 COPY --from=build /SecurityOS/server.js ./server.js
 
 EXPOSE 3000
