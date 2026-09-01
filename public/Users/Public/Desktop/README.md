@@ -25,7 +25,7 @@ that runs entirely in your browser. No install, no tracking, no logs.
   password/entropy, regex, CIDR, ciphers, hash-ID, UUID — all offline), a curated
   **Security** launcher, and a real **Linux VM** (v86) you can route through Tor.
 - 💬 **Private chat & calls.** **Matrix** is a full end-to-end-encrypted chat
-  client with every request tunneled over Tor to `matrix.securityops.co` — it
+  client with every request tunneled over Tor to `matrix.securityops.com.br` — it
   decrypts encrypted rooms, joins federated rooms, and keeps your keys **in memory
   only** (amnesic). **Keywave** offers a Tor-safe landing/control view and an explicit
   direct full client for end-to-end-encrypted text and video calls.

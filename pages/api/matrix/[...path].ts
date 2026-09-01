@@ -11,17 +11,17 @@ import { SocksProxyAgent } from "socks-proxy-agent";
  * (components/apps/Matrix). The app only ever talks to THIS same-origin endpoint
  * (e.g. /api/matrix/_matrix/client/v3/login); we relay it to the homeserver.
  *
- * Tor: when TOR_PROXY is set (e.g. socks5h://tor:9050 via the deploy compose),
- * every request is routed through Tor's SOCKS5h proxy — DNS is resolved AT Tor, so
- * the homeserver hostname never leaks to a local resolver and the real IP is never
- * exposed. We fail CLOSED: if TOR_PROXY is configured but the agent didn't build,
- * we return 502 rather than silently connecting direct (which would leak the IP
- * while the user believes they are on Tor).
+ * Tor: TOR_PROXY is mandatory (e.g. socks5h://tor:9050 via the deploy compose).
+ * Every upstream request uses that SOCKS5h agent, including Tor-side DNS. If the
+ * agent is absent or malformed, the route returns 502 instead of silently opening
+ * a direct connection. This protects the SecurityOS server's upstream route; the
+ * user's connection to SecurityOS and Matrix account metadata remain observable
+ * to the services that handle them.
  *
  * No SSRF: HOMESERVER is hardcoded and the only host we ever connect to. The
- * forwarded path MUST start with `_matrix/`, so this endpoint can ONLY ever reach
- * matrix.securityops.co's documented Client-Server API — it can never be coerced
- * into acting as an open proxy to an arbitrary host.
+ * forwarded path MUST be in the `_matrix/client/` or `_matrix/media/` family, so
+ * this endpoint can only reach matrix.securityops.com.br's Client-Server APIs — it
+ * cannot become an arbitrary-host, federation, admin, or key relay.
  *
  * Privacy: only Authorization / Content-Type / Accept are forwarded upstream (no
  * cookies, no other headers). The response relays only the upstream status, the
@@ -37,7 +37,7 @@ export const config = {
   api: { bodyParser: false },
 };
 
-const HOMESERVER = "https://matrix.securityops.co";
+const HOMESERVER = "https://matrix.securityops.com.br";
 
 // /sync long-polls up to ~30s, but matrix-js-sdk's own client-side abort is
 // pollTimeout(30s) + BUFFER_PERIOD(80s) = ~110s for steady-state syncs. Keep our
@@ -50,9 +50,9 @@ const MAX_RESPONSE_BYTES = 50 * 1024 * 1024;
 const MAX_BODY_BYTES = 50 * 1024 * 1024;
 
 const TOR_PROXY = process.env.TOR_PROXY || "";
-// Never let a malformed TOR_PROXY value take down the route at module load. A
-// bad/absent agent degrades to a clean "Tor unavailable" 502 (fail closed), it
-// never degrades to a direct connection.
+// Never let a missing or malformed TOR_PROXY value take down the route at module
+// load. A bad/absent agent degrades to a clean "Tor unavailable" 502 (fail
+// closed); this Tor-only endpoint never degrades to a direct connection.
 let socksAgent: SocksProxyAgent | undefined;
 try {
   socksAgent = TOR_PROXY ? new SocksProxyAgent(TOR_PROXY) : undefined;
@@ -63,6 +63,65 @@ try {
 // Only these client headers are ever forwarded upstream. Cookies and everything
 // else are dropped.
 const FORWARD_REQUEST_HEADERS = ["authorization", "content-type", "accept"];
+const ALLOWED_METHODS = new Set([
+  "DELETE",
+  "GET",
+  "HEAD",
+  "OPTIONS",
+  "POST",
+  "PUT",
+]);
+const ALLOWED_PATH_PREFIXES = ["_matrix/client/", "_matrix/media/"];
+const ALLOWED_NORMALIZED_PATH_PREFIXES = ALLOWED_PATH_PREFIXES.map(
+  (prefix) => `/${prefix}`
+);
+
+const hasPathControlCharacter = (value: string): boolean => {
+  for (let index = 0; index < value.length; index += 1) {
+    const codePoint = value.codePointAt(index) ?? 0;
+
+    if (codePoint <= 31 || codePoint === 127) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const isTraversalSegment = (value: string): boolean =>
+  value === "." || value === "..";
+
+// Next normally hands catch-all segments to us decoded once. Repeatedly unwrap
+// percent encoding so a STRUCTURAL segment spelled `%2e%2e` or `%252e%252e`
+// cannot survive our pre-normalization allowlist. Do not split a decoded catch-all
+// segment on `/`: Matrix aliases and opaque IDs may legally contain encoded
+// slashes, percent signs, and even slash-delimited `.` data. Each Next path segment
+// is re-encoded with encodeURIComponent below, so those characters remain opaque
+// (`%2F`, `%25`) in the upstream URL rather than becoming path delimiters.
+const isUnsafePathSegment = (segment: string): boolean => {
+  let value = segment;
+
+  // Every successful decode shortens the string, so this bound reaches a stable
+  // value without imposing an arbitrary nesting limit on an opaque Matrix ID.
+  for (let depth = 0; depth <= segment.length; depth += 1) {
+    if (isTraversalSegment(value) || hasPathControlCharacter(value)) {
+      return true;
+    }
+
+    try {
+      const decoded = decodeURIComponent(value);
+
+      if (decoded === value) return false;
+      value = decoded;
+    } catch {
+      // A literal/malformed percent sequence is re-encoded below as `%25`; it
+      // cannot alter the upstream path structure.
+      return false;
+    }
+  }
+
+  return false;
+};
 
 type UpstreamResponse = {
   body: Buffer;
@@ -101,9 +160,9 @@ const forwardToHomeserver = (
   clientReq: NextApiRequest
 ): Promise<UpstreamResponse> =>
   new Promise((resolve, reject) => {
-    // Fail CLOSED: when Tor is configured (TOR_PROXY set) but the agent failed to
-    // build, never open a direct connection — surface it as a Tor error.
-    if (TOR_PROXY && !socksAgent) {
+    // Fail CLOSED even when TOR_PROXY is absent. This endpoint is Tor-only, so an
+    // undefined agent must never become Node's implicit direct HTTPS connection.
+    if (!socksAgent) {
       reject(new Error("tor-unavailable"));
       return;
     }
@@ -278,22 +337,25 @@ const handler = async (
 ): Promise<void> => {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("X-Content-Type-Options", "nosniff");
 
-  // Reconstruct the upstream path from the catch-all segments. ONLY the documented
-  // Matrix Client-Server API (`_matrix/...`) may be reached — this is what makes
-  // the endpoint single-host with no SSRF: it can never address anything but
-  // matrix.securityops.co's /_matrix/ tree.
+  // Reconstruct the upstream path from the catch-all segments. Only Matrix client
+  // and media API families may be reached — federation/admin/key endpoints remain
+  // inaccessible even though the upstream host itself is fixed.
   const segments = Array.isArray(req.query.path) ? req.query.path : [];
   const joinedPath = segments.map((s) => encodeURIComponent(s)).join("/");
 
-  if (!joinedPath.startsWith("_matrix/")) {
+  if (
+    segments.some((segment) => isUnsafePathSegment(segment)) ||
+    !ALLOWED_PATH_PREFIXES.some((prefix) => joinedPath.startsWith(prefix))
+  ) {
     res
       .status(400)
       .setHeader("Content-Type", "application/json; charset=utf-8")
       .end(
         JSON.stringify({
           errcode: "M_SECURITYOS_BAD_PATH",
-          error: "Only _matrix/ Client-Server API paths are allowed",
+          error: "Only Matrix client and media API paths are allowed",
         })
       );
     return;
@@ -313,7 +375,29 @@ const handler = async (
   // allow-listed `_matrix/`-prefixed value; a lone trailing "/" can't escape it.)
   const pathPortion = queryIndex === -1 ? rawUrl : rawUrl.slice(0, queryIndex);
   const trailingSlash = pathPortion.endsWith("/") ? "/" : "";
-  const targetUrl = `${HOMESERVER}/${joinedPath}${trailingSlash}${queryString}`;
+  const targetUrl = new URL(
+    `${HOMESERVER}/${joinedPath}${trailingSlash}${queryString}`
+  );
+
+  // URL parsing normalizes dot segments. Re-check the normalized path so a value
+  // accepted above can never escape from client/media into federation or admin.
+  if (
+    targetUrl.origin !== HOMESERVER ||
+    !ALLOWED_NORMALIZED_PATH_PREFIXES.some((prefix) =>
+      targetUrl.pathname.startsWith(prefix)
+    )
+  ) {
+    res
+      .status(400)
+      .setHeader("Content-Type", "application/json; charset=utf-8")
+      .end(
+        JSON.stringify({
+          errcode: "M_SECURITYOS_BAD_PATH",
+          error: "Only Matrix client and media API paths are allowed",
+        })
+      );
+    return;
+  }
 
   // Allowlist the forwarded headers — Authorization (Bearer token), Content-Type,
   // Accept only. No cookies, no client IP, no anything else.
@@ -327,6 +411,21 @@ const handler = async (
   });
 
   const method = (req.method || "GET").toUpperCase();
+
+  if (!ALLOWED_METHODS.has(method)) {
+    res.setHeader("Allow", [...ALLOWED_METHODS].join(", "));
+    res
+      .status(405)
+      .setHeader("Content-Type", "application/json; charset=utf-8")
+      .end(
+        JSON.stringify({
+          errcode: "M_UNRECOGNIZED",
+          error: "Method not allowed",
+        })
+      );
+    return;
+  }
+
   let body: Buffer | undefined;
 
   try {
@@ -348,7 +447,7 @@ const handler = async (
 
   try {
     const upstream = await forwardWithRetry(
-      targetUrl,
+      targetUrl.href,
       method,
       headers,
       body,
@@ -372,7 +471,7 @@ const handler = async (
       res,
       message === "tor-unavailable"
         ? "Tor unavailable"
-        : `Could not reach the homeserver over Tor (${message})`
+        : "Could not reach the homeserver over Tor"
     );
   }
 };

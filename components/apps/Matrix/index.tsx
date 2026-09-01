@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from "react";
 
 // Matrix — first-party, FULLY FUNCTIONAL Matrix client for the SecurityOS desktop
 // (matrix-js-sdk + Rust crypto/E2EE). Every network call goes to the SAME-ORIGIN
-// /api/matrix endpoint, forwarded to matrix.securityops.co over Tor. Decrypts
+// /api/matrix endpoint, forwarded to matrix.securityops.com.br over Tor. Decrypts
 // encrypted rooms, searches people, browses + joins federated rooms, handles
 // invites, and renders images. The session is in-memory/amnesic.
 

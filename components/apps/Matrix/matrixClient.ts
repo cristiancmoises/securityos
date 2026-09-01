@@ -2,7 +2,8 @@
 //
 // EVERYTHING is routed through the SAME-ORIGIN Tor proxy: baseUrl="/api/matrix",
 // so the SDK requests "/api/matrix/_matrix/client/...", which pages/api/matrix/
-// [...path].ts forwards to matrix.securityops.co over Tor (SOCKS5h, DNS at Tor).
+// [...path].ts forwards to matrix.securityops.com.br over Tor (SOCKS5h, DNS at
+// Tor).
 // The browser NEVER talks to the homeserver directly.
 //
 // matrix-js-sdk is imported LAZILY (await import) and only from inside async
@@ -27,7 +28,7 @@ export const matrixBaseUrl = (): string =>
   `${
     typeof window === "undefined" ? "" : window.location.origin
   }${MATRIX_API_PATH}`;
-export const HOMESERVER_LABEL = "matrix.securityops.co";
+export const HOMESERVER_LABEL = "https://matrix.securityops.com.br";
 
 // PRE-WARM THE TOR CIRCUIT. The single biggest cause of "Matrix is stuck before
 // login" is that the FIRST request over Tor lands on a COLD circuit: building a

@@ -4,6 +4,17 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.23.2] — 2026-09-01
+
+- Migrated the full native Matrix/E2EE app and its fail-closed, same-origin Tor
+  proxy from the previous `matrix.securityops.co` target to the live
+  `matrix.securityops.com.br` Continuwuity homeserver. Login, sync, rooms,
+  federation, encrypted media, and in-memory crypto continue to use the native
+  Matrix client rather than a non-functional framed landing page.
+- Made the Matrix relay unconditionally fail closed when its Tor agent is absent
+  or malformed, restricted it to client/media API families and known HTTP
+  methods, and stopped returning raw upstream network errors.
+
 ## [2.23.1] — 2026-09-01
 
 - Updated Next.js and all vulnerable JavaScript dependency paths; `yarn audit`

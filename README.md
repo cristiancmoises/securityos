@@ -47,7 +47,7 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
   auto-updated by the `tails-iso` GitHub/Forgejo action.
 - **💬 Matrix (end-to-end-encrypted chat)** — a full Matrix client
   (matrix-js-sdk + Rust crypto/WASM) where **every request is tunneled through the
-  same-origin Tor proxy** to `matrix.securityops.co`. It decrypts E2EE rooms,
+  same-origin Tor proxy** to `matrix.securityops.com.br`. It decrypts E2EE rooms,
   searches the user directory, browses/joins federated rooms, handles invites, and
   renders image/file attachments. It **pre-warms the Tor circuit on open** so the
   first login is fast (cold Tor otherwise makes the first request take 15–40s).
@@ -172,7 +172,7 @@ retention is governed by the SecurityOps IRC service, not by this desktop.
 
 SecurityOS ships a **full end-to-end-encrypted Matrix client** (matrix-js-sdk with
 the **Rust crypto/WASM** stack), wired so that **every request is tunneled through
-the same-origin Tor proxy** to the `matrix.securityops.co` homeserver — nothing
+the same-origin Tor proxy** to the `matrix.securityops.com.br` homeserver — nothing
 talks to Matrix off-Tor.
 
 - **E2EE** — decrypts encrypted rooms; keys are **kept in memory only** (amnesic —
@@ -271,15 +271,15 @@ See [`CHANGELOG.md`](CHANGELOG.md) for what's new, and [`docs/`](docs) for
 
 ## 🧱 Architecture
 
-| Layer             | What                                                                                                            |
-| ----------------- | --------------------------------------------------------------------------------------------------------------- |
-| **Frontend**      | Next.js + TypeScript + styled-components (the desktop, apps, virtual filesystem)                                |
-| **Privacy proxy** | `pages/api/proxy.ts` — server-side Tor fetch, SSRF guard, header allowlist, HTML rewriting                      |
-| **Matrix proxy**  | same-origin Tor tunnel to `matrix.securityops.co` for the E2EE Matrix client (matrix-js-sdk + Rust crypto/WASM) |
-| **Rust sidecar**  | `sidecar/` — memory-safe equivalent of the proxy fetch/rewrite path                                             |
-| **Crypto**        | `wasm/vaptvupt/` → `public/Program Files/Vaptvupt/vaptvupt.js` (the WASM engine)                                |
-| **Emulation**     | v86 (x86 Linux), BoxedWine, js-dos, Ruffle — all WebAssembly                                                    |
-| **Deploy**        | `Dockerfile` + `deploy/` (compose, Tor image, nginx/Caddy, VM bootstrap, TAILS CI)                              |
+| Layer             | What                                                                                                                |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------- |
+| **Frontend**      | Next.js + TypeScript + styled-components (the desktop, apps, virtual filesystem)                                    |
+| **Privacy proxy** | `pages/api/proxy.ts` — server-side Tor fetch, SSRF guard, header allowlist, HTML rewriting                          |
+| **Matrix proxy**  | same-origin Tor tunnel to `matrix.securityops.com.br` for the E2EE Matrix client (matrix-js-sdk + Rust crypto/WASM) |
+| **Rust sidecar**  | `sidecar/` — memory-safe equivalent of the proxy fetch/rewrite path                                                 |
+| **Crypto**        | `wasm/vaptvupt/` → `public/Program Files/Vaptvupt/vaptvupt.js` (the WASM engine)                                    |
+| **Emulation**     | v86 (x86 Linux), BoxedWine, js-dos, Ruffle — all WebAssembly                                                        |
+| **Deploy**        | `Dockerfile` + `deploy/` (compose, Tor image, nginx/Caddy, VM bootstrap, TAILS CI)                                  |
 
 ---
 

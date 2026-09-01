@@ -33,9 +33,14 @@ not overwrite the file to make the checksum match.
 ## 1. Validate and build locally
 
 Start from a clean, reviewed commit. Dependency installation must not rewrite
-the lockfile.
+the lockfile. Run the release blocks in Bash with strict error handling; do not
+continue after a failed command.
 
 ```sh
+test -n "${BASH_VERSION:-}"
+set -Eeuo pipefail
+umask 077
+
 test -z "$(git status --porcelain)"
 yarn install --frozen-lockfile
 yarn test --runInBand
@@ -85,20 +90,36 @@ image_archive="${image_tar}.gz"
 gzip --test "$image_archive"
 
 printf '%s\n' "$local_image_id" >"${image_archive}.image-id"
+archive_bytes="$(stat --format='%s' "$image_archive")"
+image_bytes="$(docker image inspect --format='{{.Size}}' "$image_ref")"
+reserve_bytes=$((2 * 1024 * 1024 * 1024))
+staging_required_bytes=$((archive_bytes + reserve_bytes))
+docker_required_bytes=$((2 * image_bytes + reserve_bytes))
+shared_required_bytes=$((archive_bytes + 2 * image_bytes + reserve_bytes))
+
+printf '%s\n' \
+  "archive_bytes=${archive_bytes}" \
+  "image_bytes=${image_bytes}" \
+  "staging_required_bytes=${staging_required_bytes}" \
+  "docker_required_bytes=${docker_required_bytes}" \
+  "shared_required_bytes=${shared_required_bytes}" \
+  >"${image_archive}.capacity"
+
 (
   cd "$artifact_dir"
-  sha256sum "$(basename "$image_archive")" \
+  archive_name="$(basename "$image_archive")"
+  sha256sum "$archive_name" "$archive_name.image-id" \
+    "$archive_name.capacity" \
     >"$(basename "$image_archive").sha256"
 )
 ```
 
-Record the compressed artifact size and the image's uncompressed virtual size.
-The VPS must have room for the uploaded archive, the loaded candidate, Docker's
-load overhead, and the existing rollback image at the same time.
+Record the numeric gates. The factor of two on the image size conservatively
+covers the loaded candidate and transient Docker load/extraction overhead; the
+existing production image remains present as the rollback point.
 
 ```sh
-stat --format='archive-bytes=%s' "$image_archive"
-docker image inspect --format='image-bytes={{.Size}}' "$image_ref"
+cat "${image_archive}.capacity"
 ```
 
 ## 2. Check capacity and stage through Evelin
@@ -113,27 +134,62 @@ command ev --config "$HOME/.evelin/client.toml" shell
 Run these read-only checks on the VPS before uploading anything:
 
 ```sh
-df -h / /var/lib/docker
+test -n "${BASH_VERSION:-}"
+set -Eeuo pipefail
+umask 077
+
 docker system df
 docker image inspect securityos-web:latest >/dev/null
+
+# Copy these two exact decimal values from the reviewed local .capacity file.
+release_id="REVIEWED-COMMIT-12HEX"
+archive_bytes="REVIEWED-ARCHIVE-BYTES"
+image_bytes="REVIEWED-IMAGE-BYTES"
+[[ "$release_id" =~ ^[0-9a-f]{12}$ ]]
+[[ "$archive_bytes" =~ ^[0-9]+$ ]] && ((archive_bytes > 0))
+[[ "$image_bytes" =~ ^[0-9]+$ ]] && ((image_bytes > 0))
+
+staging_dir="/tmp/securityos-upload-${release_id}"
+reserve_bytes=$((2 * 1024 * 1024 * 1024))
+staging_required_bytes=$((archive_bytes + reserve_bytes))
+docker_required_bytes=$((2 * image_bytes + reserve_bytes))
+shared_required_bytes=$((archive_bytes + 2 * image_bytes + reserve_bytes))
+docker_root="$(docker info --format '{{.DockerRootDir}}')"
+staging_device="$(df -P /tmp | awk 'NR == 2 { print $1 }')"
+docker_device="$(df -P "$docker_root" | awk 'NR == 2 { print $1 }')"
+staging_available="$(df -PB1 /tmp | awk 'NR == 2 { print $4 }')"
+docker_available="$(df -PB1 "$docker_root" | awk 'NR == 2 { print $4 }')"
+
+[[ "$staging_available" =~ ^[0-9]+$ ]]
+[[ "$docker_available" =~ ^[0-9]+$ ]]
+if [[ "$staging_device" == "$docker_device" ]]; then
+  ((staging_available >= shared_required_bytes))
+else
+  ((staging_available >= staging_required_bytes))
+  ((docker_available >= docker_required_bytes))
+fi
 ```
 
-Stop if there is not conservative headroom for both artifact and loaded image.
-The 2026-09-01 audit found the root filesystem 95% full with only about 8.7 GiB
-free. Expand storage or perform a separately approved, exact-owner cleanup first.
-Never use broad Docker cleanup to make space.
+This is a hard numeric gate, not an advisory `df -h` check. Stop if any arithmetic
+assertion fails. The 2026-09-01 audit found the root filesystem 95% full with
+only about 8.7 GiB free. Expand storage or perform a separately approved,
+exact-owner cleanup first. Never use broad Docker cleanup to make space.
 
-Create exact staging and rollback directories, then exit the VPS shell.
+Create the exact release-scoped upload path accepted by Evelin's file-copy
+policy, plus the persistent rollback directory, then exit the VPS shell. Do not
+substitute a `/root` staging path: Evelin rejects it.
 
 ```sh
-install -d -m 0700 /root/securityos-staging /root/securityos-rollbacks
+install -d -m 0700 "$staging_dir" /root/securityos-rollbacks
+test "$(stat --format='%u:%a' "$staging_dir")" = "0:700"
 exit
 ```
 
 Upload the image and its verification files from the local machine:
 
 ```sh
-remote_archive="/root/securityos-staging/$(basename "$image_archive")"
+[[ "$release_id" =~ ^[0-9a-f]{12}$ ]]
+remote_archive="/tmp/securityos-upload-${release_id}/$(basename "$image_archive")"
 
 command ev --config "$HOME/.evelin/client.toml" cp \
   "$image_archive" "remote:${remote_archive}"
@@ -141,6 +197,8 @@ command ev --config "$HOME/.evelin/client.toml" cp \
   "${image_archive}.sha256" "remote:${remote_archive}.sha256"
 command ev --config "$HOME/.evelin/client.toml" cp \
   "${image_archive}.image-id" "remote:${remote_archive}.image-id"
+command ev --config "$HOME/.evelin/client.toml" cp \
+  "${image_archive}.capacity" "remote:${remote_archive}.capacity"
 command ev --config "$HOME/.evelin/client.toml" shell
 ```
 
@@ -151,20 +209,69 @@ On the VPS, substitute the reviewed commit identifier and verify the artifact
 before loading it. Loading an image does not affect the running container.
 
 ```sh
-set -o pipefail
-release_id="REVIEWED-COMMIT-12HEX"
-image_ref="securityos-web:candidate-${release_id}"
-remote_archive="/root/securityos-staging/securityos-web-${release_id}.tar.gz"
+test -n "${BASH_VERSION:-}"
+set -Eeuo pipefail
+umask 077
 
-cd /root/securityos-staging
+release_id="REVIEWED-COMMIT-12HEX"
+[[ "$release_id" =~ ^[0-9a-f]{12}$ ]]
+image_ref="securityos-web:candidate-${release_id}"
+staging_dir="/tmp/securityos-upload-${release_id}"
+remote_archive="${staging_dir}/securityos-web-${release_id}.tar.gz"
+
+test "$(stat --format='%u:%a' "$staging_dir")" = "0:700"
+cd "$staging_dir"
 sha256sum --check "$(basename "${remote_archive}.sha256")"
 gzip --test "$remote_archive"
 expected_image_id="$(cat "${remote_archive}.image-id")"
-printf '%s\n' "$expected_image_id" | grep -Eq '^sha256:[0-9a-f]{64}$'
+[[ "$expected_image_id" =~ ^sha256:[0-9a-f]{64}$ ]]
+
+capacity_file="${remote_archive}.capacity"
+archive_bytes="$(awk -F= '$1 == "archive_bytes" { print $2 }' \
+  "$capacity_file")"
+image_bytes="$(awk -F= '$1 == "image_bytes" { print $2 }' \
+  "$capacity_file")"
+reserve_bytes=$((2 * 1024 * 1024 * 1024))
+staging_required_bytes="$(awk -F= \
+  '$1 == "staging_required_bytes" { print $2 }' "$capacity_file")"
+docker_required_bytes="$(awk -F= \
+  '$1 == "docker_required_bytes" { print $2 }' "$capacity_file")"
+shared_required_bytes="$(awk -F= \
+  '$1 == "shared_required_bytes" { print $2 }' "$capacity_file")"
+for value in "$archive_bytes" "$image_bytes" "$staging_required_bytes" \
+  "$docker_required_bytes" "$shared_required_bytes"; do
+  [[ "$value" =~ ^[0-9]+$ ]] && ((value > 0))
+done
+test "$(stat --format='%s' "$remote_archive")" = "$archive_bytes"
+
+# Re-run the numeric gate immediately before loading; free space may have changed
+# since the pre-upload check.
+docker_root="$(docker info --format '{{.DockerRootDir}}')"
+staging_device="$(df -P "$staging_dir" | awk 'NR == 2 { print $1 }')"
+docker_device="$(df -P "$docker_root" | awk 'NR == 2 { print $1 }')"
+staging_available="$(df -PB1 "$staging_dir" | awk 'NR == 2 { print $4 }')"
+docker_available="$(df -PB1 "$docker_root" | awk 'NR == 2 { print $4 }')"
+[[ "$staging_available" =~ ^[0-9]+$ ]]
+[[ "$docker_available" =~ ^[0-9]+$ ]]
+if [[ "$staging_device" == "$docker_device" ]]; then
+  ((staging_available >= shared_required_bytes))
+else
+  ((staging_available >= staging_required_bytes))
+  ((docker_available >= docker_required_bytes))
+fi
+
+# Never overwrite an unrelated pre-existing candidate tag.
+if existing_candidate="$(docker image inspect --format '{{.Id}}' \
+  "$image_ref" 2>/dev/null)"; then
+  test "$existing_candidate" = "$expected_image_id"
+fi
 
 gzip --decompress --stdout "$remote_archive" | docker image load
 candidate_image="$(docker image inspect --format '{{.Id}}' "$image_ref")"
 test "$candidate_image" = "$expected_image_id"
+docker image inspect --format '{{json .RepoTags}}' "$candidate_image" | \
+  jq --exit-status --arg image_ref "$image_ref" \
+    'index($image_ref) != null' >/dev/null
 test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' \
   "$image_ref")" = "linux/amd64"
 ```
@@ -174,7 +281,9 @@ space. The verified local copy remains the recovery artifact.
 
 ```sh
 rm -- "$remote_archive"
-df -h /var/lib/docker
+docker_available="$(df -PB1 "$docker_root" | awk 'NR == 2 { print $4 }')"
+[[ "$docker_available" =~ ^[0-9]+$ ]]
+((docker_available >= reserve_bytes))
 ```
 
 ## 3. Verify the production model and create the rollback point
@@ -187,9 +296,27 @@ prod_root="/root/secos/securityos"
 prod_compose="$prod_root/docker-compose.yml"
 rollback_id="$(date -u +%Y%m%dT%H%M%SZ)"
 rollback_root="/root/securityos-rollbacks/${rollback_id}"
+[[ "$rollback_id" =~ ^[0-9]{8}T[0-9]{6}Z$ ]]
 
 test -f "$prod_compose"
+expected_compose_sha256="337229790ed2bcdc91bbd4286141f1390b63dfedfa0afe5a056c0fc31cb9b181"
+actual_compose_sha256="$(sha256sum "$prod_compose" | awk '{ print $1 }')"
+test "$actual_compose_sha256" = "$expected_compose_sha256"
+prod_compose_sha256="$actual_compose_sha256"
 docker compose -p securityos -f "$prod_compose" config -q
+
+compose_web_image="$(docker compose -p securityos -f "$prod_compose" \
+  config --format json | jq --exit-status --raw-output \
+  '.services.web.image')"
+test "$compose_web_image" = "securityos-web:latest"
+test "$(docker inspect --format '{{.Config.Image}}' securityos)" = \
+  "$compose_web_image"
+test "$(docker inspect --format \
+  '{{index .Config.Labels "com.docker.compose.project"}}' securityos)" = \
+  "securityos"
+test "$(docker inspect --format \
+  '{{index .Config.Labels "com.docker.compose.service"}}' securityos)" = \
+  "web"
 
 running_web_hash="$(docker inspect --format \
   '{{index .Config.Labels "com.docker.compose.config-hash"}}' securityos)"
@@ -205,13 +332,16 @@ docker compose -p securityos -f "$prod_compose" config --format json | \
   jq --exit-status '
     .name == "securityos" and
     .services.web.container_name == "securityos" and
-    ([.services.web.ports[] |
-      select(.target == 3000 and .published == "3002")] | length == 1) and
-    (.services.web.networks | has("securenet")) and
+    .services.web.image == "securityos-web:latest" and
+    ((.services.web.ports // []) | length == 1) and
+    .services.web.ports[0].target == 3000 and
+    .services.web.ports[0].published == "3002" and
+    .services.web.ports[0].protocol == "tcp" and
+    ((.services.web.networks | keys | sort) == ["securenet"]) and
     .networks.securenet.name == "securityos_securenet" and
     .services.cloudmacs.container_name == "securityos-cloudmacs" and
     ((.services.cloudmacs.ports // []) | length == 0) and
-    (.services.cloudmacs.networks | has("cloudmacs-net")) and
+    ((.services.cloudmacs.networks | keys | sort) == ["cloudmacs-net"]) and
     .networks["cloudmacs-net"].name == "securityos_cloudmacs-net"
   ' >/dev/null
 
@@ -238,7 +368,20 @@ old_web_image="$(docker inspect --format '{{.Image}}' securityos)"
 old_tor_container="$(docker inspect --format '{{.Id}}' securityos-tor-1)"
 old_cloudmacs_container="$(docker inspect --format '{{.Id}}' \
   securityos-cloudmacs)"
+old_proxy_container="$(docker inspect --format '{{.Id}}' npm-attachment)"
+old_securenet="$(docker network inspect --format '{{.Id}}' \
+  securityos_securenet)"
+old_cloudmacs_network="$(docker network inspect --format '{{.Id}}' \
+  securityos_cloudmacs-net)"
 
+[[ "$old_web_image" =~ ^sha256:[0-9a-f]{64}$ ]]
+[[ "$old_tor_container" =~ ^[0-9a-f]{64}$ ]]
+[[ "$old_cloudmacs_container" =~ ^[0-9a-f]{64}$ ]]
+[[ "$old_proxy_container" =~ ^[0-9a-f]{64}$ ]]
+[[ "$old_securenet" =~ ^[0-9a-f]{64}$ ]]
+[[ "$old_cloudmacs_network" =~ ^[0-9a-f]{64}$ ]]
+
+test ! -e "$rollback_root"
 install -d -m 0700 "$rollback_root"
 cp --preserve=all "$prod_compose" "$rollback_root/docker-compose.yml"
 test ! -e "$prod_root/old.ymo" || \
@@ -255,6 +398,43 @@ docker image tag "$old_web_image" \
   "securityos-web:rollback-${rollback_id}"
 test "$(docker image inspect --format '{{.Id}}' \
   "securityos-web:rollback-${rollback_id}")" = "$old_web_image"
+
+# Persist every value needed for rollback before cutover. The pointer makes the
+# state discoverable after an Evelin/SSH disconnect; neither file contains a
+# credential. Write both atomically and keep them root-only.
+rollback_image_ref="securityos-web:rollback-${rollback_id}"
+state_file="$rollback_root/state.env"
+state_tmp="${state_file}.tmp"
+active_state="/root/securityos-rollbacks/active-web-state"
+active_tmp="${active_state}.tmp"
+
+printf '%s\n' \
+  "release_id=$(printf '%q' "$release_id")" \
+  "image_ref=$(printf '%q' "$image_ref")" \
+  "candidate_image=$(printf '%q' "$candidate_image")" \
+  "prod_root=$(printf '%q' "$prod_root")" \
+  "prod_compose=$(printf '%q' "$prod_compose")" \
+  "compose_web_image=$(printf '%q' "$compose_web_image")" \
+  "prod_compose_sha256=$(printf '%q' "$prod_compose_sha256")" \
+  "rollback_id=$(printf '%q' "$rollback_id")" \
+  "rollback_image_ref=$(printf '%q' "$rollback_image_ref")" \
+  "old_web_image=$(printf '%q' "$old_web_image")" \
+  "old_tor_container=$(printf '%q' "$old_tor_container")" \
+  "old_cloudmacs_container=$(printf '%q' "$old_cloudmacs_container")" \
+  "old_proxy_container=$(printf '%q' "$old_proxy_container")" \
+  "old_securenet=$(printf '%q' "$old_securenet")" \
+  "old_cloudmacs_network=$(printf '%q' "$old_cloudmacs_network")" \
+  "file_web_hash=$(printf '%q' "$file_web_hash")" \
+  >"$state_tmp"
+chmod 0600 "$state_tmp"
+mv -- "$state_tmp" "$state_file"
+printf '%s\n' "$state_file" >"$active_tmp"
+chmod 0600 "$active_tmp"
+mv -- "$active_tmp" "$active_state"
+sync
+
+test "$(stat --format='%u:%a' "$state_file")" = "0:600"
+test "$(cat "$active_state")" = "$state_file"
 ```
 
 ## 4. Smoke-test the candidate on the existing Tor network
@@ -308,48 +488,210 @@ containers are still untouched.
 
 ## 5. Replace only the exact web container
 
-Point the Compose-generated web tag at the validated candidate before the short
-outage. This does not change the already-running container.
+Run this as one Bash block. It reloads the root-owned persisted state, validates
+the exact Compose image name again, and automatically performs a web-only
+rollback if retagging, recreation, or any post-cutover check fails. A failed
+automatic rollback still leaves the state pointer available for the reconnect
+procedure below.
 
 ```sh
-docker image tag "$image_ref" securityos-web:latest
-test "$(docker image inspect --format '{{.Id}}' securityos-web:latest)" = \
-  "$candidate_image"
-```
+test -n "${BASH_VERSION:-}"
+set -Eeuo pipefail
+umask 077
 
-Stop and remove only the exact `securityos` web container, then recreate only
-the `web` service from the unchanged production Compose file. `--no-deps` keeps
-Tor running; `--no-build` prevents use of the old checkout as a build context.
+active_state="/root/securityos-rollbacks/active-web-state"
+test "$(stat --format='%u:%a' "$active_state")" = "0:600"
+state_file="$(cat "$active_state")"
+case "$state_file" in
+  /root/securityos-rollbacks/*/state.env) ;;
+  *) printf '%s\n' "Invalid rollback-state path" >&2; exit 1 ;;
+esac
+test "$(stat --format='%u:%a' "$state_file")" = "0:600"
+# This file was generated by the root-only block in section 3.
+# shellcheck disable=SC1090
+source "$state_file"
 
-```sh
-docker stop securityos
-docker rm securityos
-docker compose -p securityos -f "$prod_compose" \
-  up --detach --no-deps --no-build web
-```
+[[ "$release_id" =~ ^[0-9a-f]{12}$ ]]
+[[ "$candidate_image" =~ ^sha256:[0-9a-f]{64}$ ]]
+[[ "$old_web_image" =~ ^sha256:[0-9a-f]{64}$ ]]
+[[ "$old_tor_container" =~ ^[0-9a-f]{64}$ ]]
+[[ "$old_cloudmacs_container" =~ ^[0-9a-f]{64}$ ]]
+[[ "$old_proxy_container" =~ ^[0-9a-f]{64}$ ]]
+[[ "$old_securenet" =~ ^[0-9a-f]{64}$ ]]
+[[ "$old_cloudmacs_network" =~ ^[0-9a-f]{64}$ ]]
+[[ "$file_web_hash" =~ ^[0-9a-f]{64}$ ]]
+[[ "$prod_compose_sha256" =~ ^[0-9a-f]{64}$ ]]
+[[ "$rollback_id" =~ ^[0-9]{8}T[0-9]{6}Z$ ]]
+test "$image_ref" = "securityos-web:candidate-${release_id}"
+test "$rollback_image_ref" = "securityos-web:rollback-${rollback_id}"
+test "$state_file" = \
+  "/root/securityos-rollbacks/${rollback_id}/state.env"
+test "$prod_root" = "/root/secos/securityos"
+test "$prod_compose" = "$prod_root/docker-compose.yml"
+test "$compose_web_image" = "securityos-web:latest"
 
-Verify the candidate image, port, network, HTTP route, and the unchanged
-companion container IDs:
+assert_companions_unchanged() {
+  test "$(docker inspect --format '{{.Id}}' securityos-tor-1)" = \
+    "$old_tor_container" || return 1
+  test "$(docker inspect --format '{{.Id}}' securityos-cloudmacs)" = \
+    "$old_cloudmacs_container" || return 1
+  test "$(docker inspect --format '{{.Id}}' npm-attachment)" = \
+    "$old_proxy_container" || return 1
+  test "$(docker network inspect --format '{{.Id}}' \
+    securityos_securenet)" = "$old_securenet" || return 1
+  test "$(docker network inspect --format '{{.Id}}' \
+    securityos_cloudmacs-net)" = "$old_cloudmacs_network" || return 1
+  test "$(docker inspect --format '{{.State.Running}}' securityos-tor-1)" = \
+    "true" || return 1
+  test "$(docker inspect --format '{{.State.Health.Status}}' \
+    securityos-tor-1)" = "healthy" || return 1
+  test "$(docker inspect --format '{{.State.Running}}' \
+    securityos-cloudmacs)" = "true" || return 1
+  test "$(docker inspect --format '{{.State.Running}}' npm-attachment)" = \
+    "true" || return 1
+  docker inspect --format '{{json .NetworkSettings.Networks}}' \
+    npm-attachment | jq --exit-status \
+    'has("securityos_securenet") and has("securityos_cloudmacs-net")' \
+    >/dev/null || return 1
+  docker inspect --format '{{json .NetworkSettings.Networks}}' \
+    securityos-tor-1 | jq --exit-status \
+    'has("securityos_securenet")' >/dev/null || return 1
+  docker inspect --format '{{json .NetworkSettings.Networks}}' \
+    securityos-cloudmacs | jq --exit-status \
+    'has("securityos_cloudmacs-net")' >/dev/null || return 1
+}
 
-```sh
-test "$(docker inspect --format '{{.Image}}' securityos)" = \
-  "$candidate_image"
-test "$(docker inspect --format '{{.Id}}' securityos-tor-1)" = \
-  "$old_tor_container"
-test "$(docker inspect --format '{{.Id}}' securityos-cloudmacs)" = \
-  "$old_cloudmacs_container"
-test "$(docker inspect --format '{{.State.Health.Status}}' \
-  securityos-tor-1)" = "healthy"
+assert_web_release() {
+  local expected_image="$1"
 
-docker port securityos 3000/tcp | grep -Eq ':3002$'
-docker inspect --format '{{json .NetworkSettings.Networks}}' securityos |
-  jq --exit-status 'has("securityos_securenet")' >/dev/null
+  test "$(docker inspect --format '{{.Name}}' securityos)" = "/securityos" || \
+    return 1
+  test "$(docker inspect --format \
+    '{{index .Config.Labels "com.docker.compose.project"}}' securityos)" = \
+    "securityos" || return 1
+  test "$(docker inspect --format \
+    '{{index .Config.Labels "com.docker.compose.service"}}' securityos)" = \
+    "web" || return 1
+  test "$(docker inspect --format '{{.Config.Image}}' securityos)" = \
+    "$compose_web_image" || return 1
+  test "$(docker inspect --format '{{.Image}}' securityos)" = \
+    "$expected_image" || return 1
+  test "$(docker inspect --format \
+    '{{index .Config.Labels "com.docker.compose.config-hash"}}' securityos)" = \
+    "$file_web_hash" || return 1
+  test "$(docker inspect --format '{{.State.Running}}' securityos)" = \
+    "true" || return 1
+  docker inspect --format '{{json .NetworkSettings.Ports}}' securityos | \
+    jq --exit-status '
+      [. | to_entries[] | select(.value != null)] as $published |
+      ($published | length) == 1 and
+      $published[0].key == "3000/tcp" and
+      ($published[0].value | length) >= 1 and
+      all($published[0].value[]; .HostPort == "3002")
+    ' >/dev/null || return 1
+  docker inspect --format '{{json .NetworkSettings.Networks}}' securityos | \
+    jq --exit-status \
+    '(keys | sort) == ["securityos_securenet"]' >/dev/null || return 1
+  curl --fail --silent --show-error --output /dev/null \
+    --retry 20 --retry-delay 2 --retry-connrefused \
+    http://127.0.0.1:3002/ || return 1
+  curl --fail --silent --show-error \
+    http://127.0.0.1:3002/api/tor-status | \
+    jq --exit-status '.configured == true and .tor == true' >/dev/null || \
+    return 1
+  curl --fail --silent --show-error \
+    'http://127.0.0.1:3002/api/proxy?url=https%3A%2F%2Fcheck.torproject.org%2Fapi%2Fip' | \
+    jq --exit-status '.IsTor == true' >/dev/null || return 1
+  curl --fail --silent --show-error --output /dev/null \
+    --retry 10 --retry-delay 3 https://os.securityops.co/ || return 1
+}
 
-curl --fail --silent --show-error --output /dev/null \
-  --retry 20 --retry-delay 2 --retry-connrefused \
-  http://127.0.0.1:3002/
-curl --fail --silent --show-error --output /dev/null \
-  --retry 10 --retry-delay 3 https://os.securityops.co/
+remove_exact_web() {
+  if docker container inspect securityos >/dev/null 2>&1; then
+    test "$(docker inspect --format '{{.Name}}' securityos)" = "/securityos" || \
+      return 1
+    test "$(docker inspect --format \
+      '{{index .Config.Labels "com.docker.compose.project"}}' securityos)" = \
+      "securityos" || return 1
+    test "$(docker inspect --format \
+      '{{index .Config.Labels "com.docker.compose.service"}}' securityos)" = \
+      "web" || return 1
+    docker stop securityos || return 1
+    docker rm securityos || return 1
+  fi
+}
+
+start_exact_web() {
+  test "$(sha256sum "$prod_compose" | awk '{ print $1 }')" = \
+    "$prod_compose_sha256" || return 1
+  docker compose -p securityos -f "$prod_compose" config -q || return 1
+  test "$(docker compose -p securityos -f "$prod_compose" \
+    config --format json | jq --exit-status --raw-output \
+    '.services.web.image')" = "$compose_web_image" || return 1
+  docker compose -p securityos -f "$prod_compose" \
+    up --detach --no-deps --no-build --pull never web || return 1
+}
+
+rollback_web() {
+  test "$(docker image inspect --format '{{.Id}}' \
+    "$rollback_image_ref")" = "$old_web_image" || return 1
+  docker image tag "$rollback_image_ref" "$compose_web_image" || return 1
+  test "$(docker image inspect --format '{{.Id}}' \
+    "$compose_web_image")" = "$old_web_image" || return 1
+  remove_exact_web || return 1
+  start_exact_web || return 1
+  assert_companions_unchanged || return 1
+  assert_web_release "$old_web_image" || return 1
+}
+
+cutover_web() {
+  docker image tag "$image_ref" "$compose_web_image" || return 1
+  test "$(docker image inspect --format '{{.Id}}' \
+    "$compose_web_image")" = "$candidate_image" || return 1
+  web_container_touched=1
+  remove_exact_web || return 1
+  start_exact_web || return 1
+  assert_companions_unchanged || return 1
+  assert_web_release "$candidate_image" || return 1
+}
+
+preflight_cutover() {
+  test "$(sha256sum "$prod_compose" | awk '{ print $1 }')" = \
+    "$prod_compose_sha256" || return 1
+  assert_companions_unchanged || return 1
+  assert_web_release "$old_web_image" || return 1
+  test "$(docker image inspect --format '{{.Id}}' "$image_ref")" = \
+    "$candidate_image" || return 1
+  test "$(docker image inspect --format '{{.Id}}' \
+    "$rollback_image_ref")" = "$old_web_image" || return 1
+}
+
+if ! preflight_cutover; then
+  printf '%s\n' "Cutover preflight failed; production was not changed." >&2
+  exit 1
+fi
+
+web_container_touched=0
+if ! cutover_web; then
+  if ((web_container_touched == 0)); then
+    docker image tag "$rollback_image_ref" "$compose_web_image"
+    test "$(docker image inspect --format '{{.Id}}' \
+      "$compose_web_image")" = "$old_web_image"
+    printf '%s\n' \
+      "Candidate retag failed; the running production container was untouched." \
+      >&2
+    exit 1
+  fi
+  printf '%s\n' "Candidate cutover failed; starting web-only rollback." >&2
+  if rollback_web; then
+    printf '%s\n' "Automatic web-only rollback succeeded." >&2
+    exit 1
+  fi
+  printf '%s\n' \
+    "AUTOMATIC ROLLBACK OR ITS VALIDATION FAILED. Reconnect and inspect using the persisted rollback state." \
+    >&2
+  exit 2
+fi
 ```
 
 Then validate Tor Browser, Clearnet Browser, ZUPT, Keywave, IRC, and GODS EYE
@@ -358,30 +700,137 @@ observation window.
 
 ## Rollback
 
-Rollback also replaces only the exact web container. The saved image tag points
-to the immutable image that ran before cutover.
+If the same shell is still connected, run `rollback_web` from section 5. After a
+disconnect, use this self-contained recovery block. It resolves the last state
+file through the root-only pointer, validates every persisted identifier before
+use, retags the immutable old web image, and replaces only the exact Compose
+`web` container.
 
 ```sh
+test -n "${BASH_VERSION:-}"
+set -Eeuo pipefail
+umask 077
+
+active_state="/root/securityos-rollbacks/active-web-state"
+test "$(stat --format='%u:%a' "$active_state")" = "0:600"
+state_file="$(cat "$active_state")"
+case "$state_file" in
+  /root/securityos-rollbacks/*/state.env) ;;
+  *) printf '%s\n' "Invalid rollback-state path" >&2; exit 1 ;;
+esac
+test "$(stat --format='%u:%a' "$state_file")" = "0:600"
+# shellcheck disable=SC1090
+source "$state_file"
+
+[[ "$old_web_image" =~ ^sha256:[0-9a-f]{64}$ ]]
+[[ "$old_tor_container" =~ ^[0-9a-f]{64}$ ]]
+[[ "$old_cloudmacs_container" =~ ^[0-9a-f]{64}$ ]]
+[[ "$old_proxy_container" =~ ^[0-9a-f]{64}$ ]]
+[[ "$old_securenet" =~ ^[0-9a-f]{64}$ ]]
+[[ "$old_cloudmacs_network" =~ ^[0-9a-f]{64}$ ]]
+[[ "$file_web_hash" =~ ^[0-9a-f]{64}$ ]]
+[[ "$prod_compose_sha256" =~ ^[0-9a-f]{64}$ ]]
+[[ "$rollback_id" =~ ^[0-9]{8}T[0-9]{6}Z$ ]]
+test "$rollback_image_ref" = "securityos-web:rollback-${rollback_id}"
+test "$state_file" = \
+  "/root/securityos-rollbacks/${rollback_id}/state.env"
+test "$prod_root" = "/root/secos/securityos"
+test "$prod_compose" = "$prod_root/docker-compose.yml"
+test "$compose_web_image" = "securityos-web:latest"
+test "$(sha256sum "$prod_compose" | awk '{ print $1 }')" = \
+  "$prod_compose_sha256"
+test "$(docker compose -p securityos -f "$prod_compose" \
+  config --format json | jq --exit-status --raw-output \
+  '.services.web.image')" = "$compose_web_image"
+test "$(docker image inspect --format '{{.Id}}' \
+  "$rollback_image_ref")" = "$old_web_image"
+
+docker image tag "$rollback_image_ref" "$compose_web_image"
+test "$(docker image inspect --format '{{.Id}}' \
+  "$compose_web_image")" = "$old_web_image"
+
 if docker container inspect securityos >/dev/null 2>&1; then
+  test "$(docker inspect --format '{{.Name}}' securityos)" = "/securityos"
+  test "$(docker inspect --format \
+    '{{index .Config.Labels "com.docker.compose.project"}}' securityos)" = \
+    "securityos"
+  test "$(docker inspect --format \
+    '{{index .Config.Labels "com.docker.compose.service"}}' securityos)" = \
+    "web"
   docker stop securityos
   docker rm securityos
 fi
 
-docker image tag "securityos-web:rollback-${rollback_id}" \
-  securityos-web:latest
 docker compose -p securityos -f "$prod_compose" \
-  up --detach --no-deps --no-build web
+  up --detach --no-deps --no-build --pull never web
 
+test "$(docker inspect --format '{{.Name}}' securityos)" = "/securityos"
+test "$(docker inspect --format \
+  '{{index .Config.Labels "com.docker.compose.project"}}' securityos)" = \
+  "securityos"
+test "$(docker inspect --format \
+  '{{index .Config.Labels "com.docker.compose.service"}}' securityos)" = \
+  "web"
+test "$(docker inspect --format '{{.Config.Image}}' securityos)" = \
+  "$compose_web_image"
 test "$(docker inspect --format '{{.Image}}' securityos)" = \
   "$old_web_image"
+test "$(docker inspect --format \
+  '{{index .Config.Labels "com.docker.compose.config-hash"}}' securityos)" = \
+  "$file_web_hash"
+test "$(docker inspect --format '{{.State.Running}}' securityos)" = "true"
 test "$(docker inspect --format '{{.Id}}' securityos-tor-1)" = \
   "$old_tor_container"
 test "$(docker inspect --format '{{.Id}}' securityos-cloudmacs)" = \
   "$old_cloudmacs_container"
-docker port securityos 3000/tcp | grep -Eq ':3002$'
+test "$(docker inspect --format '{{.Id}}' npm-attachment)" = \
+  "$old_proxy_container"
+test "$(docker network inspect --format '{{.Id}}' \
+  securityos_securenet)" = "$old_securenet"
+test "$(docker network inspect --format '{{.Id}}' \
+  securityos_cloudmacs-net)" = "$old_cloudmacs_network"
+test "$(docker inspect --format '{{.State.Running}}' securityos-tor-1)" = \
+  "true"
+test "$(docker inspect --format '{{.State.Health.Status}}' \
+  securityos-tor-1)" = "healthy"
+test "$(docker inspect --format '{{.State.Running}}' \
+  securityos-cloudmacs)" = "true"
+test "$(docker inspect --format '{{.State.Running}}' npm-attachment)" = \
+  "true"
+
+docker inspect --format '{{json .NetworkSettings.Ports}}' securityos | \
+  jq --exit-status '
+    [. | to_entries[] | select(.value != null)] as $published |
+    ($published | length) == 1 and
+    $published[0].key == "3000/tcp" and
+    ($published[0].value | length) >= 1 and
+    all($published[0].value[]; .HostPort == "3002")
+  ' >/dev/null
+docker inspect --format '{{json .NetworkSettings.Networks}}' securityos | \
+  jq --exit-status \
+  '(keys | sort) == ["securityos_securenet"]' >/dev/null
+docker inspect --format '{{json .NetworkSettings.Networks}}' npm-attachment | \
+  jq --exit-status \
+  'has("securityos_securenet") and has("securityos_cloudmacs-net")' \
+  >/dev/null
+docker inspect --format '{{json .NetworkSettings.Networks}}' \
+  securityos-tor-1 | jq --exit-status \
+  'has("securityos_securenet")' >/dev/null
+docker inspect --format '{{json .NetworkSettings.Networks}}' \
+  securityos-cloudmacs | jq --exit-status \
+  'has("securityos_cloudmacs-net")' >/dev/null
+
 curl --fail --silent --show-error --output /dev/null \
   --retry 20 --retry-delay 2 --retry-connrefused \
   http://127.0.0.1:3002/
+curl --fail --silent --show-error \
+  http://127.0.0.1:3002/api/tor-status | \
+  jq --exit-status '.configured == true and .tor == true' >/dev/null
+curl --fail --silent --show-error \
+  'http://127.0.0.1:3002/api/proxy?url=https%3A%2F%2Fcheck.torproject.org%2Fapi%2Fip' | \
+  jq --exit-status '.IsTor == true' >/dev/null
+curl --fail --silent --show-error --output /dev/null \
+  --retry 10 --retry-delay 3 https://os.securityops.co/
 ```
 
 The production checkout, dirty Compose model, persistent networks, Tor service,
