@@ -18,6 +18,9 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   handshake timeouts from 30 to 120 seconds so cold stream-isolated Tor circuits
   can finish connecting instead of producing false failures in ZUPT, Keywave,
   IRC, and browser tabs.
+- Corrected the production cutover/rollback runbook to match the checksum-audited
+  legacy VPS Compose model: its build-only web service derives `securityos-web`
+  rather than declaring `securityos-web:latest`.
 
 ## [2.23.1] — 2026-09-01
 
