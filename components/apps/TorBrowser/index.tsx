@@ -23,10 +23,13 @@ const TOR_HOME =
 const TOR_SEARCH_QUERY =
   "http://torchdeedp3i2jigzjdmfpn5ttjhthh5wbmda2rr3jvqjg5p77c54dqd.onion/search?query=";
 
+const CLEARNET_HOME = "https://search.brave.com/";
+const CLEARNET_SEARCH_QUERY = "https://search.brave.com/search?q=";
+
 // Bookmarks. "Search" is the home onion above; the rest are the operator's .onion
 // hidden services — they resolve only while their listeners are running (otherwise
 // the proxy shows a clear "this .onion looks offline" page, not a Tor error).
-const BOOKMARKS: { name: string; url: string }[] = [
+const TOR_BOOKMARKS: { name: string; url: string }[] = [
   { name: "Search", url: TOR_HOME },
   {
     name: "Hacker News",
@@ -70,17 +73,28 @@ const BOOKMARKS: { name: string; url: string }[] = [
   },
 ];
 
+// First-party public services, available in the separate clearnet browser.  Keep
+// this list deliberately explicit so opening the browser never leaks an onion
+// address into a non-Tor request.
+const CLEARNET_BOOKMARKS: { name: string; url: string }[] = [
+  { name: "SecurityOps", url: "https://securityops.com.br/" },
+  { name: "SecurityOps .co", url: "https://securityops.co/" },
+  { name: "GODS EYE", url: "https://eye.securityops.co/" },
+];
+
 type Bookmark = { name: string; url: string };
 
 // User bookmarks (the built-in BOOKMARKS above are the operator's onion services;
 // these are sites the USER saves). Persisted in localStorage so they survive
 // reopening the window. Best-effort: malformed/old storage is dropped, not thrown.
-const LS_USER_BOOKMARKS = "securityos:torbrowser:bookmarks";
+const LS_USER_BOOKMARKS = "securityos:%mode%browser:bookmarks";
 
-const readUserBookmarks = (): Bookmark[] => {
+const readUserBookmarks = (mode: BrowserMode): Bookmark[] => {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(LS_USER_BOOKMARKS);
+    const raw = window.localStorage.getItem(
+      LS_USER_BOOKMARKS.replace("%mode%", mode)
+    );
     const parsed = raw ? (JSON.parse(raw) as unknown) : [];
 
     return Array.isArray(parsed)
@@ -96,10 +110,13 @@ const readUserBookmarks = (): Bookmark[] => {
   }
 };
 
-const writeUserBookmarks = (bookmarks: Bookmark[]): void => {
+const writeUserBookmarks = (mode: BrowserMode, bookmarks: Bookmark[]): void => {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(LS_USER_BOOKMARKS, JSON.stringify(bookmarks));
+    window.localStorage.setItem(
+      LS_USER_BOOKMARKS.replace("%mode%", mode),
+      JSON.stringify(bookmarks)
+    );
   } catch {
     // localStorage full/unavailable — bookmarks are a best-effort convenience.
   }
@@ -203,13 +220,24 @@ const JS_MODE_LABEL: Record<JsMode, string> = {
   all: "Scripts: ALL allowed. Click to block everything (Safest).",
 };
 
-const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
+export type BrowserMode = "tor" | "clearnet";
+
+type BrowserProps = ComponentProcessProps & { mode?: BrowserMode };
+
+// Shared browser engine. Tor mode always uses SOCKS5h through the server-side Tor
+// proxy; clearnet mode explicitly opts into the ordinary egress path. Both retain
+// sandboxed rendering, SSRF protection, tabs, history, and per-session JS controls.
+export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
   const {
     processes: { [id]: process },
   } = useProcesses();
   const { prependFileToTitle } = useTitle(id);
   const { url = "" } = process || {};
-  const initialUrl = url || TOR_HOME;
+  const isTor = mode === "tor";
+  const home = isTor ? TOR_HOME : CLEARNET_HOME;
+  const searchQuery = isTor ? TOR_SEARCH_QUERY : CLEARNET_SEARCH_QUERY;
+  const bookmarks = isTor ? TOR_BOOKMARKS : CLEARNET_BOOKMARKS;
+  const initialUrl = url || home;
   const inputRef = useRef<HTMLInputElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const keyCounter = useRef(0);
@@ -248,7 +276,7 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
       addressInput: string,
       iso: string
     ): Promise<{ src: string; address: string }> => {
-      const addressUrl = await getUrlOrSearch(addressInput, TOR_SEARCH_QUERY);
+      const addressUrl = await getUrlOrSearch(addressInput, searchQuery);
 
       if (!/^https?:/.test(addressUrl))
         return { src: "", address: addressInput };
@@ -261,11 +289,13 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
             : jsMode === "noscript"
             ? "&librejs=1"
             : ""
-        }${extEnabled ? "&ext=1" : ""}${iso ? `&iso=${iso}` : ""}`,
+        }${extEnabled ? "&ext=1" : ""}${isTor && iso ? `&iso=${iso}` : ""}${
+          isTor ? "" : "&direct=1"
+        }`,
         address: addressInput,
       };
     },
-    [extEnabled, jsMode]
+    [extEnabled, isTor, jsMode, searchQuery]
   );
 
   const navigateTab = useCallback(
@@ -305,7 +335,7 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
   );
 
   const openTab = useCallback(
-    (addressInput: string = TOR_HOME): void => {
+    (addressInput: string = home): void => {
       keyCounter.current += 1;
       const key = keyCounter.current;
       // Generate the new tab's isolation token here so the immediate navigateTab
@@ -316,7 +346,7 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
       setActiveKey(key);
       void navigateTab(key, addressInput, true, iso);
     },
-    [navigateTab]
+    [home, navigateTab]
   );
 
   const openProxiedTab = useCallback((proxiedSrc: string): void => {
@@ -365,18 +395,18 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
 
   // ---- User bookmarks (persisted) ----------------------------------------
   const [userBookmarks, setUserBookmarks] = useState<Bookmark[]>(() =>
-    readUserBookmarks()
+    readUserBookmarks(mode)
   );
 
   const removeBookmark = useCallback((url: string): void => {
     setUserBookmarks((prev) => {
       const next = prev.filter((bookmark) => bookmark.url !== url);
 
-      writeUserBookmarks(next);
+      writeUserBookmarks(mode, next);
 
       return next;
     });
-  }, []);
+  }, [mode]);
 
   // Save the active tab's current address (deduped). Names default to the page
   // title, then the hostname, then the raw address.
@@ -387,7 +417,7 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
     if (!address) return;
     // The operator's built-in bookmarks are always shown in the bar — don't add a
     // duplicate user chip for one.
-    if (BOOKMARKS.some((bookmark) => bookmark.url === address)) return;
+    if (bookmarks.some((bookmark) => bookmark.url === address)) return;
 
     setUserBookmarks((prev) => {
       if (prev.some((bookmark) => bookmark.url === address)) return prev;
@@ -395,11 +425,11 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
       const name = (tab?.title || tabLabel(tab as Tab) || address).slice(0, 40);
       const next = [...prev, { name, url: address }];
 
-      writeUserBookmarks(next);
+      writeUserBookmarks(mode, next);
 
       return next;
     });
-  }, [activeKey]);
+  }, [activeKey, bookmarks, mode]);
 
   const goToBookmark = useCallback(
     (bookmarkUrl: string): void => {
@@ -416,9 +446,9 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
   const activeBookmarked = useMemo(
     () =>
       !!activeTab?.address &&
-      (BOOKMARKS.some((bookmark) => bookmark.url === activeTab.address) ||
+      (bookmarks.some((bookmark) => bookmark.url === activeTab.address) ||
         userBookmarks.some((bookmark) => bookmark.url === activeTab.address)),
-    [activeTab?.address, userBookmarks]
+    [activeTab?.address, bookmarks, userBookmarks]
   );
 
   const toggleJs = useCallback(
@@ -579,7 +609,7 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
           >
             {activeTab?.loading ? <Stop /> : <Refresh />}
           </Button>
-          <Button
+          {isTor && <Button
             onClick={newCircuit}
             {...label("New Tor circuit for this site (fresh exit IP)")}
           >
@@ -601,7 +631,7 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
                 strokeWidth="1.8"
               />
             </svg>
-          </Button>
+          </Button>}
           <Button onClick={toggleJs} {...label(JS_MODE_LABEL[jsMode])}>
             <svg
               height="16"
@@ -686,7 +716,7 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
         >
           {activeBookmarked ? "★" : "☆"}
         </Button>
-        {BOOKMARKS.map(({ name, url: bookmarkUrl }) => (
+        {bookmarks.map(({ name, url: bookmarkUrl }) => (
           <Button
             key={name}
             onClick={() => goToBookmark(bookmarkUrl)}
@@ -732,4 +762,4 @@ const TorBrowser: FC<ComponentProcessProps> = ({ id }) => {
   );
 };
 
-export default TorBrowser;
+export default Browser;

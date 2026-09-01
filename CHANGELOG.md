@@ -4,6 +4,20 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.23.0] — 2026-09-01
+
+- Added a dedicated **Clearnet Browser** with full tabs, history, bookmarks and
+  JavaScript controls. It is explicitly marked non-anonymous and ships SecurityOps
+  public-service bookmarks.
+- Expanded **Tor Browser** documentation and navigation positioning: `.onion` and
+  clearnet URLs navigate in tabs over isolated Tor circuits; JavaScript remains
+  opt-in and sandbox limitations are documented honestly.
+- Added **GODS EYE**, a sandboxed dashboard window for `eye.securityops.co`.
+- Set IRC's default network to **irc.securityops.com.br** and allowlisted its secure
+  WebSocket gateway for the Tor tunnel.
+- Removed WhatsApp and Telegram shortcuts from the desktop (their existing Start
+  menu launchers remain available).
+
 ## [2.21.0] — 2026-06-21
 
 ### The embedded apps actually load now — the production sidecar was stripping their runtime shim

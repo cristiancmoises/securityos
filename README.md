@@ -11,13 +11,22 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
 
 ## ✨ Highlights
 
-- **🧅 Tor Browser (anonymity-only)** — all web access goes through the **Tor
+- **🧅 Tor Browser (anonymous navigation)** — the **Tor Browser** routes every
   Browser**: a server-side privacy proxy routes every request over Tor (SOCKS5h,
   so `.onion` resolves and clear-net hostnames never leak), with **tabs** and a
-  **NoScript-style 3-state JS control** (Off / first-party-only / All). There is
-  no clearnet browser. The proxy is SSRF-guarded, fails closed if Tor is
+  **NoScript-style 3-state JS control** (Off / first-party-only / All). It supports
+  full tabbed navigation of `.onion` and clearnet sites; JavaScript is off by
+  default. The proxy is SSRF-guarded, fails closed if Tor is
   misconfigured, pins the SSRF-validated IP, forwards only an allowlist of
   response headers, and logs nothing. See [Tor Browser](#-tor-browser).
+- **🌐 Clearnet Browser** — a clearly labelled, full tabbed browser for ordinary
+  public websites. It has independent bookmarks for `securityops.com.br`,
+  `securityops.co`, and **GODS EYE**. It uses direct egress by design and is **not
+  anonymous**.
+- **👁️ GODS EYE** — a dedicated, sandboxed dashboard window for
+  `https://eye.securityops.co`.
+- **💬 SecurityOps IRC** — a first-party, amnesic IRC client configured for
+  `irc.securityops.com.br`, carried through the Tor WebSocket tunnel.
 - **🦀 Memory-safe proxy sidecar** — the untrusted fetch + HTML-rewriting path is also
   available as a Rust sidecar (Tor SOCKS5h, DNS-pinned SSRF guard, `lol_html`
   streaming rewriter); the OS delegates to it and transparently falls back to the
@@ -110,9 +119,9 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
 
 ## 🧅 Tor Browser
 
-SecurityOS browses the web through **one** browser — the **Tor Browser**,
-anonymity first. (There is intentionally **no clearnet browser**: all web access
-goes over Tor.)
+SecurityOS has two deliberately separate browsers. Use **Tor Browser** for
+anonymous browsing; use **Clearnet Browser** only when ordinary, non-anonymous
+access is appropriate. The applications do not silently fall back between modes.
 
 - Every request is routed through **Tor** (SOCKS5h, including DNS) via a
   server-side privacy proxy, so `.onion` resolves and your real IP is never
@@ -129,13 +138,28 @@ goes over Tor.)
   SSRF-validated IP** (no DNS rebinding), forwards only an allowlist of response
   headers, rewrites links/forms to stay in-app, and **logs nothing**.
 
-> **What loads, and what won't.** The proxy renders pages **server-side in an
-> opaque sandbox**, so it's deliberately *not* a full browser: onions and simple,
-> mostly-static sites render cleanly, but many arbitrary sites **won't** — they
-> block Tor exit IPs (Cloudflare challenges), require JavaScript + login, or break
-> under URL rewriting. That's the inherent ceiling of a privacy proxy, not a bug.
-> For genuinely full, anonymous browsing of arbitrary sites, use the **Linux VM
-> via Tor Control**.
+> **Compatibility.** The Tor Browser supports full navigation, tabs, history and
+> opt-in JavaScript, but a site can still reject Tor exits or depend on browser
+> features unavailable in an opaque sandbox (such as service workers). Use the
+> Linux VM via Tor Control when a destination needs a native browser environment.
+
+## 🌐 Clearnet Browser & GODS EYE
+
+The **Clearnet Browser** has the same tab, history, bookmark and JavaScript controls
+as Tor Browser, but uses direct egress (`direct=1`) and is therefore **not an
+anonymity tool**. Its built-in bookmarks are `https://securityops.com.br`,
+`https://securityops.co`, and `https://eye.securityops.co`.
+
+**GODS EYE** opens the last of those as a dedicated dashboard window. It is rendered
+through the same SSRF-guarded proxy and an opaque iframe sandbox, so the dashboard
+cannot access the SecurityOS origin.
+
+## 💬 SecurityOps IRC
+
+IRC defaults to **SecurityOps IRC** (`irc.securityops.com.br`) and is amnesic: nicks,
+credentials, channels and message history are kept only in the live window. The
+server must expose an IRC-over-WebSocket endpoint at `wss://irc.securityops.com.br/`;
+the app tunnels that endpoint through `/api/ws` and Tor.
 
 ---
 

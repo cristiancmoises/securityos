@@ -28,11 +28,9 @@ that runs entirely in your browser. No install, no tracking, no logs.
   client with every request tunneled over Tor to `matrix.securityops.co` — it
   decrypts encrypted rooms, joins federated rooms, and keeps your keys **in memory
   only** (amnesic). **SecChat** is end-to-end-encrypted video chat.
-- 🟢 **Your everyday messengers.** **WhatsApp**, **Telegram** and **Session**
-  launchers open the official clients (full chats, calls, file sharing). They run
-  in a real window (a ⚠ *direct, not-over-Tor* badge is shown) because they need
-  WebSockets the Tor proxy blocks — to use them over Tor, run SecurityOS in the Tor
-  Browser/Tails (each app and the Handbook explain how).
+- 🟢 **Private messaging.** **Session** stays on the desktop; WhatsApp and Telegram
+  remain available from the Start menu. Their official clients need a real window;
+  use Tor Browser or Tails for anonymous access.
 - 🔎 **Instant search.** Open the **Start menu** and just start typing — it searches
   every app and file and launches the match (Enter opens the top hit).
 - 📁 **Encrypted file sharing over Tor.** **VaptVupt** opens the SecurityOps file
@@ -61,8 +59,11 @@ that runs entirely in your browser. No install, no tracking, no logs.
 | --- | --- |
 | Find & launch any app | **Start menu** → start typing |
 | Browse anonymously | **Tor Browser** (Start menu) |
+| Browse public sites (not anonymous) | **Clearnet Browser** |
+| Open the observability dashboard | **GODS EYE** |
+| Join SecurityOps IRC over Tor | **IRC** |
 | Chat end-to-end encrypted (over Tor) | **Matrix** |
-| Message on WhatsApp / Telegram / Session | **WhatsApp** · **Telegram** · **Session** |
+| Message privately | **Session** (desktop) · WhatsApp / Telegram (Start menu) |
 | Share files (encrypted, over Tor) | **VaptVupt** |
 | Edit docs/sheets (encrypted, over Tor) | **CryptPad** |
 | Encrypted video chat | **SecChat** |
