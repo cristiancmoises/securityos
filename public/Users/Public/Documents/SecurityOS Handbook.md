@@ -46,7 +46,7 @@ handbook is your starting point — everything here runs in your browser.
 | ---- | ----- | ----- |
 | **Start-menu search** | Open Start, then type | Searches every app and file and launches the match — **Enter** opens the top hit. |
 | **Security Tools** | Start ▸ *Security Tools* | 10 offline tools (hashing, encoding, JWT, passwords, regex, UUID, CIDR, ciphers, hash-ID, timestamps). No network, ever. |
-| **Matrix** | Start ▸ *Matrix* | Full end-to-end-encrypted Matrix chat, every request tunneled over Tor to `matrix.securityops.co`. Keys live in memory only (amnesic). See *Private chat* below. |
+| **Matrix** | Start ▸ *Matrix* | Full end-to-end-encrypted Matrix chat, every request tunneled over Tor to `matrix.securityops.com.br`. Keys live in memory only (amnesic). See *Private chat* below. |
 | **Keywave** | Start ▸ *Keywave* | End-to-end-encrypted chat at `chat.securityops.co`. Tor mode keeps HTTP/Socket.IO in the fail-closed proxy and blocks WebRTC; the explicit clearnet window is the full text/media client and is not anonymous. |
 | **Radio** | Start ▸ *Radio* | Internet radio worldwide (radio-browser API) — **exact** country filter (ISO code), genre filter, **only working HTTPS stations** (offline/non-playable ones removed), favorites. |
 | **Tor Browser** | Desktop / Start ▸ *Tor Browser* | Tabbed `.onion` and public-site navigation over Tor. JavaScript is off by default; choose NoScript or All only when needed. Some sites can still reject Tor exits or require native browser features. |
@@ -85,7 +85,7 @@ leaves your machine:
 
 - **Matrix** is a full **end-to-end-encrypted** chat client. Unlike the in-OS
   Browser, **every Matrix request is tunneled through Tor** (the same-origin proxy)
-  to `matrix.securityops.co` — it decrypts encrypted rooms, searches the user
+  to `matrix.securityops.com.br` — it decrypts encrypted rooms, searches the user
   directory, browses/joins federated rooms, handles invites, and renders
   image/file attachments. Your **keys live in memory only** (amnesic). It
   **pre-warms the Tor circuit when you open it**, so the first login is fast (a cold

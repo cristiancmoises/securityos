@@ -37,7 +37,7 @@ or unauthorized activity. See **`terms.md`** on this desktop.
 
 > Self-hosted services run on the organization's own infrastructure:
 > `chat.securityops.co` (E2E video chat), `yt.securityops.co` (SecTube),
-> `share.securityops.co` (file share), `matrix.securityops.co` (Matrix chat),
+> `share.securityops.co` (file share), `matrix.securityops.com.br` (Matrix chat),
 > `git.securityops.co` (Forgejo).
 
 ## 🧩 Projects
