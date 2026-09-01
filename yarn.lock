@@ -6286,10 +6286,10 @@ pdfjs-dist@^6.3.289:
   optionalDependencies:
     "@napi-rs/canvas" "^1.0.0"
 
-pe-library@^1.0.0:
-  version "1.0.0"
-  resolved "https://registry.npmjs.org/pe-library/-/pe-library-1.0.0.tgz"
-  integrity sha512-yZ+4d3YHKUjO0BX03oXFfHRKLdYKDO2HmCt1RcApPxme/P5ASPbbKnuQkzFrmT482wi2kfO+sPgqasrz5QeU1w==
+pe-library@^2.0.1:
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/pe-library/-/pe-library-2.0.1.tgz#00e6732546d616279944de39685b91a05aa24f8a"
+  integrity sha512-/qjYFqNSlq59B5DI36am++5/3gMgh02QnzpYigrwrW6s+QpU0mHf09/iA4wjTu21UUxodyV7ZCetV5MiDhaN/A==
 
 picocolors@^1.0.0:
   version "1.0.0"
@@ -6803,12 +6803,12 @@ requires-port@^1.0.0:
   resolved "https://registry.npmjs.org/requires-port/-/requires-port-1.0.0.tgz"
   integrity sha512-KigOCHcocU3XODJxsu8i/j8T9tzT4adHiecwORRQ0ZZFcp7ahwXuRU1m+yuO90C5ZUyGeGfocHDI14M3L3yDAQ==
 
-resedit@^2.0.0:
-  version "2.0.0"
-  resolved "https://registry.npmjs.org/resedit/-/resedit-2.0.0.tgz"
-  integrity sha512-vrrJCabKxAW4MT1QivtAAb0poGp8KT2qhnSzfN9tFIxb2rQu1hRHNn1VgGSZR7nmxGaW5Yz0YeW1bjgvRfNoKA==
+resedit@^3.0.2:
+  version "3.0.2"
+  resolved "https://registry.yarnpkg.com/resedit/-/resedit-3.0.2.tgz#9f4a6045f0abe6c4a9f12512436cac9e209ec387"
+  integrity sha512-FnqVDJYX4etlEnz2AaJYE1c1FTcgrsHiI2U4DXRxO4CIzbGP7r0jml9uZIMlvzCom2pbBLZjIhF26wj92y1cVQ==
   dependencies:
-    pe-library "^1.0.0"
+    pe-library "^2.0.1"
 
 reselect@^3.0.1:
   version "3.0.1"
