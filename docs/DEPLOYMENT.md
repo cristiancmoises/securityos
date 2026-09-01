@@ -15,6 +15,11 @@ load it on the VPS. Do not run a Docker build on the VPS.
 - Treat that production checkout as immutable deployment evidence. Its modified
   Compose file is intentional and is not interchangeable with the repository's
   version.
+- The audited production `web` service is build-only (`image` is unset). With
+  project `securityos`, Compose derives the runtime image reference
+  `securityos-web`. The release flow retags the verified candidate to that exact
+  derived reference and always uses `--no-build`; do not add an `image` field or
+  edit the production file to make it resemble a newer Compose model.
 - Keep the web container named `securityos`, published as `3002:3000`, and
   attached to `securityos_securenet`.
 - Keep `securityos-tor-1` running and healthy on `securityos_securenet`.
@@ -139,7 +144,7 @@ set -Eeuo pipefail
 umask 077
 
 docker system df
-docker image inspect securityos-web:latest >/dev/null
+docker image inspect securityos-web >/dev/null
 
 # Copy these two exact decimal values from the reviewed local .capacity file.
 release_id="REVIEWED-COMMIT-12HEX"
@@ -305,10 +310,18 @@ test "$actual_compose_sha256" = "$expected_compose_sha256"
 prod_compose_sha256="$actual_compose_sha256"
 docker compose -p securityos -f "$prod_compose" config -q
 
-compose_web_image="$(docker compose -p securityos -f "$prod_compose" \
-  config --format json | jq --exit-status --raw-output \
-  '.services.web.image')"
-test "$compose_web_image" = "securityos-web:latest"
+# This audited legacy Compose service has `build`, but deliberately no `image`.
+# Compose derives `${project}-${service}` as `securityos-web`; pin that exact
+# effective reference without mutating the dirty production file.
+docker compose -p securityos -f "$prod_compose" config --format json | \
+  jq --exit-status '
+    .services.web.image == null and
+    .services.web.build.context == "/root/secos/securityos" and
+    .services.web.build.dockerfile == "Dockerfile"
+  ' >/dev/null
+compose_web_image="securityos-web"
+test "$(docker compose -p securityos -f "$prod_compose" config --images | \
+  grep --fixed-strings --line-regexp --count "$compose_web_image")" = "1"
 test "$(docker inspect --format '{{.Config.Image}}' securityos)" = \
   "$compose_web_image"
 test "$(docker inspect --format \
@@ -332,7 +345,9 @@ docker compose -p securityos -f "$prod_compose" config --format json | \
   jq --exit-status '
     .name == "securityos" and
     .services.web.container_name == "securityos" and
-    .services.web.image == "securityos-web:latest" and
+    .services.web.image == null and
+    .services.web.build.context == "/root/secos/securityos" and
+    .services.web.build.dockerfile == "Dockerfile" and
     ((.services.web.ports // []) | length == 1) and
     .services.web.ports[0].target == 3000 and
     .services.web.ports[0].published == "3002" and
@@ -489,10 +504,10 @@ containers are still untouched.
 ## 5. Replace only the exact web container
 
 Run this as one Bash block. It reloads the root-owned persisted state, validates
-the exact Compose image name again, and automatically performs a web-only
-rollback if retagging, recreation, or any post-cutover check fails. A failed
-automatic rollback still leaves the state pointer available for the reconnect
-procedure below.
+the exact Compose-derived runtime image name again, and automatically performs a
+web-only rollback if retagging, recreation, or any post-cutover check fails. A
+failed automatic rollback still leaves the state pointer available for the
+reconnect procedure below.
 
 ```sh
 test -n "${BASH_VERSION:-}"
@@ -528,7 +543,7 @@ test "$state_file" = \
   "/root/securityos-rollbacks/${rollback_id}/state.env"
 test "$prod_root" = "/root/secos/securityos"
 test "$prod_compose" = "$prod_root/docker-compose.yml"
-test "$compose_web_image" = "securityos-web:latest"
+test "$compose_web_image" = "securityos-web"
 
 assert_companions_unchanged() {
   test "$(docker inspect --format '{{.Id}}' securityos-tor-1)" = \
@@ -625,9 +640,13 @@ start_exact_web() {
   test "$(sha256sum "$prod_compose" | awk '{ print $1 }')" = \
     "$prod_compose_sha256" || return 1
   docker compose -p securityos -f "$prod_compose" config -q || return 1
-  test "$(docker compose -p securityos -f "$prod_compose" \
-    config --format json | jq --exit-status --raw-output \
-    '.services.web.image')" = "$compose_web_image" || return 1
+  docker compose -p securityos -f "$prod_compose" config --format json | \
+    jq --exit-status '
+      .services.web.image == null and
+      .services.web.build.context == "/root/secos/securityos" and
+      .services.web.build.dockerfile == "Dockerfile" and
+      .services.web.container_name == "securityos"
+    ' >/dev/null || return 1
   docker compose -p securityos -f "$prod_compose" \
     up --detach --no-deps --no-build --pull never web || return 1
 }
@@ -736,12 +755,16 @@ test "$state_file" = \
   "/root/securityos-rollbacks/${rollback_id}/state.env"
 test "$prod_root" = "/root/secos/securityos"
 test "$prod_compose" = "$prod_root/docker-compose.yml"
-test "$compose_web_image" = "securityos-web:latest"
+test "$compose_web_image" = "securityos-web"
 test "$(sha256sum "$prod_compose" | awk '{ print $1 }')" = \
   "$prod_compose_sha256"
-test "$(docker compose -p securityos -f "$prod_compose" \
-  config --format json | jq --exit-status --raw-output \
-  '.services.web.image')" = "$compose_web_image"
+docker compose -p securityos -f "$prod_compose" config --format json | \
+  jq --exit-status '
+    .services.web.image == null and
+    .services.web.build.context == "/root/secos/securityos" and
+    .services.web.build.dockerfile == "Dockerfile" and
+    .services.web.container_name == "securityos"
+  ' >/dev/null
 test "$(docker image inspect --format '{{.Id}}' \
   "$rollback_image_ref")" = "$old_web_image"
 
