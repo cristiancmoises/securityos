@@ -386,6 +386,28 @@ const directory: Processes = {
     singleton: true,
     title: "CryptPad",
   },
+  ClearnetBrowser: {
+    Component: dynamic(() => import("components/apps/ClearnetBrowser")),
+    backgroundColor: "#000",
+    defaultSize: {
+      height: 560,
+      width: 900,
+    },
+    icon: "/System/Icons/chromium.webp",
+    singleton: false,
+    title: "Clearnet Browser",
+  },
+  GodsEye: {
+    Component: dynamic(() => import("components/apps/GodsEye")),
+    backgroundColor: "#05070b",
+    defaultSize: {
+      height: 680,
+      width: 1100,
+    },
+    icon: "/System/Icons/securityos.webp",
+    singleton: true,
+    title: "GODS EYE",
+  },
   TorBrowser: {
     Component: dynamic(() => import("components/apps/TorBrowser")),
     backgroundColor: "#000",

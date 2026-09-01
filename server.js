@@ -55,6 +55,8 @@ const WS_ALLOW = [
   // The IRC app tunnels IRC-over-WebSocket to Libera.Chat's KiwiIRC gateway
   // (web.libera.chat/webirc/websocket/). Anchored suffix covers web./irc.libera.chat.
   /(^|\.)libera\.chat$/i,
+  // First-party IRC-over-WebSocket gateway used by the SecurityOps IRC app.
+  /(^|\.)securityops\.com\.br$/i,
 ];
 
 const hostAllowed = (host) => WS_ALLOW.some((re) => re.test(host));

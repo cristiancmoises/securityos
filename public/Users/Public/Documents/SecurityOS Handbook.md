@@ -3,7 +3,20 @@
 Welcome. SecurityOS is a **privacy-first, security-education web desktop**. This
 handbook is your starting point — everything here runs in your browser.
 
-## What's new (v2.14 → v2.17)
+## What's new (v2.23)
+
+- **Two explicit browsing modes.** **Tor Browser** supports tabbed navigation of
+  `.onion` and public sites over Tor, with per-tab circuit isolation and an opt-in
+  JavaScript safety control. **Clearnet Browser** offers the same navigation tools
+  for public websites, but is plainly marked **not anonymous**.
+- **GODS EYE** — a dedicated, sandboxed dashboard window for
+  `https://eye.securityops.co`.
+- **SecurityOps IRC** now defaults to `irc.securityops.com.br` through the Tor
+  WebSocket tunnel. Conversations and credentials remain in memory only.
+- **Desktop focus.** WhatsApp and Telegram shortcuts have been removed from the
+  desktop; their Start-menu launchers remain available.
+
+## Earlier improvements
 
 - **CryptPad** — the encrypted office suite (`office.securityops.co`) now runs
   **inside the OS over Tor**, via a new same-origin **WebSocket tunnel** that also
@@ -34,6 +47,10 @@ handbook is your starting point — everything here runs in your browser.
 | **Matrix** | Start ▸ *Matrix* | Full end-to-end-encrypted Matrix chat, every request tunneled over Tor to `matrix.securityops.co`. Keys live in memory only (amnesic). See *Private chat* below. |
 | **SecChat** | Start ▸ *SecChat* | End-to-end-encrypted video chat (`chat.securityops.co`). |
 | **Radio** | Start ▸ *Radio* | Internet radio worldwide (radio-browser API) — **exact** country filter (ISO code), genre filter, **only working HTTPS stations** (offline/non-playable ones removed), favorites. |
+| **Tor Browser** | Desktop / Start ▸ *Tor Browser* | Tabbed `.onion` and public-site navigation over Tor. JavaScript is off by default; choose NoScript or All only when needed. Some sites can still reject Tor exits or require native browser features. |
+| **Clearnet Browser** | Desktop / Start ▸ *Clearnet Browser* | Full tabs, history and bookmarks for public websites. **Direct egress; not anonymous.** Built-in bookmarks include the SecurityOps public sites and GODS EYE. |
+| **GODS EYE** | Desktop / Start ▸ *GODS EYE* | Sandboxed observability dashboard for `eye.securityops.co`. |
+| **IRC** | Desktop / Start ▸ *IRC* | Amnesic IRC client for `irc.securityops.com.br`, using its secure WebSocket endpoint over the Tor tunnel. |
 | **WhatsApp / Telegram** | Start ▸ each app | Run the official web client **embedded INSIDE the OS, over Tor** (fetched server-side through the privacy proxy, so they work even on networks that block them). Heavy apps, so the embed is best-effort — a **Window** button opens the full client. |
 | **Session** | Start ▸ *Session* | **Launcher** (Session has no web client) — opens the official download page. Session is onion-routed once installed. |
 | **VaptVupt** | Start ▸ *VaptVupt* | The first-party encrypted file share, embedded **over Tor** (its `.onion` through the privacy proxy). Upload & download files in the window; for advanced/script-heavy actions use **Open in Tor Browser** from its toolbar. |
