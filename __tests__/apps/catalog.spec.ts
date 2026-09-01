@@ -27,6 +27,16 @@ const APPS_DIRECTORY = projectPath("components/apps");
 const readProjectFile = (...segments: string[]): string =>
   readFileSync(projectPath(...segments), "utf8");
 
+const isWebP = (filePath: string): boolean => {
+  const bytes = readFileSync(filePath);
+
+  return (
+    bytes.length >= 12 &&
+    bytes.toString("ascii", 0, 4) === "RIFF" &&
+    bytes.toString("ascii", 8, 12) === "WEBP"
+  );
+};
+
 const listFiles = (directory: string): string[] =>
   readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const entryPath = join(directory, entry.name);
@@ -36,6 +46,7 @@ const listFiles = (directory: string): string[] =>
 
 const catalogSource = readProjectFile("contexts/process/directory.ts");
 const constantsSource = readProjectFile("utils/constants.ts");
+const dockerfileSource = readProjectFile("Dockerfile");
 const runDialogSource = readProjectFile(
   "components/system/Dialogs/Run/index.tsx"
 );
@@ -61,6 +72,17 @@ const iconDigest = (name: string, size: number): string =>
     .digest("hex");
 
 describe("SecurityOS application catalog", () => {
+  it("keeps the runtime-visible version aligned with package metadata", () => {
+    const { version } = JSON.parse(readProjectFile("package.json")) as {
+      version: string;
+    };
+    const packageDataBlock = constantsSource.match(
+      /export const PACKAGE_DATA = {[\S\s]*?\n};/
+    )?.[0];
+
+    expect(packageDataBlock).toContain(`version: "${version}"`);
+  });
+
   it("presents Zupt while preserving the legacy process identity", () => {
     expect(catalogSource).toMatch(
       /Vaptvupt:\s*{[\S\s]*?icon: "\/System\/Icons\/zupt\.webp"[\S\s]*?title: "Zupt"/
@@ -139,6 +161,31 @@ describe("SecurityOS application catalog", () => {
     ).toBe(false);
   });
 
+  it("removes retired integrations from active deployment configuration", () => {
+    const deploymentSources = [
+      readProjectFile("docker-compose.yml"),
+      readProjectFile("deploy/docker-compose.yml"),
+      ...listFiles(projectPath("deploy/cloudmacs")).map((filePath) =>
+        readFileSync(filePath, "utf8")
+      ),
+    ].join("\n");
+
+    expect(deploymentSources).not.toMatch(
+      /\b(?:cryptpad|telegram|telega|whatsapp|whatsappel|wuzapi)\b/i
+    );
+  });
+
+  it("keeps the production runtime on the unprivileged node user", () => {
+    const runtimeUserDirectives = [
+      ...dockerfileSource.matchAll(/^USER\s+(\S+)\s*$/gm),
+    ].map(([, user]) => user);
+
+    expect(runtimeUserDirectives.at(-1)).toBe("node");
+    expect(dockerfileSource.indexOf("USER node")).toBeLessThan(
+      dockerfileSource.indexOf("CMD [")
+    );
+  });
+
   it("registers Wiki at the exact SecurityOps origin", () => {
     const wikiSource = readProjectFile("components/apps/Wiki/index.tsx");
 
@@ -153,6 +200,15 @@ describe("SecurityOS application catalog", () => {
 });
 
 describe("process icon catalog", () => {
+  it("ships Tor Browser assets as genuine WebP files", () => {
+    for (const size of ICON_SIZES) {
+      expect(isWebP(iconPath("torbrowser", size))).toBe(true);
+    }
+    expect(
+      isWebP(projectPath("public/System/Icons/Favicons/16x16/torbrowser.webp"))
+    ).toBe(true);
+  });
+
   it("keeps every process icon reference in an auditable form", () => {
     expect(
       processIconExpressions.filter(

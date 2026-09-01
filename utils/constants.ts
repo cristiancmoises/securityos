@@ -413,7 +413,7 @@ export const PACKAGE_DATA = {
   },
   description: "Web Operating System",
   license: "MIT",
-  version: "2.3.0",
+  version: "2.24.0",
 };
 
 export const BASE_ZIP_CONFIG: AsyncZipOptions = {
