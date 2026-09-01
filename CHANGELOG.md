@@ -48,8 +48,9 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   tag, dedicated network, reverse-proxy attachment and host, production launcher,
   shortcuts, editor association, icon assets, and loopback CSP allowances. Its
   source remains in the repository behind an explicit build flag and Compose
-  profile; a root-only production override prevents accidental recreation, while
-  dormant bind-mount data is preserved unmounted for recovery.
+  profile. The root-only exclusion is the final layer of the audited base +
+  per-release + exclusion production stack, while dormant bind-mount data is
+  preserved unmounted for recovery.
 - Updated the root README, in-OS welcome and handbook, Tor model, release notes,
   and execution prompt. Current JavaScript and Rust advisory databases report zero
   known vulnerabilities in the audited dependency graphs. Matrix SDK/Rust crypto,
@@ -72,8 +73,9 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   can finish connecting instead of producing false failures in ZUPT, Keywave,
   IRC, and browser tabs.
 - Corrected the production cutover/rollback runbook to match the checksum-audited
-  legacy VPS Compose model: its build-only web service derives `securityos-web`
-  rather than declaring `securityos-web:latest`.
+  VPS model: the preserved base stays build-only, while an immutable per-release
+  override supplies the explicit web image and the durable Cloudmacs exclusion is
+  always applied last.
 
 ## [2.23.1] — 2026-09-01
 

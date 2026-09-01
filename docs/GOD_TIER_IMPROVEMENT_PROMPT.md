@@ -150,11 +150,12 @@ deployment, but the IONOS production state must have no Cloudmacs container, no
 dedicated Cloudmacs network, and no reverse-proxy attachment to such a network.
 The default production image must also omit its catalog entry, shortcuts, editor
 association, icon assets, and loopback CSP allowances. Prove those absences before
-and after every cutover. Always combine the preserved production Compose file with
-the reviewed root-only IONOS exclusion override so ordinary operations cannot
-recreate it. Retain dormant Cloudmacs host directories as unmounted user/rollback
-data; destructive deletion or re-enabling Cloudmacs requires separate
-authorization.
+and after every cutover. Every operation must use the ordered production stack:
+preserved base, reviewed immutable per-release web override, then the root-only
+IONOS exclusion override last. The exclusion is not auto-loaded; omitting it can
+recreate Cloudmacs. Retain dormant Cloudmacs host directories as unmounted
+user/rollback data; destructive deletion or re-enabling Cloudmacs requires
+separate authorization.
 
 The work is complete only when the clean repository, all real remotes, the
 verified artifact, and the live public deployment agree on the reviewed release.

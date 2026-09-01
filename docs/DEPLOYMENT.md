@@ -11,16 +11,19 @@ load it on the VPS. Do not run a Docker build on the VPS.
 
 ## Production invariants
 
-- Use Compose project `securityos` and the existing production file
-  `/root/secos/securityos/docker-compose.yml` for container recreation.
+- Use Compose project `securityos` and this exact ordered stack for every
+  production operation: the preserved base
+  `/root/secos/securityos/docker-compose.yml`, one reviewed
+  `/root/securityos-runtime/docker-compose.release-<sha>.yml`, then the durable
+  root-only
+  `/root/securityos-runtime/ionos-no-cloudmacs.override.yml` **last**.
 - Treat that production checkout as immutable deployment evidence. Its modified
   Compose file is intentional and is not interchangeable with the repository's
   version.
-- The audited production `web` service is build-only (`image` is unset). With
-  project `securityos`, Compose derives the runtime image reference
-  `securityos-web`. The release flow retags the verified candidate to that exact
-  derived reference and always uses `--no-build`; do not add an `image` field or
-  edit the production file to make it resemble a newer Compose model.
+- The base `web` service is build-only, but the selected per-release override
+  supplies the exact immutable image reference and root-only runtime env file.
+  Always use `--no-build` and `--pull never`; never retag a candidate over a
+  Compose-derived name or edit the dirty base file.
 - Keep the web container named `securityos`, published as `3002:3000`, and
   attached to `securityos_securenet`.
 - Keep `securityos-tor-1` running and healthy on `securityos_securenet`.
@@ -35,13 +38,14 @@ load it on the VPS. Do not run a Docker build on the VPS.
 - Preserve the dormant Cloudmacs bind-mount directories as user/rollback data.
   Their existence does not authorize mounting or deleting them.
 - The audited VPS platform is `linux/amd64`.
-- Never deploy with the release's Compose file, run `docker compose down`, or
-  select Tor or Cloudmacs in a release command. Always select `web` explicitly.
+- Never deploy with the repository's general-purpose Compose model, run
+  `docker compose down`, or select Tor or Cloudmacs in a release command. Always
+  select `web` explicitly and include all three audited production files.
 
-At the 2026-09-01 audit, the active production Compose file had SHA-256
+At the 2026-09-01 audit, the preserved base Compose file had SHA-256
 `337229790ed2bcdc91bbd4286141f1390b63dfedfa0afe5a056c0fc31cb9b181`.
-If that fingerprint changes, re-audit the effective model before deploying; do
-not overwrite the file to make the checksum match.
+If that fingerprint or either selected override changes, re-audit the effective
+model before deploying; do not overwrite a file to make a checksum match.
 
 ## 1. Validate and build locally
 
@@ -78,7 +82,7 @@ architecture. The candidate tag contains the reviewed commit identifier.
 
 ```sh
 release_id="$(git rev-parse --short=12 HEAD)"
-image_ref="securityos-web:candidate-${release_id}"
+image_ref="securityos:${release_id}"
 
 docker build --pull --platform linux/amd64 --target runtime \
   --tag "$image_ref" .
@@ -96,6 +100,19 @@ space required on the VPS.
 artifact_dir="$(cd .. && pwd)/securityos-artifacts"
 image_tar="$artifact_dir/securityos-web-${release_id}.tar"
 install -d -m 0700 "$artifact_dir"
+
+# This rendered override contains no secret. Its env_file target is provisioned
+# separately on the VPS and is never copied into the repository or artifact.
+release_override="$artifact_dir/docker-compose.release-${release_id}.yml"
+sed "s/REVIEWED-COMMIT-12HEX/${release_id}/g" \
+  deploy/ionos-web-release.override.example.yml >"$release_override"
+chmod 0600 "$release_override"
+if grep --quiet 'REVIEWED-COMMIT-12HEX' "$release_override"; then
+  printf '%s\n' "Release override still contains its placeholder" >&2
+  exit 1
+fi
+exclusion_override="$artifact_dir/ionos-no-cloudmacs.override.yml"
+install -m 0600 deploy/ionos-no-cloudmacs.override.yml "$exclusion_override"
 
 docker image save --output "$image_tar" "$image_ref"
 gzip -9 "$image_tar"
@@ -122,7 +139,8 @@ printf '%s\n' \
   cd "$artifact_dir"
   archive_name="$(basename "$image_archive")"
   sha256sum "$archive_name" "$archive_name.image-id" \
-    "$archive_name.capacity" \
+    "$archive_name.capacity" "$(basename "$release_override")" \
+    "$(basename "$exclusion_override")" \
     >"$(basename "$image_archive").sha256"
 )
 ```
@@ -152,7 +170,10 @@ set -Eeuo pipefail
 umask 077
 
 docker system df
-docker image inspect securityos-web >/dev/null
+docker container inspect securityos >/dev/null
+current_web_image="$(docker inspect --format '{{.Image}}' securityos)"
+[[ "$current_web_image" =~ ^sha256:[0-9a-f]{64}$ ]]
+docker image inspect "$current_web_image" >/dev/null
 
 # Copy these two exact decimal values from the reviewed local .capacity file.
 release_id="REVIEWED-COMMIT-12HEX"
@@ -212,6 +233,12 @@ command ev --config "$HOME/.evelin/client.toml" cp \
   "${image_archive}.image-id" "remote:${remote_archive}.image-id"
 command ev --config "$HOME/.evelin/client.toml" cp \
   "${image_archive}.capacity" "remote:${remote_archive}.capacity"
+command ev --config "$HOME/.evelin/client.toml" cp \
+  "$release_override" \
+  "remote:/tmp/securityos-upload-${release_id}/$(basename "$release_override")"
+command ev --config "$HOME/.evelin/client.toml" cp \
+  "$exclusion_override" \
+  "remote:/tmp/securityos-upload-${release_id}/$(basename "$exclusion_override")"
 command ev --config "$HOME/.evelin/client.toml" shell
 ```
 
@@ -228,7 +255,7 @@ umask 077
 
 release_id="REVIEWED-COMMIT-12HEX"
 [[ "$release_id" =~ ^[0-9a-f]{12}$ ]]
-image_ref="securityos-web:candidate-${release_id}"
+image_ref="securityos:${release_id}"
 staging_dir="/tmp/securityos-upload-${release_id}"
 remote_archive="${staging_dir}/securityos-web-${release_id}.tar.gz"
 
@@ -301,50 +328,109 @@ docker_available="$(df -PB1 "$docker_root" | awk 'NR == 2 { print $4 }')"
 
 ## 3. Verify the production model and create the rollback point
 
-Use the active production Compose file, not a Compose file from the release
-artifact. The `--no-build` cutover later ensures its build context is never used.
-Separately transfer `deploy/ionos-no-cloudmacs.override.yml`, verify its release
-checksum, and install it root-only at
-`/root/securityos-runtime/ionos-no-cloudmacs.override.yml` (owner root, mode
-`0600`). Every production Compose command combines that durable exclusion with
-the preserved base file; this prevents a broad future `up` from resurrecting the
-retired service without modifying the dirty checkout.
+The live service is defined by three ordered files: preserved base, selected
+per-release web override, and durable no-Cloudmacs exclusion. The exclusion is
+not auto-loaded, so every command below names it last. Install the rendered
+candidate override from the staging directory and provision its referenced env
+file separately as root-owned mode `0600`. That env file contains
+`SECURITYOS_ORIGIN` and `PROXY_CAPABILITY_SECRET`; never print, copy into Git, or
+place either secret value in a Compose file.
 
 ```sh
+release_id="REVIEWED-COMMIT-12HEX"
+[[ "$release_id" =~ ^[0-9a-f]{12}$ ]]
+image_ref="securityos:${release_id}"
+candidate_image="$(docker image inspect --format '{{.Id}}' "$image_ref")"
+[[ "$candidate_image" =~ ^sha256:[0-9a-f]{64}$ ]]
+
 prod_root="/root/secos/securityos"
 prod_compose="$prod_root/docker-compose.yml"
-prod_exclusion="/root/securityos-runtime/ionos-no-cloudmacs.override.yml"
+runtime_root="/root/securityos-runtime"
+candidate_release="$runtime_root/docker-compose.release-${release_id}.yml"
+candidate_runtime_env="$runtime_root/securityos.env"
+prod_exclusion="$runtime_root/ionos-no-cloudmacs.override.yml"
+staged_release="/tmp/securityos-upload-${release_id}/docker-compose.release-${release_id}.yml"
+staged_exclusion="/tmp/securityos-upload-${release_id}/ionos-no-cloudmacs.override.yml"
 rollback_id="$(date -u +%Y%m%dT%H%M%SZ)"
 rollback_root="/root/securityos-rollbacks/${rollback_id}"
 [[ "$rollback_id" =~ ^[0-9]{8}T[0-9]{6}Z$ ]]
 
 test -f "$prod_compose"
+test -f "$staged_release"
+test -f "$staged_exclusion"
+test ! -e "$candidate_release"
+install -o root -g root -m 0600 "$staged_release" "$candidate_release"
+rm -- "$staged_release"
+test "$(stat --format='%u:%a' "$candidate_release")" = "0:600"
+test "$(stat --format='%u:%a' "$candidate_runtime_env")" = "0:600"
+test "$(grep --count '^SECURITYOS_ORIGIN=https://os\.securityops\.co$' \
+  "$candidate_runtime_env")" = "1"
+test "$(grep --count '^PROXY_CAPABILITY_SECRET=' \
+  "$candidate_runtime_env")" = "1"
+test "$(awk 'NF && $0 !~ /^#/ { count++ } END { print count }' \
+  "$candidate_runtime_env")" = "2"
+capability_secret_length="$(awk -F= \
+  '$1 == "PROXY_CAPABILITY_SECRET" { print length($2) }' \
+  "$candidate_runtime_env")"
+[[ "$capability_secret_length" =~ ^[0-9]+$ ]]
+((capability_secret_length >= 32))
 test "$(stat --format='%u:%a' "$prod_exclusion")" = "0:600"
-test "$(sha256sum "$prod_exclusion" | awk '{ print $1 }')" = \
-  "48f14a2132d4f735b5f3297db3b06c73ed43ad05020214f6880028a3743b5a8e"
+# The canonical exclusion is transferred and checksum-verified with every
+# release. Byte drift is a hard stop; update it only in a separately reviewed,
+# rollback-protected provisioning change.
+cmp --silent "$staged_exclusion" "$prod_exclusion"
+rm -- "$staged_exclusion"
 expected_compose_sha256="337229790ed2bcdc91bbd4286141f1390b63dfedfa0afe5a056c0fc31cb9b181"
 actual_compose_sha256="$(sha256sum "$prod_compose" | awk '{ print $1 }')"
 test "$actual_compose_sha256" = "$expected_compose_sha256"
 prod_compose_sha256="$actual_compose_sha256"
-docker compose -p securityos -f "$prod_compose" -f "$prod_exclusion" config -q
+candidate_release_sha256="$(sha256sum "$candidate_release" | awk '{ print $1 }')"
+candidate_runtime_env_sha256="$(sha256sum "$candidate_runtime_env" | \
+  awk '{ print $1 }')"
+prod_exclusion_sha256="$(sha256sum "$prod_exclusion" | awk '{ print $1 }')"
+[[ "$candidate_release_sha256" =~ ^[0-9a-f]{64}$ ]]
+[[ "$candidate_runtime_env_sha256" =~ ^[0-9a-f]{64}$ ]]
+[[ "$prod_exclusion_sha256" =~ ^[0-9a-f]{64}$ ]]
 
-# This audited legacy Compose service has `build`, but deliberately no `image`.
-# Compose derives `${project}-${service}` as `securityos-web`; pin that exact
-# effective reference without mutating the dirty production file.
-docker compose -p securityos -f "$prod_compose" -f "$prod_exclusion" \
-  config --format json | \
-  jq --exit-status '
-    .services.web.image == null and
-    .services.web.build.context == "/root/secos/securityos" and
-    .services.web.build.dockerfile == "Dockerfile" and
-    (.services.cloudmacs // null) == null
-  ' >/dev/null
-compose_web_image="securityos-web"
-test "$(docker compose -p securityos -f "$prod_compose" -f "$prod_exclusion" \
-  config --images | \
-  grep --fixed-strings --line-regexp --count "$compose_web_image")" = "1"
-test "$(docker inspect --format '{{.Config.Image}}' securityos)" = \
-  "$compose_web_image"
+# Resolve the release override that created the running container. The exact
+# three-file label is evidence; do not guess an old release from image tags.
+active_config_files="$(docker inspect --format \
+  '{{index .Config.Labels "com.docker.compose.project.config_files"}}' \
+  securityos)"
+IFS=',' read -r active_base old_release active_exclusion active_extra \
+  <<<"$active_config_files"
+test -z "${active_extra:-}"
+test "$active_base" = "$prod_compose"
+test "$active_exclusion" = "$prod_exclusion"
+case "$old_release" in
+  "$runtime_root"/docker-compose.release-*.yml)
+    old_release_id="${old_release##*/docker-compose.release-}"
+    old_release_id="${old_release_id%.yml}"
+    [[ "$old_release_id" =~ ^[0-9a-f]{7,40}$ ]] || {
+      printf '%s\n' "Invalid active release identifier" >&2
+      exit 1
+    }
+    ;;
+  /root/securityos-rollbacks/*/docker-compose.release.rollback.yml)
+    [[ "$old_release" =~ ^/root/securityos-rollbacks/[0-9]{8}T[0-9]{6}Z/docker-compose\.release\.rollback\.yml$ ]] || {
+      printf '%s\n' "Invalid active rollback override path" >&2
+      exit 1
+    }
+    old_rollback_root="${old_release%/docker-compose.release.rollback.yml}"
+    test "$(stat --format='%u:%a' "$old_rollback_root")" = "0:700"
+    ;;
+  *) printf '%s\n' "Invalid active release override" >&2; exit 1 ;;
+esac
+test "$(realpath --canonicalize-existing "$old_release")" = "$old_release"
+test "$old_release" != "$candidate_release"
+test "$(stat --format='%u:%a' "$old_release")" = "0:600"
+old_release_sha256="$(sha256sum "$old_release" | awk '{ print $1 }')"
+[[ "$old_release_sha256" =~ ^[0-9a-f]{64}$ ]]
+
+old_web_ref="$(docker inspect --format '{{.Config.Image}}' securityos)"
+old_web_image="$(docker inspect --format '{{.Image}}' securityos)"
+[[ "$old_web_image" =~ ^sha256:[0-9a-f]{64}$ ]]
+test -n "$old_web_ref"
 test "$(docker inspect --format \
   '{{index .Config.Labels "com.docker.compose.project"}}' securityos)" = \
   "securityos"
@@ -352,31 +438,54 @@ test "$(docker inspect --format \
   '{{index .Config.Labels "com.docker.compose.service"}}' securityos)" = \
   "web"
 
-running_web_hash="$(docker inspect --format \
+old_web_hash="$(docker inspect --format \
   '{{index .Config.Labels "com.docker.compose.config-hash"}}' securityos)"
-file_web_hash="$(docker compose -p securityos -f "$prod_compose" \
-  -f "$prod_exclusion" \
+old_file_web_hash="$(docker compose -p securityos -f "$prod_compose" \
+  -f "$old_release" -f "$prod_exclusion" \
   config --hash web | awk '$1 == "web" { print $2 }')"
-test "$running_web_hash" = "$file_web_hash"
+candidate_web_hash="$(docker compose -p securityos -f "$prod_compose" \
+  -f "$candidate_release" -f "$prod_exclusion" \
+  config --hash web | awk '$1 == "web" { print $2 }')"
+[[ "$old_web_hash" =~ ^[0-9a-f]{64}$ ]]
+[[ "$candidate_web_hash" =~ ^[0-9a-f]{64}$ ]]
+test "$old_web_hash" = "$old_file_web_hash"
+
+docker compose -p securityos -f "$prod_compose" -f "$old_release" \
+  -f "$prod_exclusion" config -q
+docker compose -p securityos -f "$prod_compose" -f "$candidate_release" \
+  -f "$prod_exclusion" config -q
 ```
 
 Validate the host-specific topology without displaying environment values:
 
 ```sh
-docker compose -p securityos -f "$prod_compose" -f "$prod_exclusion" \
-  config --format json | \
-  jq --exit-status '
+docker compose -p securityos -f "$prod_compose" -f "$candidate_release" \
+  -f "$prod_exclusion" config --format json | \
+  jq --exit-status --arg image_ref "$image_ref" '
     .name == "securityos" and
     .services.web.container_name == "securityos" and
-    .services.web.image == null and
-    .services.web.build.context == "/root/secos/securityos" and
-    .services.web.build.dockerfile == "Dockerfile" and
+    .services.web.image == $image_ref and
+    (.services.web.build // null) == null and
+    (.services.web.tmpfs | sort) ==
+      ["/SecurityOS/.next/cache", "/home/node/.cache", "/tmp"] and
     ((.services.web.ports // []) | length == 1) and
     .services.web.ports[0].target == 3000 and
     .services.web.ports[0].published == "3002" and
     .services.web.ports[0].protocol == "tcp" and
     ((.services.web.networks | keys | sort) == ["securenet"]) and
-    .networks.securenet.name == "securityos_securenet"
+    .networks.securenet.name == "securityos_securenet" and
+    (.services.cloudmacs // null) == null
+  ' >/dev/null
+
+docker compose -p securityos -f "$prod_compose" -f "$old_release" \
+  -f "$prod_exclusion" config --format json | \
+  jq --exit-status --arg old_web_ref "$old_web_ref" '
+    .services.web.image == $old_web_ref and
+    .services.web.container_name == "securityos" and
+    (.services.web.build // null) == null and
+    (.services.web.tmpfs | sort) ==
+      ["/SecurityOS/.next/cache", "/home/node/.cache", "/tmp"] and
+    (.services.cloudmacs // null) == null
   ' >/dev/null
 
 test "$(docker inspect --format '{{.State.Health.Status}}' \
@@ -408,13 +517,11 @@ rollback evidence, then give the running web image a cheap rollback tag. Do not
 tag or replace Tor images, and do not recreate Cloudmacs.
 
 ```sh
-old_web_image="$(docker inspect --format '{{.Image}}' securityos)"
 old_tor_container="$(docker inspect --format '{{.Id}}' securityos-tor-1)"
 old_proxy_container="$(docker inspect --format '{{.Id}}' npm-attachment)"
 old_securenet="$(docker network inspect --format '{{.Id}}' \
   securityos_securenet)"
 
-[[ "$old_web_image" =~ ^sha256:[0-9a-f]{64}$ ]]
 [[ "$old_tor_container" =~ ^[0-9a-f]{64}$ ]]
 [[ "$old_proxy_container" =~ ^[0-9a-f]{64}$ ]]
 [[ "$old_securenet" =~ ^[0-9a-f]{64}$ ]]
@@ -422,8 +529,46 @@ old_securenet="$(docker network inspect --format '{{.Id}}' \
 test ! -e "$rollback_root"
 install -d -m 0700 "$rollback_root"
 cp --preserve=all "$prod_compose" "$rollback_root/docker-compose.yml"
+rollback_image_ref="securityos-web:rollback-${rollback_id}"
+docker image tag "$old_web_image" "$rollback_image_ref"
+test "$(docker image inspect --format '{{.Id}}' \
+  "$rollback_image_ref")" = "$old_web_image"
+
+# Preserve both reviewed release files as evidence, then derive a dedicated
+# rollback override from the old release by changing its sole image field to the
+# protected rollback tag. The rollback service hash is intentionally distinct.
+old_release_evidence="$rollback_root/docker-compose.release.previous.yml"
+cp --preserve=all "$old_release" "$old_release_evidence"
+cp --preserve=all "$candidate_release" \
+  "$rollback_root/docker-compose.release.candidate.yml"
+rollback_release="$rollback_root/docker-compose.release.rollback.yml"
+test "$(grep --count '^    image:' "$old_release")" = "1"
+sed "s|^    image:.*$|    image: ${rollback_image_ref}|" \
+  "$old_release" >"${rollback_release}.tmp"
+install -o root -g root -m 0600 "${rollback_release}.tmp" "$rollback_release"
+rm -- "${rollback_release}.tmp"
 cp --preserve=all "$prod_exclusion" \
   "$rollback_root/ionos-no-cloudmacs.override.yml"
+chmod 0600 "$rollback_release" \
+  "$old_release_evidence" \
+  "$rollback_root/docker-compose.release.candidate.yml" \
+  "$rollback_root/ionos-no-cloudmacs.override.yml"
+rollback_release_sha256="$(sha256sum "$rollback_release" | awk '{ print $1 }')"
+[[ "$rollback_release_sha256" =~ ^[0-9a-f]{64}$ ]]
+docker compose -p securityos -f "$prod_compose" -f "$rollback_release" \
+  -f "$prod_exclusion" config --format json | \
+  jq --exit-status --arg rollback_image_ref "$rollback_image_ref" '
+    .services.web.image == $rollback_image_ref and
+    .services.web.container_name == "securityos" and
+    (.services.web.build // null) == null and
+    (.services.web.tmpfs | sort) ==
+      ["/SecurityOS/.next/cache", "/home/node/.cache", "/tmp"] and
+    (.services.cloudmacs // null) == null
+  ' >/dev/null
+rollback_web_hash="$(docker compose -p securityos -f "$prod_compose" \
+  -f "$rollback_release" -f "$prod_exclusion" \
+  config --hash web | awk '$1 == "web" { print $2 }')"
+[[ "$rollback_web_hash" =~ ^[0-9a-f]{64}$ ]]
 test ! -e "$prod_root/old.ymo" || \
   cp --preserve=all "$prod_root/old.ymo" "$rollback_root/old.ymo"
 GIT_OPTIONAL_LOCKS=0 git -C "$prod_root" rev-parse HEAD \
@@ -433,16 +578,11 @@ GIT_OPTIONAL_LOCKS=0 git -C "$prod_root" status --short --branch \
 GIT_OPTIONAL_LOCKS=0 git -C "$prod_root" diff --binary \
   >"$rollback_root/working-tree.patch"
 printf '%s\n' "$old_web_image" >"$rollback_root/web-image-id.txt"
-
-docker image tag "$old_web_image" \
-  "securityos-web:rollback-${rollback_id}"
-test "$(docker image inspect --format '{{.Id}}' \
-  "securityos-web:rollback-${rollback_id}")" = "$old_web_image"
+printf '%s\n' "$old_web_ref" >"$rollback_root/web-image-ref.txt"
 
 # Persist every value needed for rollback before cutover. The pointer makes the
 # state discoverable after an Evelin/SSH disconnect; neither file contains a
 # credential. Write both atomically and keep them root-only.
-rollback_image_ref="securityos-web:rollback-${rollback_id}"
 state_file="$rollback_root/state.env"
 state_tmp="${state_file}.tmp"
 active_state="/root/securityos-rollbacks/active-web-state"
@@ -453,17 +593,30 @@ printf '%s\n' \
   "image_ref=$(printf '%q' "$image_ref")" \
   "candidate_image=$(printf '%q' "$candidate_image")" \
   "prod_root=$(printf '%q' "$prod_root")" \
+  "runtime_root=$(printf '%q' "$runtime_root")" \
   "prod_compose=$(printf '%q' "$prod_compose")" \
+  "candidate_release=$(printf '%q' "$candidate_release")" \
+  "candidate_runtime_env=$(printf '%q' "$candidate_runtime_env")" \
+  "old_release_evidence=$(printf '%q' "$old_release_evidence")" \
+  "rollback_release=$(printf '%q' "$rollback_release")" \
   "prod_exclusion=$(printf '%q' "$prod_exclusion")" \
-  "compose_web_image=$(printf '%q' "$compose_web_image")" \
   "prod_compose_sha256=$(printf '%q' "$prod_compose_sha256")" \
+  "candidate_release_sha256=$(printf '%q' "$candidate_release_sha256")" \
+  "candidate_runtime_env_sha256=$(printf '%q' \
+    "$candidate_runtime_env_sha256")" \
+  "old_release_sha256=$(printf '%q' "$old_release_sha256")" \
+  "rollback_release_sha256=$(printf '%q' "$rollback_release_sha256")" \
+  "prod_exclusion_sha256=$(printf '%q' "$prod_exclusion_sha256")" \
   "rollback_id=$(printf '%q' "$rollback_id")" \
   "rollback_image_ref=$(printf '%q' "$rollback_image_ref")" \
   "old_web_image=$(printf '%q' "$old_web_image")" \
+  "old_web_ref=$(printf '%q' "$old_web_ref")" \
   "old_tor_container=$(printf '%q' "$old_tor_container")" \
   "old_proxy_container=$(printf '%q' "$old_proxy_container")" \
   "old_securenet=$(printf '%q' "$old_securenet")" \
-  "file_web_hash=$(printf '%q' "$file_web_hash")" \
+  "old_web_hash=$(printf '%q' "$old_web_hash")" \
+  "candidate_web_hash=$(printf '%q' "$candidate_web_hash")" \
+  "rollback_web_hash=$(printf '%q' "$rollback_web_hash")" \
   >"$state_tmp"
 chmod 0600 "$state_tmp"
 mv -- "$state_tmp" "$state_file"
@@ -474,6 +627,13 @@ sync
 
 test "$(stat --format='%u:%a' "$state_file")" = "0:600"
 test "$(cat "$active_state")" = "$state_file"
+
+# The loaded image and installed override are durable; remove only this release's
+# remaining verified upload metadata and then the now-empty staging directory.
+remote_archive="/tmp/securityos-upload-${release_id}/securityos-web-${release_id}.tar.gz"
+rm -- "${remote_archive}.sha256" "${remote_archive}.image-id" \
+  "${remote_archive}.capacity"
+rmdir -- "/tmp/securityos-upload-${release_id}"
 ```
 
 ## 4. Smoke-test the candidate on the existing Tor network
@@ -493,6 +653,7 @@ trap cleanup_smoke EXIT
 
 docker run --detach --rm --name "$smoke" --init \
   --network securityos_securenet \
+  --env-file "$candidate_runtime_env" \
   --read-only \
   --tmpfs /tmp \
   --tmpfs /SecurityOS/.next/cache \
@@ -529,11 +690,11 @@ still untouched, and Cloudmacs remains absent.
 
 ## 5. Replace only the exact web container
 
-Run this as one Bash block. It reloads the root-owned persisted state, validates
-the exact Compose-derived runtime image name again, and automatically performs a
-web-only rollback if retagging, recreation, or any post-cutover check fails. A
-failed automatic rollback still leaves the state pointer available for the
-reconnect procedure below.
+Run this as one Bash block. It reloads the root-owned state, validates both the
+captured old release and candidate three-file models, and automatically performs
+a web-only rollback if recreation or a post-cutover check fails. A failed
+automatic rollback still leaves the state pointer available for the reconnect
+procedure below.
 
 ```sh
 test -n "${BASH_VERSION:-}"
@@ -558,21 +719,49 @@ source "$state_file"
 [[ "$old_tor_container" =~ ^[0-9a-f]{64}$ ]]
 [[ "$old_proxy_container" =~ ^[0-9a-f]{64}$ ]]
 [[ "$old_securenet" =~ ^[0-9a-f]{64}$ ]]
-[[ "$file_web_hash" =~ ^[0-9a-f]{64}$ ]]
+[[ "$old_web_hash" =~ ^[0-9a-f]{64}$ ]]
+[[ "$candidate_web_hash" =~ ^[0-9a-f]{64}$ ]]
 [[ "$prod_compose_sha256" =~ ^[0-9a-f]{64}$ ]]
+[[ "$candidate_release_sha256" =~ ^[0-9a-f]{64}$ ]]
+[[ "$candidate_runtime_env_sha256" =~ ^[0-9a-f]{64}$ ]]
+[[ "$old_release_sha256" =~ ^[0-9a-f]{64}$ ]]
+[[ "$rollback_release_sha256" =~ ^[0-9a-f]{64}$ ]]
+[[ "$prod_exclusion_sha256" =~ ^[0-9a-f]{64}$ ]]
 [[ "$rollback_id" =~ ^[0-9]{8}T[0-9]{6}Z$ ]]
-test "$image_ref" = "securityos-web:candidate-${release_id}"
+test "$image_ref" = "securityos:${release_id}"
 test "$rollback_image_ref" = "securityos-web:rollback-${rollback_id}"
+test -n "$old_web_ref"
 test "$state_file" = \
   "/root/securityos-rollbacks/${rollback_id}/state.env"
 test "$prod_root" = "/root/secos/securityos"
+test "$runtime_root" = "/root/securityos-runtime"
 test "$prod_compose" = "$prod_root/docker-compose.yml"
+test "$candidate_release" = \
+  "$runtime_root/docker-compose.release-${release_id}.yml"
+test "$candidate_runtime_env" = \
+  "$runtime_root/securityos.env"
+test "$old_release_evidence" = \
+  "/root/securityos-rollbacks/${rollback_id}/docker-compose.release.previous.yml"
+test "$rollback_release" = \
+  "/root/securityos-rollbacks/${rollback_id}/docker-compose.release.rollback.yml"
 test "$prod_exclusion" = \
   "/root/securityos-runtime/ionos-no-cloudmacs.override.yml"
+test "$(stat --format='%u:%a' "$candidate_release")" = "0:600"
+test "$(stat --format='%u:%a' "$candidate_runtime_env")" = "0:600"
+test "$(stat --format='%u:%a' "$rollback_release")" = "0:600"
 test "$(stat --format='%u:%a' "$prod_exclusion")" = "0:600"
+test "$(sha256sum "$prod_compose" | awk '{ print $1 }')" = \
+  "$prod_compose_sha256"
+test "$(sha256sum "$candidate_release" | awk '{ print $1 }')" = \
+  "$candidate_release_sha256"
+test "$(sha256sum "$candidate_runtime_env" | awk '{ print $1 }')" = \
+  "$candidate_runtime_env_sha256"
+test "$(sha256sum "$old_release_evidence" | awk '{ print $1 }')" = \
+  "$old_release_sha256"
+test "$(sha256sum "$rollback_release" | awk '{ print $1 }')" = \
+  "$rollback_release_sha256"
 test "$(sha256sum "$prod_exclusion" | awk '{ print $1 }')" = \
-  "48f14a2132d4f735b5f3297db3b06c73ed43ad05020214f6880028a3743b5a8e"
-test "$compose_web_image" = "securityos-web"
+  "$prod_exclusion_sha256"
 
 assert_companions_unchanged() {
   local dormant_path
@@ -615,6 +804,8 @@ assert_companions_unchanged() {
 
 assert_web_release() {
   local expected_image="$1"
+  local expected_ref="$2"
+  local expected_hash="$3"
   local fs_index
   local headers
   local icon_size
@@ -628,12 +819,12 @@ assert_web_release() {
     '{{index .Config.Labels "com.docker.compose.service"}}' securityos)" = \
     "web" || return 1
   test "$(docker inspect --format '{{.Config.Image}}' securityos)" = \
-    "$compose_web_image" || return 1
+    "$expected_ref" || return 1
   test "$(docker inspect --format '{{.Image}}' securityos)" = \
     "$expected_image" || return 1
   test "$(docker inspect --format \
     '{{index .Config.Labels "com.docker.compose.config-hash"}}' securityos)" = \
-    "$file_web_hash" || return 1
+    "$expected_hash" || return 1
   test "$(docker inspect --format '{{.State.Running}}' securityos)" = \
     "true" || return 1
   docker inspect --format '{{json .Config.Env}}' securityos | \
@@ -700,52 +891,82 @@ remove_exact_web() {
   fi
 }
 
-start_exact_web() {
+validate_release_stack() {
+  local selected_release="$1"
+  local expected_ref="$2"
+  local expected_hash="$3"
+  local expected_release_sha="$4"
+  local rendered_hash
+
   test "$(sha256sum "$prod_compose" | awk '{ print $1 }')" = \
     "$prod_compose_sha256" || return 1
-  docker compose -p securityos -f "$prod_compose" -f "$prod_exclusion" \
-    config -q || return 1
-  docker compose -p securityos -f "$prod_compose" -f "$prod_exclusion" \
-    config --format json | \
-    jq --exit-status '
-      .services.web.image == null and
-      .services.web.build.context == "/root/secos/securityos" and
-      .services.web.build.dockerfile == "Dockerfile" and
+  test "$(sha256sum "$selected_release" | awk '{ print $1 }')" = \
+    "$expected_release_sha" || return 1
+  test "$(sha256sum "$prod_exclusion" | awk '{ print $1 }')" = \
+    "$prod_exclusion_sha256" || return 1
+  docker compose -p securityos -f "$prod_compose" -f "$selected_release" \
+    -f "$prod_exclusion" config -q || return 1
+  docker compose -p securityos -f "$prod_compose" -f "$selected_release" \
+    -f "$prod_exclusion" config --format json | \
+    jq --exit-status --arg expected_ref "$expected_ref" '
+      .services.web.image == $expected_ref and
       .services.web.container_name == "securityos" and
+      (.services.web.build // null) == null and
+      (.services.web.tmpfs | sort) ==
+        ["/SecurityOS/.next/cache", "/home/node/.cache", "/tmp"] and
       (.services.cloudmacs // null) == null
     ' >/dev/null || return 1
-  docker compose -p securityos -f "$prod_compose" -f "$prod_exclusion" \
-    up --detach --no-deps --no-build --pull never web || return 1
+  rendered_hash="$(docker compose -p securityos -f "$prod_compose" \
+    -f "$selected_release" -f "$prod_exclusion" \
+    config --hash web | awk '$1 == "web" { print $2 }')" || return 1
+  test "$rendered_hash" = "$expected_hash" || return 1
+}
+
+start_exact_web() {
+  local selected_release="$1"
+  local expected_ref="$2"
+  local expected_hash="$3"
+  local expected_release_sha="$4"
+
+  validate_release_stack "$selected_release" "$expected_ref" \
+    "$expected_hash" "$expected_release_sha" || return 1
+  docker compose -p securityos -f "$prod_compose" -f "$selected_release" \
+    -f "$prod_exclusion" up --detach --no-deps --no-build --pull never web || \
+    return 1
 }
 
 rollback_web() {
   test "$(docker image inspect --format '{{.Id}}' \
     "$rollback_image_ref")" = "$old_web_image" || return 1
-  docker image tag "$rollback_image_ref" "$compose_web_image" || return 1
-  test "$(docker image inspect --format '{{.Id}}' \
-    "$compose_web_image")" = "$old_web_image" || return 1
   remove_exact_web || return 1
-  start_exact_web || return 1
+  start_exact_web "$rollback_release" "$rollback_image_ref" \
+    "$rollback_web_hash" "$rollback_release_sha256" || return 1
   assert_companions_unchanged || return 1
-  assert_web_release "$old_web_image" || return 1
+  assert_web_release "$old_web_image" "$rollback_image_ref" \
+    "$rollback_web_hash" || return 1
 }
 
 cutover_web() {
-  docker image tag "$image_ref" "$compose_web_image" || return 1
-  test "$(docker image inspect --format '{{.Id}}' \
-    "$compose_web_image")" = "$candidate_image" || return 1
+  test "$(docker image inspect --format '{{.Id}}' "$image_ref")" = \
+    "$candidate_image" || return 1
   web_container_touched=1
   remove_exact_web || return 1
-  start_exact_web || return 1
+  start_exact_web "$candidate_release" "$image_ref" "$candidate_web_hash" \
+    "$candidate_release_sha256" || return 1
   assert_companions_unchanged || return 1
-  assert_web_release "$candidate_image" || return 1
+  assert_web_release "$candidate_image" "$image_ref" \
+    "$candidate_web_hash" || return 1
 }
 
 preflight_cutover() {
-  test "$(sha256sum "$prod_compose" | awk '{ print $1 }')" = \
-    "$prod_compose_sha256" || return 1
+  test "$old_web_ref" != "$image_ref" || return 1
+  validate_release_stack "$rollback_release" "$rollback_image_ref" \
+    "$rollback_web_hash" "$rollback_release_sha256" || return 1
+  validate_release_stack "$candidate_release" "$image_ref" \
+    "$candidate_web_hash" "$candidate_release_sha256" || return 1
   assert_companions_unchanged || return 1
-  assert_web_release "$old_web_image" || return 1
+  assert_web_release "$old_web_image" "$old_web_ref" "$old_web_hash" || \
+    return 1
   test "$(docker image inspect --format '{{.Id}}' "$image_ref")" = \
     "$candidate_image" || return 1
   test "$(docker image inspect --format '{{.Id}}' \
@@ -760,11 +981,8 @@ fi
 web_container_touched=0
 if ! cutover_web; then
   if ((web_container_touched == 0)); then
-    docker image tag "$rollback_image_ref" "$compose_web_image"
-    test "$(docker image inspect --format '{{.Id}}' \
-      "$compose_web_image")" = "$old_web_image"
     printf '%s\n' \
-      "Candidate retag failed; the running production container was untouched." \
+      "Candidate pre-cutover validation failed; production was untouched." \
       >&2
     exit 1
   fi
@@ -789,8 +1007,9 @@ observation window.
 If the same shell is still connected, run `rollback_web` from section 5. After a
 disconnect, use this self-contained recovery block. It resolves the last state
 file through the root-only pointer, validates every persisted identifier before
-use, retags the immutable old web image, and replaces only the exact Compose
-`web` container.
+use, and replaces only the exact Compose `web` container with the dedicated
+rollback override and immutable rollback tag. The ordered model remains base +
+selected rollback release + exclusion.
 
 ```sh
 test -n "${BASH_VERSION:-}"
@@ -812,37 +1031,50 @@ source "$state_file"
 [[ "$old_tor_container" =~ ^[0-9a-f]{64}$ ]]
 [[ "$old_proxy_container" =~ ^[0-9a-f]{64}$ ]]
 [[ "$old_securenet" =~ ^[0-9a-f]{64}$ ]]
-[[ "$file_web_hash" =~ ^[0-9a-f]{64}$ ]]
+[[ "$old_web_hash" =~ ^[0-9a-f]{64}$ ]]
+[[ "$rollback_web_hash" =~ ^[0-9a-f]{64}$ ]]
 [[ "$prod_compose_sha256" =~ ^[0-9a-f]{64}$ ]]
+[[ "$old_release_sha256" =~ ^[0-9a-f]{64}$ ]]
+[[ "$rollback_release_sha256" =~ ^[0-9a-f]{64}$ ]]
+[[ "$prod_exclusion_sha256" =~ ^[0-9a-f]{64}$ ]]
 [[ "$rollback_id" =~ ^[0-9]{8}T[0-9]{6}Z$ ]]
 test "$rollback_image_ref" = "securityos-web:rollback-${rollback_id}"
+test -n "$old_web_ref"
 test "$state_file" = \
   "/root/securityos-rollbacks/${rollback_id}/state.env"
 test "$prod_root" = "/root/secos/securityos"
+test "$runtime_root" = "/root/securityos-runtime"
 test "$prod_compose" = "$prod_root/docker-compose.yml"
+test "$rollback_release" = \
+  "/root/securityos-rollbacks/${rollback_id}/docker-compose.release.rollback.yml"
 test "$prod_exclusion" = \
   "/root/securityos-runtime/ionos-no-cloudmacs.override.yml"
+test "$(stat --format='%u:%a' "$rollback_release")" = "0:600"
 test "$(stat --format='%u:%a' "$prod_exclusion")" = "0:600"
-test "$(sha256sum "$prod_exclusion" | awk '{ print $1 }')" = \
-  "48f14a2132d4f735b5f3297db3b06c73ed43ad05020214f6880028a3743b5a8e"
-test "$compose_web_image" = "securityos-web"
 test "$(sha256sum "$prod_compose" | awk '{ print $1 }')" = \
   "$prod_compose_sha256"
-docker compose -p securityos -f "$prod_compose" -f "$prod_exclusion" \
-  config --format json | \
-  jq --exit-status '
-    .services.web.image == null and
-    .services.web.build.context == "/root/secos/securityos" and
-    .services.web.build.dockerfile == "Dockerfile" and
+test "$(sha256sum "$rollback_release" | awk '{ print $1 }')" = \
+  "$rollback_release_sha256"
+test "$(sha256sum "$prod_exclusion" | awk '{ print $1 }')" = \
+  "$prod_exclusion_sha256"
+docker compose -p securityos -f "$prod_compose" -f "$rollback_release" \
+  -f "$prod_exclusion" config -q
+docker compose -p securityos -f "$prod_compose" -f "$rollback_release" \
+  -f "$prod_exclusion" config --format json | \
+  jq --exit-status --arg rollback_image_ref "$rollback_image_ref" '
+    .services.web.image == $rollback_image_ref and
     .services.web.container_name == "securityos" and
+    (.services.web.build // null) == null and
+    (.services.web.tmpfs | sort) ==
+      ["/SecurityOS/.next/cache", "/home/node/.cache", "/tmp"] and
     (.services.cloudmacs // null) == null
   ' >/dev/null
+rendered_rollback_web_hash="$(docker compose -p securityos -f "$prod_compose" \
+  -f "$rollback_release" -f "$prod_exclusion" \
+  config --hash web | awk '$1 == "web" { print $2 }')"
+test "$rendered_rollback_web_hash" = "$rollback_web_hash"
 test "$(docker image inspect --format '{{.Id}}' \
   "$rollback_image_ref")" = "$old_web_image"
-
-docker image tag "$rollback_image_ref" "$compose_web_image"
-test "$(docker image inspect --format '{{.Id}}' \
-  "$compose_web_image")" = "$old_web_image"
 
 if docker container inspect securityos >/dev/null 2>&1; then
   test "$(docker inspect --format '{{.Name}}' securityos)" = "/securityos"
@@ -856,8 +1088,8 @@ if docker container inspect securityos >/dev/null 2>&1; then
   docker rm securityos
 fi
 
-docker compose -p securityos -f "$prod_compose" -f "$prod_exclusion" \
-  up --detach --no-deps --no-build --pull never web
+docker compose -p securityos -f "$prod_compose" -f "$rollback_release" \
+  -f "$prod_exclusion" up --detach --no-deps --no-build --pull never web
 
 test "$(docker inspect --format '{{.Name}}' securityos)" = "/securityos"
 test "$(docker inspect --format \
@@ -867,12 +1099,12 @@ test "$(docker inspect --format \
   '{{index .Config.Labels "com.docker.compose.service"}}' securityos)" = \
   "web"
 test "$(docker inspect --format '{{.Config.Image}}' securityos)" = \
-  "$compose_web_image"
+  "$rollback_image_ref"
 test "$(docker inspect --format '{{.Image}}' securityos)" = \
   "$old_web_image"
 test "$(docker inspect --format \
   '{{index .Config.Labels "com.docker.compose.config-hash"}}' securityos)" = \
-  "$file_web_hash"
+  "$rollback_web_hash"
 test "$(docker inspect --format '{{.State.Running}}' securityos)" = "true"
 test "$(docker inspect --format '{{.Id}}' securityos-tor-1)" = \
   "$old_tor_container"
@@ -880,8 +1112,14 @@ test "$(docker inspect --format '{{.Id}}' npm-attachment)" = \
   "$old_proxy_container"
 test "$(docker network inspect --format '{{.Id}}' \
   securityos_securenet)" = "$old_securenet"
-! docker container inspect securityos-cloudmacs >/dev/null 2>&1
-! docker network inspect securityos_cloudmacs-net >/dev/null 2>&1
+if docker container inspect securityos-cloudmacs >/dev/null 2>&1; then
+  printf '%s\n' "Cloudmacs container exists after rollback" >&2
+  exit 1
+fi
+if docker network inspect securityos_cloudmacs-net >/dev/null 2>&1; then
+  printf '%s\n' "Cloudmacs network exists after rollback" >&2
+  exit 1
+fi
 test "$(docker inspect --format '{{.State.Running}}' securityos-tor-1)" = \
   "true"
 test "$(docker inspect --format '{{.State.Health.Status}}' \
@@ -934,7 +1172,7 @@ must prove all of the following:
 - no `securityos-cloudmacs` container exists;
 - no `securityos_cloudmacs-net` network exists;
 - `npm-attachment` is connected to `securityos_securenet` and not to a Cloudmacs
-  network; and
+  network;
 - the known Cloudmacs host directories are not mounted by any running container;
   and
 - the production web image has no Cloudmacs catalog entry, desktop/Start shortcut,
@@ -968,8 +1206,8 @@ unrelated hosts were not changed. Post-transition validation proved the web, Tor
 and proxy container IDs were unchanged; the retired container/network, active
 image tag, proxy-host row/configuration, and public TLS virtual host were absent;
 and no running container mounted the dormant directories. The durable root-only
-Compose override now prevents ordinary production operations from recreating the
-service.
+Compose override prevents recreation only when it is applied last in the required
+base + selected release + exclusion stack; it is not auto-loaded.
 
 If rollback is separately authorized during the observation window, use only the
 captured snapshot and exact rollback tag. First validate every stored identifier,

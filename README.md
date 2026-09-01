@@ -281,9 +281,12 @@ Two containers, no host networking, no manual flags, Tor on by default.
 The audited Cloudmacs exclusion applies to Dockerfile-built production images:
 the build removes its optional static launch assets as well as compiling out its
 catalog integration. Raw/non-Docker Next.js builds retain repository assets and
-are not the supported IONOS release path. Production also layers
-`deploy/ionos-no-cloudmacs.override.yml` over the preserved VPS Compose file so a
-future broad `up` cannot recreate the retired service.
+are not the supported IONOS release path. Every production operation uses the
+ordered stack: preserved VPS base, immutable
+`/root/securityos-runtime/docker-compose.release-<sha>.yml`, then
+a root-owned copy of `deploy/ionos-no-cloudmacs.override.yml` installed at
+`/root/securityos-runtime/ionos-no-cloudmacs.override.yml` last. That exclusion
+is not auto-loaded; omitting it can recreate the retired service.
 
 <details><summary>Other options</summary>
 
