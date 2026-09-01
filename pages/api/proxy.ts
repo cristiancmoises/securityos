@@ -45,7 +45,13 @@ export const config = {
   api: { bodyParser: false, responseLimit: false },
 };
 
-const FETCH_TIMEOUT_MS = 30_000;
+// A cold, stream-isolated Tor circuit regularly needs more than 30 seconds to
+// connect on a busy relay. That old ceiling caused otherwise healthy first-party
+// apps (ZUPT, Keywave, IRC) to fail with 502 just before the SOCKS connection
+// completed. Keep this aligned with the Matrix relay: it is an inactivity/connect
+// ceiling, not a total download deadline, and the existing socket/byte caps still
+// bound resource use.
+const FETCH_TIMEOUT_MS = 120_000;
 const MAX_RESPONSE_BYTES = 25 * 1024 * 1024;
 // Larger cap for explicit binary fetches (?bin=1), e.g. the V86 app pulling a
 // live ISO it will boot. Self-hosted single-user OS, so a bigger buffer is fine.

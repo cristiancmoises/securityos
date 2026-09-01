@@ -14,6 +14,9 @@ follows [Keep a Changelog](https://keepachangelog.com/).
 - Made the Matrix relay unconditionally fail closed when its Tor agent is absent
   or malformed, restricted it to client/media API families and known HTTP
   methods, and stopped returning raw upstream network errors.
+- Raised the privacy proxy's bounded SOCKS/inactivity timeout from 30 to 120
+  seconds so cold stream-isolated Tor circuits can finish connecting instead of
+  producing false 502 failures in ZUPT, Keywave, IRC, and browser tabs.
 
 ## [2.23.1] — 2026-09-01
 
