@@ -2,7 +2,9 @@
 
 This runbook covers the audited SecurityOS topology on the IONOS VPS. A normal
 release replaces the **web container only**. Tor, Cloudmacs, their data, and the
-reverse-proxy network attachments stay running throughout the deployment.
+reverse-proxy network attachments stay running throughout the deployment. The
+separately authorized, one-time Cloudmacs retired-integration migration is
+documented after the standard web cutover and must not be folded into it.
 
 The VPS has limited free disk space. Build the multi-stage runtime image on a
 compatible local machine, validate it, transfer the compressed Docker image, and
@@ -24,7 +26,9 @@ load it on the VPS. Do not run a Docker build on the VPS.
   attached to `securityos_securenet`.
 - Keep `securityos-tor-1` running and healthy on `securityos_securenet`.
 - Keep `securityos-cloudmacs` running on `securityos_cloudmacs-net`, without a
-  published host port. Preserve all of its bind-mounted data.
+  published host port. Preserve all current data mounts during normal releases.
+  The one-time migration may detach retired integration mounts, but must preserve
+  their host directories as rollback data unless deletion is separately approved.
 - Keep the `npm-attachment` reverse proxy attached to both networks.
 - The audited VPS platform is `linux/amd64`.
 - Never deploy with the release's Compose file, run `docker compose down`, or
@@ -472,7 +476,7 @@ docker run --detach --rm --name "$smoke" --init \
   --read-only \
   --tmpfs /tmp \
   --tmpfs /SecurityOS/.next/cache \
-  --tmpfs /root/.cache \
+  --tmpfs /home/node/.cache \
   --cap-drop ALL \
   --security-opt no-new-privileges:true \
   --memory 1g \
@@ -483,6 +487,8 @@ docker run --detach --rm --name "$smoke" --init \
   --env TMPDIR=/tmp \
   --env TOR_PROXY=socks5h://tor:9050 \
   "$image_ref"
+
+test "$(docker inspect --format '{{.Config.User}}' "$smoke")" = "node"
 
 smoke_ip="$(docker inspect --format \
   '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$smoke")"
@@ -857,8 +863,46 @@ curl --fail --silent --show-error --output /dev/null \
 ```
 
 The production checkout, dirty Compose model, persistent networks, Tor service,
-Cloudmacs service, and Cloudmacs bind mounts remain untouched throughout
-cutover and rollback.
+Cloudmacs service, and Cloudmacs bind mounts remain untouched throughout the
+standard web cutover and rollback.
+
+## One-time retired-integration Cloudmacs migration
+
+This migration is authorized only when a release removes integrations that the
+running Cloudmacs container still loads or mounts. Perform it after the web
+cutover has passed every gate. Build and transfer an immutable `linux/amd64`
+Cloudmacs image from `deploy/cloudmacs/` using the same checksum and disk-capacity
+discipline as the web artifact.
+
+Before recreation, create a fresh root-only rollback directory, tag the exact
+running Cloudmacs image, and save its container/image inspection plus effective
+Compose configuration. Create a release-scoped Compose override whose `image`
+is the verified candidate and whose `volumes` list uses Compose `!override` to
+contain only these active mounts:
+
+```yaml
+services:
+  cloudmacs:
+    image: securityos-cloudmacs:candidate-REVIEWED-COMMIT-12HEX
+    volumes: !override
+      - ${HOME}/.cloudmacs.d:/home/emacs/.emacs.d
+      - ${HOME}/.spacemacs.d:/home/emacs/.spacemacs.d
+      - ${HOME}/cloudmacs-data:/home/emacs/data
+```
+
+First verify the installed Compose version supports `!override`, then render the
+base plus override and assert that the image ID, networks, ports, environment,
+and three mount targets are exact. The rendered service must contain no retired
+integration name or mount. Recreate **only** `cloudmacs` with `--no-deps`,
+`--no-build`, `--pull never`, and `--force-recreate`; never select `web`, Tor, or
+the reverse proxy in this command.
+
+After recreation, require the candidate image ID, zero restarts, the unchanged
+Cloudmacs network, a working local Gotty/Emacs response, and exactly the three
+active mounts above. Also assert that the web, Tor, and reverse-proxy container
+IDs did not change. On any failure, immediately recreate Cloudmacs from the
+captured rollback image and mount model. Detached host directories are retained
+for recovery: do not delete them as part of this migration.
 
 ## Forbidden cleanup operations
 
@@ -869,7 +913,8 @@ release:
   `docker volume prune`, or broad image deletion;
 - `docker compose down`, `down -v`, `rm -v`, or `--rmi all`;
 - stopping, removing, rebuilding, or recreating `securityos-tor-1` or
-  `securityos-cloudmacs` during a web release;
+  `securityos-cloudmacs` during a normal web release (the narrowly scoped,
+  separately gated migration above is the only Cloudmacs exception);
 - deletion of unnamed or apparently unused volumes without documented ownership;
 - deletion of Cloudmacs bind-mount directories;
 - `git pull`, `git reset --hard`, `git clean`, or replacement of

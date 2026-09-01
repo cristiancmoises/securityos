@@ -51,6 +51,12 @@ COPY --from=build /SecurityOS/server.js ./server.js
 COPY --from=build /SecurityOS/utils/proxyCapability.js ./utils/proxyCapability.js
 
 EXPOSE 3000
+# The runtime only needs read access to the immutable application tree and binds
+# an unprivileged port. Keep the process out of uid 0 even if an operator runs the
+# image without the Compose capability/read-only hardening.
+ENV HOME=/home/node
+USER node
+
 # Serve the already-built app (the image's `yarn build` produced .next). Avoids
 # the wasteful full rebuild that `yarn start` performs before launching this server
 # every container start. -H 0.0.0.0 makes it reachable via the published port.

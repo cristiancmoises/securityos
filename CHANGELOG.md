@@ -39,6 +39,11 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   proprietary operating-system name, logo, trademark, wallpaper, or other asset.
 - Added distinct multi-resolution Zupt, IRC, GODS EYE, Wiki, Pinball, and V86 icon
   families. Every registered process icon now resolves at 16/32/48/96/144 pixels.
+- Aligned Terminal's runtime-visible version with the package release, made the
+  production web image run as the unprivileged `node` user, and corrected the Tor
+  Browser icon family so `.webp` assets contain genuine WebP data.
+- Pinned Cloudmacs to its reviewed upstream image digest and upgraded the base
+  Alpine runtime packages before adding the minimal Spacemacs toolchain.
 - Updated the root README, in-OS welcome and handbook, Tor model, release notes,
   and execution prompt. Current JavaScript and Rust advisory databases report zero
   known vulnerabilities in the audited dependency graphs. Matrix SDK/Rust crypto,

@@ -145,5 +145,12 @@ image if identity, topology, local HTTP, Tor exit, public HTTPS, Matrix, Zupt,
 Wiki, IRC, GODS EYE, browser, or WebSocket validation fails. Keep both candidate
 and rollback tags throughout the observation window.
 
+After the web release passes, perform the separately authorized, rollback-protected
+Cloudmacs migration: deploy the verified messenger-free Cloudmacs image, replace
+its volume list with only the Emacs configuration and data mounts, and recreate
+only that container. Prove Tor, web, reverse proxy, and networks were untouched.
+Detach retired integration mounts but retain their host directories as rollback
+data; destructive data deletion requires separate authorization.
+
 The work is complete only when the clean repository, all real remotes, the
 verified artifact, and the live public deployment agree on the reviewed release.
