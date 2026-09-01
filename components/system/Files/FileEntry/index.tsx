@@ -158,8 +158,8 @@ const FileEntry: FC<FileEntryProps> = ({
   const [showInFileManager, setShowInFileManager] = useState(false);
   const { formats, sizes } = useTheme();
   const { themeName } = useSession();
-  // Undercover (Windows 11 disguise) is a pure presentation overlay: swap the
-  // VISIBLE label for a generic Win11-ish name without renaming the file on disk.
+  // Undercover is a pure presentation overlay: swap the visible label for a
+  // generic enterprise name without renaming the file on disk.
   // Gated on the live themeName so the default theme always shows real names and
   // toggling Undercover off restores them with no leftovers.
   const displayName = useMemo(() => {

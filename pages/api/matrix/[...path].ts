@@ -28,7 +28,8 @@ import { SocksProxyAgent } from "socks-proxy-agent";
  * Content-Type and the body bytes, with Cache-Control: no-store and
  * Referrer-Policy: no-referrer. No logging.
  *
- * Server-only: exists under `next start` (Docker default); absent in static export.
+ * Server-only: exists under the custom Node server (Docker default); absent in
+ * static export.
  */
 
 // Read the RAW request body ourselves so non-GET bodies (login JSON, message

@@ -28,3 +28,15 @@ export const Stop: FC = () => (
     <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
   </svg>
 );
+
+export const Home: FC = () => (
+  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 3.1 2.8 11v10h6.1v-6.2h6.2V21h6.1V11L12 3.1Zm7.2 15.9h-2.1v-6.2H6.9V19H4.8v-7.1L12 5.7l7.2 6.2V19Z" />
+  </svg>
+);
+
+export const ExternalLink: FC = () => (
+  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M14 3v2h3.6l-8.3 8.3 1.4 1.4L19 6.4V10h2V3h-7ZM5 5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7h-2v7H5V7h7V5H5Z" />
+  </svg>
+);

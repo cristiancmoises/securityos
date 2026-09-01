@@ -4,7 +4,7 @@ import { TASKBAR_HEIGHT } from "utils/constants";
 const StyledTaskbar = styled.nav`
   backdrop-filter: ${({ theme }) =>
     theme.name === "Undercover"
-      ? /* Win11 "acrylic": a heavier blur + extra saturation over a lighter
+      ? /* A heavier blur + extra saturation over a lighter
            translucent surface so the wallpaper bleeds through as frosted glass. */
         `blur(${theme.sizes.taskbar.blur}) saturate(180%) brightness(108%)`
       : `blur(${theme.sizes.taskbar.blur}) saturate(160%)`};
@@ -12,7 +12,7 @@ const StyledTaskbar = styled.nav`
 
   /* Neon top edge: a thin cyan->magenta hairline plus an upward glow that lifts
      the bar off the desktop — the signature Cyber-Neon Glass detail. Theme-driven
-     so Undercover (Windows 11) flattens it to a plain, glow-free bar. */
+     so Undercover flattens it to a plain, glow-free bar. */
   border-top: ${({ theme }) => `1px solid ${theme.colors.accent.edge}`};
   bottom: 0;
 

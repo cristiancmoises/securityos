@@ -27,7 +27,7 @@ const StyledClock = styled.div`
     background-color: ${({ theme }) => theme.colors.taskbar.foreground};
   }
 
-  /* Windows 11 disguise: stack the time over the date, right-aligned and smaller,
+  /* Enterprise disguise: stack the time over the date, right-aligned and smaller,
      in the bottom-right corner of the taskbar. Gated on the Undercover theme so the
      default single-line HUD clock above is completely untouched. */
   &.undercover {

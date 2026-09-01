@@ -1,4 +1,4 @@
 [InternetShortcut]
 BaseURL=IRC
-Comment=SecurityOps IRC web client, embedded over Tor
+Comment=SecurityOps IRC web client (selectable Tor or Clearnet)
 IconFile=/System/Icons/irc.webp

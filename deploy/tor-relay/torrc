@@ -27,7 +27,7 @@ CookieAuthentication 1
 
 # --- Optional: publish SecurityOS itself as a Tor hidden service (.onion) ----
 # Uncomment and point HiddenServicePort at your SecurityOS web server (the Node
-# `next start` container or your nginx/Caddy from deploy/). After first start,
+# custom `yarn start` container or your nginx/Caddy from deploy/). After first start,
 # read the generated hostname:
 #   docker compose exec tor cat /var/lib/tor/securityos/hostname
 #

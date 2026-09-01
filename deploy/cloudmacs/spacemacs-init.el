@@ -59,7 +59,7 @@ This function should only modify configuration layer settings."
    ;; `dotspacemacs/user-config'. To use a local version of a package, use the
    ;; `:location' property: '(your-package :location "~/path/to/your-package/")
    ;; Also include the dependencies as they will not be resolved automatically.
-   dotspacemacs-additional-packages '(telega)
+   dotspacemacs-additional-packages '()
 
    ;; A list of packages that cannot be updated.
    dotspacemacs-frozen-packages '()
@@ -593,28 +593,6 @@ before packages are loaded."
     (unless (file-directory-p org-directory)
       (ignore-errors (make-directory org-directory t))))
 
-  ;; Telega (Telegram in Emacs). The package is installed from MELPA; a live
-  ;; connection additionally needs `telega-server' (built from TDLib) — run
-  ;; `M-x telega-server-build' once TDLib is available in the container.
-  (with-eval-after-load 'telega
-    ;; TDLib (libtdjson) is installed at /usr/local in the cloudmacs image, so
-    ;; `M-x telega-server-build' links telega-server against it. Images don't
-    ;; render in a TTY, so keep them off for the terminal client.
-    (setq telega-server-libs-prefix "/usr/local"
-          telega-use-images nil))
-  (spacemacs/set-leader-keys "at" #'telega)
-
-  ;; whatsappel — WhatsApp in Emacs (github.com/cristiancmoises/whatsappel),
-  ;; mounted read-only at ~/whatsappel. It talks to a wuzapi backend (run
-  ;; separately); here we just put it on the load-path and load it if present.
-  (let ((whatsappel-dir (expand-file-name "~/whatsappel")))
-    (when (file-directory-p whatsappel-dir)
-      (add-to-list 'load-path whatsappel-dir)
-      (ignore-errors (require 'whatsapp))
-      (ignore-errors (require 'whatsapp-org))))
-  (spacemacs/set-leader-keys "aW" (lambda () (interactive)
-                                    (if (fboundp 'whatsapp) (whatsapp)
-                                      (message "whatsappel loaded; start the wuzapi backend to connect."))))
   )
 
 

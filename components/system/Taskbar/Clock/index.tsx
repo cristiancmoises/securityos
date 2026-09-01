@@ -68,7 +68,7 @@ const Clock: FC = () => {
   );
   const { date, time } = now;
   const { clockSource } = useSession();
-  // Windows 11 stacks the time over the date in the bottom-right of the taskbar.
+  // Undercover stacks the time over the date in the taskbar's bottom-right.
   // Under Undercover we render the clock as DOM text (so we can stack two lines)
   // instead of the single-line OffscreenCanvas readout used by the default theme.
   const { name: themeDisplayName } = useTheme();

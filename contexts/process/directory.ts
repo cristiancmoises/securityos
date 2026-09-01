@@ -29,9 +29,9 @@ const directory: Processes = {
       height: 680,
       width: 1000,
     },
-    icon: "/System/Icons/vaptvupt.webp",
+    icon: "/System/Icons/zupt.webp",
     singleton: true,
-    title: "Vaptvupt",
+    title: "Zupt",
   },
   SecChat: {
     Component: dynamic(() => import("components/apps/SecChat")),
@@ -159,7 +159,7 @@ const directory: Processes = {
     },
     icon: "/System/Icons/irc.webp",
     singleton: true,
-    title: "IRC",
+    title: "SecurityOps IRC",
   },
   Matrix: {
     Component: dynamic(() => import("components/apps/Matrix")),
@@ -342,50 +342,6 @@ const directory: Processes = {
     singleton: true,
     title: "Tails",
   },
-  WhatsApp: {
-    Component: dynamic(() => import("components/apps/WhatsApp")),
-    backgroundColor: "#120c18",
-    defaultSize: {
-      height: 600,
-      width: 500,
-    },
-    icon: "/System/Icons/whatsapp.webp",
-    singleton: true,
-    title: "WhatsApp",
-  },
-  Telegram: {
-    Component: dynamic(() => import("components/apps/Telegram")),
-    backgroundColor: "#120c18",
-    defaultSize: {
-      height: 600,
-      width: 500,
-    },
-    icon: "/System/Icons/telegram.webp",
-    singleton: true,
-    title: "Telegram",
-  },
-  Session: {
-    Component: dynamic(() => import("components/apps/Session")),
-    backgroundColor: "#120c18",
-    defaultSize: {
-      height: 600,
-      width: 500,
-    },
-    icon: "/System/Icons/session.webp",
-    singleton: true,
-    title: "Session",
-  },
-  CryptPad: {
-    Component: dynamic(() => import("components/apps/CryptPad")),
-    backgroundColor: "#1c1340",
-    defaultSize: {
-      height: 680,
-      width: 1000,
-    },
-    icon: "/System/Icons/cryptpad.webp",
-    singleton: true,
-    title: "CryptPad",
-  },
   ClearnetBrowser: {
     Component: dynamic(() => import("components/apps/ClearnetBrowser")),
     backgroundColor: "#000",
@@ -404,7 +360,7 @@ const directory: Processes = {
       height: 680,
       width: 1100,
     },
-    icon: "/System/Icons/securityos.webp",
+    icon: "/System/Icons/godseye.webp",
     singleton: true,
     title: "GODS EYE",
   },
@@ -499,6 +455,17 @@ const directory: Processes = {
     libs: ["/Program Files/Webamp/webamp.bundle.min.js"],
     singleton: true,
     title: "Webamp",
+  },
+  Wiki: {
+    Component: dynamic(() => import("components/apps/Wiki")),
+    backgroundColor: "#090d13",
+    defaultSize: {
+      height: 680,
+      width: 1000,
+    },
+    icon: "/System/Icons/wiki.webp",
+    singleton: true,
+    title: "SecurityOps Wiki",
   },
 };
 

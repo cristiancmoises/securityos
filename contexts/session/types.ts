@@ -15,6 +15,12 @@ export type WindowStates = Record<string, WindowState>;
 
 export type WallpaperFit = "center" | "fill" | "fit" | "stretch" | "tile";
 
+export type UndercoverAppearance = {
+  themeName: ThemeName;
+  wallpaperFit: WallpaperFit;
+  wallpaperImage: string;
+};
+
 type SortOrder = [string[], SortBy, boolean];
 
 export type SortOrders = Record<string, SortOrder>;
@@ -31,15 +37,16 @@ export type IconPositions = Record<string, IconPosition>;
 export type SessionData = {
   aiApi: string;
   clockSource: ClockSource;
-  // WebSocket relay URL for the v86 emulator's guest networking. Empty string =>
-  // guest networking disabled (the privacy-preserving default). Set to a Tor
-  // WS->SOCKS bridge to route the in-browser Linux through Tor.
+  // WebSocket relay URL for the v86 emulator's guest networking. The default
+  // selects the local Tor bridge and fails closed when it is unavailable; an
+  // empty string explicitly disables guest networking.
   emulatorRelayUrl: string;
   iconPositions: IconPositions;
   muted: boolean;
   runHistory: string[];
   sortOrders: SortOrders;
   themeName: ThemeName;
+  undercoverAppearance?: UndercoverAppearance;
   volume: number;
   wallpaperFit: WallpaperFit;
   wallpaperImage: string;
@@ -47,6 +54,8 @@ export type SessionData = {
 };
 
 export type SessionContextState = SessionData & {
+  disableUndercover: () => void;
+  enableUndercover: () => void;
   foregroundId: string;
   prependToStack: (id: string) => void;
   removeFromStack: (id: string) => void;
@@ -58,7 +67,6 @@ export type SessionContextState = SessionData & {
   setIconPositions: React.Dispatch<React.SetStateAction<IconPositions>>;
   setMuted: React.Dispatch<React.SetStateAction<boolean>>;
   setRunHistory: React.Dispatch<React.SetStateAction<string[]>>;
-  setVolume: React.Dispatch<React.SetStateAction<number>>;
   setSortOrder: (
     directory: string,
     order: string[] | ((currentSortOrder: string[]) => string[]),
@@ -66,6 +74,7 @@ export type SessionContextState = SessionData & {
     ascending?: boolean
   ) => void;
   setThemeName: React.Dispatch<React.SetStateAction<ThemeName>>;
+  setVolume: React.Dispatch<React.SetStateAction<number>>;
   setWallpaper: (image: string, fit?: WallpaperFit) => void;
   setWindowStates: React.Dispatch<React.SetStateAction<WindowStates>>;
   stackOrder: string[];

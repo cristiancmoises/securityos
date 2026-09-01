@@ -1,7 +1,7 @@
 import styled, { keyframes } from "styled-components";
 
 /**
- * Full-screen lock overlay — Win11 / macOS style.
+ * Full-screen lock overlay with a neutral frosted-glass style.
  *
  * Sits above everything (z-index well past windows, taskbar and menus) and
  * captures all pointer/keyboard input so the desktop is inert while locked.

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hidden service blocked in Clearnet Browser</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        align-items: center;
+        background: #090d13;
+        color: #dce8e2;
+        display: flex;
+        font: 14px/1.55 system-ui, sans-serif;
+        justify-content: center;
+        text-align: center;
+      }
+
+      main {
+        background: #101720;
+        border: 1px solid #6f4c8f;
+        border-radius: 12px;
+        max-width: 520px;
+        padding: 28px;
+      }
+
+      h1 {
+        color: #d5b3ee;
+        font-size: 20px;
+        margin: 0 0 12px;
+      }
+
+      p {
+        margin: 8px 0;
+      }
+
+      strong {
+        color: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Hidden service protected</h1>
+      <p>
+        Clearnet Browser will not resolve or open a <strong>.onion</strong>
+        address. This prevents the hidden-service name from leaking to an ordinary
+        DNS resolver.
+      </p>
+      <p>Copy the address and open it explicitly in <strong>Tor Browser</strong>.</p>
+    </main>
+  </body>
+</html>

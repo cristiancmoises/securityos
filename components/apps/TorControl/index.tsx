@@ -1,11 +1,11 @@
-import { RELAY_PRESETS } from "components/apps/V86/config";
 import StyledTorControl from "components/apps/TorControl/StyledTorControl";
+import { RELAY_PRESETS } from "components/apps/V86/config";
 import type { ComponentProcessProps } from "components/system/Apps/RenderComponent";
 import { useProcesses } from "contexts/process";
 import { useSession } from "contexts/session";
 import { useEffect, useId, useState } from "react";
 
-type Mode = "disabled" | "tor" | "clearnet" | "custom";
+type Mode = "clearnet" | "custom" | "disabled" | "tor";
 
 const isWsUrl = (value: string): boolean => /^wss?:\/\/.+/i.test(value.trim());
 
@@ -20,7 +20,7 @@ const STATUS_LABEL: Record<Mode, string> = {
   clearnet: "Clearnet relay — NOT anonymous",
   custom: "Custom relay",
   disabled: "Networking disabled (most private)",
-  tor: "Routing the Linux VM through Tor",
+  tor: "Local Tor relay selected (fail-closed)",
 };
 
 type ProxyTor = "checking" | "down" | "off" | "up";
@@ -29,7 +29,7 @@ const PROXY_TOR_LABEL: Record<ProxyTor, string> = {
   checking: "Checking the Tor proxy…",
   down: "Tor proxy UNREACHABLE — start the tor service (onions won't load)",
   off: "Tor proxy not configured (set TOR_PROXY)",
-  up: "Tor: connected — Browser & Tor Browser are routed through Tor",
+  up: "Tor proxy connected — Tor-mode apps are routed through Tor",
 };
 
 const TorControl: FC<ComponentProcessProps> = () => {
@@ -60,7 +60,11 @@ const TorControl: FC<ComponentProcessProps> = () => {
         };
 
         if (!active) return;
-        setProxyTor(!data.configured ? "off" : data.tor ? "up" : "down");
+        if (data.configured) {
+          setProxyTor(data.tor ? "up" : "down");
+        } else {
+          setProxyTor("off");
+        }
       } catch {
         if (active) setProxyTor("down");
       }
@@ -81,9 +85,19 @@ const TorControl: FC<ComponentProcessProps> = () => {
 
   const selectMode = (next: Mode): void => {
     setMode(next);
-    if (next === "disabled") setEmulatorRelayUrl("");
-    else if (next === "tor") setEmulatorRelayUrl(RELAY_PRESETS.tor);
-    else if (next === "clearnet") setEmulatorRelayUrl(RELAY_PRESETS.clearnet);
+    switch (next) {
+      case "clearnet":
+        setEmulatorRelayUrl(RELAY_PRESETS.clearnet);
+        break;
+      case "disabled":
+        setEmulatorRelayUrl("");
+        break;
+      case "tor":
+        setEmulatorRelayUrl(RELAY_PRESETS.tor);
+        break;
+      default:
+        break;
+    }
   };
 
   const applyCustom = (): void => {
@@ -94,9 +108,10 @@ const TorControl: FC<ComponentProcessProps> = () => {
     <StyledTorControl>
       <h1>🧅 Tor Control</h1>
       <p className="subtitle">
-        Tor is <strong>enabled by default</strong> for in-OS browsing. The
-        status below is live. The relay section controls the separate v86 Linux
-        VM.
+        Tor is <strong>enabled by default</strong> for in-OS Tor-mode browsing.
+        The v86 Linux VM separately defaults to the local Tor relay and stays
+        offline if that bridge is unavailable. Only the proxy status below is a
+        live connectivity check; the VM status shows its selected relay.
       </p>
 
       <div className={`status proxy-${proxyTor}`}>
@@ -120,7 +135,7 @@ const TorControl: FC<ComponentProcessProps> = () => {
             type="radio"
           />
           <span>
-            <span className="mode-title">Disabled (default)</span>
+            <span className="mode-title">Disabled</span>
             <br />
             <span className="mode-desc">
               The emulated Linux has no external network. Nothing leaves your
@@ -137,12 +152,14 @@ const TorControl: FC<ComponentProcessProps> = () => {
             type="radio"
           />
           <span>
-            <span className="mode-title">Tor ({RELAY_PRESETS.tor})</span>
+            <span className="mode-title">
+              Tor — default ({RELAY_PRESETS.tor})
+            </span>
             <br />
             <span className="mode-desc">
               Sends the VM&apos;s traffic through a local WebSocket→SOCKS5
-              bridge that exits via Tor. Requires the bridge to be running (see
-              docs).
+              bridge that exits via Tor. If the bridge is unavailable, the VM
+              has no network; it never falls back to clearnet.
             </span>
           </span>
         </label>
@@ -207,9 +224,9 @@ const TorControl: FC<ComponentProcessProps> = () => {
       </fieldset>
 
       <div className="note">
-        Changes apply the <strong>next time the V86 app boots</strong>. Close
-        and reopen the VM (or start a fresh disk image) for a new relay to take
-        effect.
+        The local Tor relay is selected on a fresh session. Changes apply the
+        <strong> next time the V86 app boots</strong>. Close and reopen the VM
+        (or start a fresh disk image) for a new relay to take effect.
       </div>
 
       <div className="note">
@@ -231,11 +248,11 @@ const TorControl: FC<ComponentProcessProps> = () => {
 
       <div className="note warn">
         The relay above controls only the <strong>emulated Linux VM</strong>.
-        The in-OS <strong>Browser</strong> and <strong>Tor Browser</strong>{" "}
-        already route through Tor server-side (status shown at the top). Only
-        the SecurityOS shell page itself uses your real browser connection — to
-        anonymize that too, open SecurityOS via its <code>.onion</code> address.
-        See docs/TOR.md.
+        The in-OS <strong>Tor Browser</strong> and apps explicitly set to Tor
+        use the server-side Tor proxy (status shown at the top). Clearnet mode
+        stays direct and is not anonymous. The SecurityOS shell page itself uses
+        your real browser connection — to anonymize that too, open SecurityOS
+        via its <code>.onion</code> address. See docs/TOR.md.
       </div>
     </StyledTorControl>
   );

@@ -1,9 +1,8 @@
 import defaultFormats from "styles/defaultTheme/formats";
 
-// Undercover (Windows 11) typography: the default theme is fully monospace (Emacs);
-// Win11 uses Segoe UI everywhere, so override both the body and display fonts back
-// to a sans stack. The mono font (terminals/code) is unchanged.
-const SANS = "'Segoe UI', system-ui, Roboto, 'Helvetica Neue', sans-serif";
+// The default theme is fully monospace; Undercover uses a neutral system sans stack
+// for a familiar enterprise workspace. Terminal/code typography remains unchanged.
+const SANS = "system-ui, Inter, Roboto, 'Helvetica Neue', Arial, sans-serif";
 
 const formats = {
   ...defaultFormats,

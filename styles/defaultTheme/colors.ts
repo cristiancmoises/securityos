@@ -5,7 +5,7 @@
  * "buffer" surfaces, a lighter-gray mode-line (the window title bars), and a single
  * region/selection blue as the accent — no neon glow (the `accent.*` glow tokens are
  * transparent). The whole desktop chrome reads from these tokens, so the look is
- * driven from here; the Undercover theme swaps them for a Windows 11 light palette.
+ * driven from here; the Undercover theme swaps them for a neutral light palette.
  */
 const colors = {
   // Identity accents. Emacs is flat, so the "glow" tokens are transparent; only the

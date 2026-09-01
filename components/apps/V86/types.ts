@@ -32,8 +32,8 @@ export type V86Config = V86ImageConfig &
     };
     initial_state?: { url: string };
     memory_size: number;
-    // WebSocket relay bridging the guest's packets to a real network. Opt-in and
-    // session-configurable (clearnet or Tor); omitted => the guest has no network.
+    // WebSocket relay bridging the guest's packets to a real network. Defaults
+    // to the local Tor bridge; omitted only when networking is explicitly off.
     network_relay_url?: string;
     screen_container: HTMLDivElement | null;
     vga_memory_size: number;

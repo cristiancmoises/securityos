@@ -1,25 +1,25 @@
 /**
- * SecurityOS "Undercover" palette — a Windows 11 disguise (à la Kali Undercover).
+ * SecurityOS "Undercover" palette — a neutral enterprise-workspace disguise.
  *
  * Same token shape as the default Cyber-Neon Glass palette, but tuned toward the
- * Windows 11 light "Mica/Fluent" look: translucent light-grey acrylic surfaces, the
- * Win11 blue accent family (#005fb8) and NO neon glow (the `accent.*` glow tokens go
- * transparent). Paired with the light "bloom" wallpaper so dark text stays readable
- * on both the desktop and inside file windows.
+ * Translucent light-grey surfaces, a restrained blue accent, and no neon glow.
+ * Paired with the original light abstract wallpaper so dark text stays readable on
+ * both the desktop and inside file windows.
  *
  * NOTE: this object spreads the default palette elsewhere — only VALUES are overridden
- * here; the key shape is preserved exactly. No Microsoft trademarks/colors-as-logo.
+ * here; the key shape is preserved exactly. No third-party branding or assets.
  */
+const TRANSPARENT_GLOW = "hsla(206, 100%, 36%, 0%)";
+
 const colors = {
   accent: {
     bar: "linear-gradient(90deg, transparent, transparent)",
 
-    /* Soft Win11 hairline along the top of the acrylic taskbar — no neon, just a
-       faint light divider. */
+    /* Soft hairline along the top of the acrylic taskbar. */
     edge: "hsla(214, 18%, 70%, 38%)",
-    glow: "hsla(206, 100%, 36%, 0%)",
-    glowStrong: "hsla(206, 100%, 36%, 0%)",
-    start: "hsla(206, 100%, 36%, 0%)",
+    glow: TRANSPARENT_GLOW,
+    glowStrong: TRANSPARENT_GLOW,
+    start: TRANSPARENT_GLOW,
   },
   background: "#e6e9ef",
   fileEntry: {
@@ -35,7 +35,7 @@ const colors = {
       0 1px 1px rgba(255, 255, 255, 60%),
       0 1px 2px rgba(255, 255, 255, 45%)`,
   },
-  /* Win11 selection/highlight blue (#005fb8 family). */
+  /* Restrained selection/highlight blue. */
   highlight: "hsla(206, 100%, 36%, 95%)",
   highlightBackground: "hsla(206, 100%, 40%, 22%)",
   progress: "hsla(206, 100%, 36%, 95%)",
@@ -46,9 +46,7 @@ const colors = {
     active: "hsla(206, 100%, 40%, 18%)",
     activeForeground: "hsla(206, 100%, 42%, 30%)",
 
-    /* Translucent light-grey "Mica" acrylic — neutral, not blue-tinted — so the
-       heavier Undercover backdrop blur reads as the Win11 taskbar: the wallpaper
-       frosts through the glass. */
+    /* Neutral translucent taskbar surface; the original wallpaper frosts through. */
     background: "hsla(0, 0%, 96%, 82%)",
     foreground: "hsla(0, 0%, 55%, 25%)",
     foregroundHover: "hsla(206, 100%, 40%, 20%)",
@@ -62,7 +60,7 @@ const colors = {
     backgroundHover: "hsla(206, 100%, 40%, 14%)",
     backgroundInactive: "hsla(0, 0%, 92%, 95%)",
     buttonInactive: "hsla(0, 0%, 42%, 100%)",
-    /* Generic close-button red (NOT a Microsoft asset). */
+    /* Generic close-button red. */
     closeHover: "rgb(232, 17, 35)",
     text: "rgb(31, 39, 51)",
     textInactive: "rgba(80, 90, 105, 70%)",

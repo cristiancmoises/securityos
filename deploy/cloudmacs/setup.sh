@@ -4,9 +4,8 @@
 # Idempotent: safe to re-run. The cloudmacs service mounts these host dirs:
 #   ~/.cloudmacs.d   -> /home/emacs/.emacs.d        (the Spacemacs checkout)
 #   ~/.spacemacs.d   -> /home/emacs/.spacemacs.d     (the dotfile: init.el)
-#   ~/whatsappel     -> /home/emacs/whatsappel (ro)  (the whatsappel package)
 #   ~/cloudmacs-data -> /home/emacs/data             (org notes, files)
-# Packages (the enabled layers + Telega) install from MELPA on first open.
+# Packages for the enabled layers install from ELPA/MELPA on first open.
 set -eu
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -26,16 +25,8 @@ cp "$HERE/spacemacs-init.el" "$HOME/.spacemacs.d/init.el"
 cp "$HERE/securityos-banner.txt" "$HOME/.spacemacs.d/securityos-banner.txt"
 echo "Installed ~/.spacemacs.d/init.el + securityos-banner.txt"
 
-# 2b) Folders Emacs expects so first launch never errors on a missing dir:
-#   ~/cloudmacs-data/org -> /home/emacs/data/org   (org-directory + agenda files)
-#   ~/cloudmacs-telega   -> /home/emacs/.telega     (telega cache/state, persisted)
-mkdir -p "$HOME/cloudmacs-data/org" "$HOME/cloudmacs-telega"
-echo "Created data/org + telega folders"
-
-# 3) whatsappel (optional — only mounted if it exists).
-if [ ! -d "$HOME/whatsappel" ]; then
-  echo "NOTE: ~/whatsappel not found — clone github.com/cristiancmoises/whatsappel"
-  echo "      there (and run its wuzapi backend) for live WhatsApp in Emacs."
-fi
+# 2b) Org-mode's mounted notes/agenda directory.
+mkdir -p "$HOME/cloudmacs-data/org"
+echo "Created data/org folder"
 
 echo "Done. Now run: docker compose up -d cloudmacs"

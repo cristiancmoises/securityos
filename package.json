@@ -1,6 +1,6 @@
 {
   "name": "SecurityOS",
-  "version": "2.23.2",
+  "version": "2.24.0",
   "description": "Web Operating System",
   "author": {
     "name": "Cristian Cezar Moisés",
@@ -29,7 +29,7 @@
     "export": "next export",
     "prepare": "husky install",
     "prettier": "prettier --write .",
-    "start": "next build && next start",
+    "start": "next build && node server.js",
     "stylelint": "stylelint --formatter=verbose **/*.ts*",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -64,6 +64,7 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
+    "@matrix-org/matrix-sdk-crypto-wasm": "^18.7.0",
     "@panzoom/panzoom": "^4.6.2",
     "@prettier/plugin-xml": "^2.2.0",
     "@wasmer/wasm-terminal": "^0.12.0",
@@ -81,6 +82,7 @@
     "idb": "^7.1.1",
     "ini": "^3.0.1",
     "isomorphic-git": "^1.41.9",
+    "matrix-js-sdk": "^42.3.0",
     "minimist": "^1.2.8",
     "multiformats": "^11.0.2",
     "music-metadata": "^11.15.0",
@@ -96,9 +98,11 @@
     "regl": "^2.1.1",
     "resedit": "^2.0.0",
     "rtf.js": "^3.0.9",
+    "socks-proxy-agent": "^10.1.0",
     "styled-components": "^5.3.8",
     "utif": "https://github.com/photopea/UTIF.js#588351078202eebccdb3ba996f5b98c640e4265a",
     "wasi-js": "^1.7.3",
+    "ws": "^8.21.3",
     "yarn": "^1.22.22"
   },
   "devDependencies": {

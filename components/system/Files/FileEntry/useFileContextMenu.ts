@@ -190,9 +190,7 @@ const useFileContextMenu = (
                   // Wrong password, not an encrypted file, or a directory — no-op.
                 }
               },
-              label: isEncryptedFile
-                ? "Decrypt (Vaptvupt)"
-                : "Encrypt (Vaptvupt)",
+              label: isEncryptedFile ? "Decrypt (Zupt)" : "Encrypt (Zupt)",
             });
 
             // Secure delete: overwrite the file's bytes (random or zeros) BEFORE

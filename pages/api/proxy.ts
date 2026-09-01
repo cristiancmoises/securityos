@@ -7,9 +7,15 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { SocksProxyAgent } from "socks-proxy-agent";
 import { ADBLOCK_COSMETIC_CSS, isAdUrl } from "utils/adblock";
 import {
+  type ProxyProfile,
+  type ProxyScriptPolicy,
+  verifyProxyCapability,
+} from "utils/proxyCapability";
+import {
   EphemeralCsrfCookieJar,
   proxyCookieSessionKey,
 } from "utils/proxyCookieJar";
+import { rewriteProxyGetForms } from "utils/proxyForms";
 
 /**
  * SecurityOS privacy proxy.
@@ -36,9 +42,12 @@ import {
  *    runtime shim wraps fetch/XHR/EventSource/sendBeacon + blocks raw WebSocket so
  *    script-generated requests also go through Tor. Residual JS edge cases remain
  *    (see docs/TOR.md) — for strong anonymity use the v86 VM via Tor or Tor Browser.
- *  - No logging, no caching. The CALLER renders this in an opaque-origin sandbox.
+ *  - No app-level request logging or caching. Operators must keep query-bearing
+ *    proxy URLs out of reverse-proxy and hosting-platform access logs. The CALLER
+ *    renders this in an opaque-origin sandbox.
  *
- * Server-only: exists under `next start` (Docker default); absent in static export.
+ * Server-only: exists under the custom Node server (Docker default); absent in
+ * static export.
  */
 
 export const config = {
@@ -82,6 +91,10 @@ let inFlightBuffered = 0;
 // body over the cap is still rejected (413) rather than partially forwarded.
 const MAX_UPLOAD_BYTES = 256 * 1024 * 1024;
 const MAX_REDIRECTS = 5;
+const MAX_ACTIVE_PROXY_REQUESTS = 128;
+const MAX_ACTIVE_PROXY_REQUESTS_PER_CLIENT = 48;
+const activeProxyRequestsByClient = new Map<string, number>();
+let activeProxyRequests = 0;
 // HTTP methods we forward upstream. GET/HEAD carry no body; the rest may carry one
 // (read + forwarded byte-for-byte). Anything else is rejected before we touch Tor.
 const ALLOWED_METHODS = new Set([
@@ -95,6 +108,30 @@ const ALLOWED_METHODS = new Set([
 ]);
 // Body-less methods: never read or forward a request body for these.
 const BODYLESS_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+const reserveProxyRequest = (clientKey: string): boolean => {
+  const clientCount = activeProxyRequestsByClient.get(clientKey) || 0;
+
+  if (
+    activeProxyRequests >= MAX_ACTIVE_PROXY_REQUESTS ||
+    clientCount >= MAX_ACTIVE_PROXY_REQUESTS_PER_CLIENT
+  ) {
+    return false;
+  }
+
+  activeProxyRequests += 1;
+  activeProxyRequestsByClient.set(clientKey, clientCount + 1);
+
+  return true;
+};
+
+const releaseProxyRequest = (clientKey: string): void => {
+  const clientCount = activeProxyRequestsByClient.get(clientKey) || 0;
+
+  if (clientCount <= 1) activeProxyRequestsByClient.delete(clientKey);
+  else activeProxyRequestsByClient.set(clientKey, clientCount - 1);
+  activeProxyRequests = Math.max(0, activeProxyRequests - 1);
+};
 
 const TOR_PROXY = process.env.TOR_PROXY || "";
 // Keep-alive / socket pooling for the SOCKS (Tor) agents. Reusing warm Tor circuits
@@ -137,6 +174,28 @@ try {
 const MAX_ISO_AGENTS = 256;
 const isoAgents = new Map<string, SocksProxyAgent>();
 const ZUPT_WEB_ORIGIN = "https://share.securityops.co";
+const FIXED_PROFILE_ORIGINS: Partial<Record<ProxyProfile, string>> = {
+  godseye: "https://eye.securityops.co",
+  irc: "https://irc.securityops.com.br",
+  keywave: "https://chat.securityops.co",
+  wiki: "https://wiki.securityops.co",
+  zupt: ZUPT_WEB_ORIGIN,
+};
+const APP_PROFILES = new Set<ProxyProfile>(["godseye", "irc", "wiki"]);
+
+const profileAllowsUrl = (profile: ProxyProfile, target: URL): boolean => {
+  const fixedOrigin = FIXED_PROFILE_ORIGINS[profile];
+
+  if (fixedOrigin) return target.origin === fixedOrigin;
+  // The general browser is intentionally user-directed and may navigate to any
+  // public HTTP(S) origin. SSRF validation still runs on every direct hop.
+  return profile === "browser";
+};
+
+const methodsForProfile = (profile: ProxyProfile): Set<string> =>
+  profile === "browser" || profile === "zupt"
+    ? ALLOWED_METHODS
+    : new Set(["GET", "HEAD", "POST", "OPTIONS"]);
 
 // ZUPT's multipart tools bind the hidden CSRF form field to an HttpOnly cookie.
 // Because the privacy proxy intentionally strips browser cookies, that otherwise
@@ -226,7 +285,7 @@ const BROWSER_HEADERS: Record<string, string> = {
   Accept:
     "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,video/*,audio/*,*/*;q=0.8",
   // Request COMPRESSION. Bytes-over-Tor is the dominant cost (a cold circuit plus
-  // CryptPad's multi-MB JS/CSS is the "too slow" complaint), and text assets shrink
+  // a modern app's multi-MB JS/CSS), and text assets shrink
   // ~3-5x with gzip/br. Node's http/https don't auto-decompress, but decodeBody()
   // below gunzip/inflate/brotli-decodes every response (size-capped anti-bomb, raw
   // fallback on error) BEFORE the HTML rewriter / asset passthrough see the bytes.
@@ -778,12 +837,16 @@ const proxiedCsp = (
 // keeps the exact same proxy mode (no-JS, extension, adblock, LibreJS, direct/Tor).
 type ProxyFlags = {
   adblock: boolean;
-  // Embedded-app mode (&app=1, set by CryptPad/WhatsApp/Telegram): forces the Node
+  // Embedded-app mode (&app=1, used by routed first-party apps) forces the Node
   // path so the clientShim is injected (the Rust sidecar injects none), and turns on
   // the extra in-memory IndexedDB shim. Carried on every rewritten URL so the app's
   // own sub-resources/sub-iframes stay on the shimmed Node path too. Does NOT change
   // circuit selection / SSRF / fail-closed — only sidecar-bypass + shim injection.
   app: boolean;
+  // Signed, route-bound bearer minted only for the same-origin desktop. It is
+  // propagated through every rewritten navigation/resource/form so an opaque
+  // sandbox can read its proxied fetch/XHR responses without gaining our origin.
+  capability: string;
   injectExt: boolean;
   isDirect: boolean;
   // Per-tab Tor stream-isolation token: carried on every rewritten URL so links,
@@ -795,6 +858,7 @@ type ProxyFlags = {
   keywave: boolean;
   libreJs: boolean;
   noJs: boolean;
+  profile: ProxyProfile;
   // Exact-origin ZUPT mode: forces the Node path and carries the isolated,
   // server-owned CSRF session across rewritten forms/resources.
   zupt: boolean;
@@ -807,6 +871,8 @@ const flagQuery = (f: ProxyFlags): string =>
     f.app ? "&app=1" : ""
   }${f.keywave ? "&keywave=1" : ""}${f.zupt ? "&zupt=1" : ""}${
     f.iso ? `&iso=${f.iso}` : ""
+  }&profile=${f.profile}${
+    f.capability ? `&cap=${encodeURIComponent(f.capability)}` : ""
   }`;
 
 const proxify = (
@@ -847,9 +913,11 @@ const clientShim = (
     flagQuery(flags)
   )};function abs(u){try{return new URL(u,B).href}catch(e){return u}}function px(u){if(u==null)return u;var s=String(u);if(/^(data:|blob:|javascript:|about:|#|mailto:|tel:)/i.test(s))return u;if(s.indexOf(P)===0)return u;var a=abs(s);if(!/^https?:/i.test(a))return u;return P+encodeURIComponent(a)+F}try{var of=window.fetch;if(of)window.fetch=function(i,init){try{if(typeof i==="string")i=px(i);else if(i&&i.url)i=new Request(px(i.url),i)}catch(e){}return of.call(this,i,init)};var xo=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u){var a=[].slice.call(arguments);try{a[1]=px(u)}catch(e){}return xo.apply(this,a)};if(navigator.sendBeacon){var sb=navigator.sendBeacon.bind(navigator);navigator.sendBeacon=function(u,d){try{u=px(u)}catch(e){}return sb(u,d)}}var ES=window.EventSource;if(ES){window.EventSource=function(u,c){try{u=px(u)}catch(e){}return new ES(u,c)};window.EventSource.prototype=ES.prototype}window.open=function(u){try{if(u)parent.postMessage({__sosNewTab:px(String(u))},"*")}catch(e){}return null};document.addEventListener("click",function(e){var t=e.target;while(t&&t.tagName!=="A")t=t.parentNode;if(t&&t.href&&(e.ctrlKey||e.metaKey||e.button===1)){e.preventDefault();try{parent.postMessage({__sosNewTab:t.href},"*")}catch(x){}}},true);function _pt(){try{parent.postMessage({__sosTitle:document.title||"",__sosHref:location.href},"*")}catch(e){}}document.addEventListener("DOMContentLoaded",_pt);addEventListener("load",_pt);setTimeout(_pt,1200);var _D=${
     flags.isDirect ? "1" : "0"
-  };var _I=${JSON.stringify(
-    flags.iso
-  )};var _OWS=window.WebSocket;var _WSP=(location.protocol==="https:"?"wss://":"ws://")+location.host+"/api/ws?url=";function _SWS(u,p){try{var s=String(u);if(/^wss?:/i.test(s)){var t=_WSP+encodeURIComponent(s)+(_D?"&direct=1":"")+(_I?"&iso="+encodeURIComponent(_I):"");return p!==undefined?new _OWS(t,p):new _OWS(t)}}catch(e){}return p!==undefined?new _OWS(u,p):new _OWS(u)}try{_SWS.prototype=_OWS.prototype;_SWS.CONNECTING=0;_SWS.OPEN=1;_SWS.CLOSING=2;_SWS.CLOSED=3;window.WebSocket=_SWS}catch(e){}var _rtc=function(){throw new Error("WebRTC blocked by SecurityOS privacy proxy (would leak your real IP, bypassing Tor)")};try{window.RTCPeerConnection=_rtc;window.webkitRTCPeerConnection=_rtc;window.mozRTCPeerConnection=_rtc;window.RTCDataChannel=_rtc;if(navigator.mediaDevices){navigator.mediaDevices.getUserMedia=function(){return Promise.reject(new Error("blocked"))}}}catch(e){}var _MEM=function(){var d={};var o={getItem:function(k){return Object.prototype.hasOwnProperty.call(d,k)?d[k]:null},setItem:function(k,v){d[k]=String(v)},removeItem:function(k){delete d[k]},clear:function(){for(var k in d){delete d[k]}},key:function(i){return Object.keys(d)[i]||null}};try{Object.defineProperty(o,"length",{get:function(){return Object.keys(d).length}})}catch(e){}return o};function _shimStore(n){try{void window[n].length}catch(e){try{Object.defineProperty(window,n,{configurable:true,value:_MEM()})}catch(e2){}}}_shimStore("localStorage");_shimStore("sessionStorage");${
+  };var _I=${JSON.stringify(flags.iso)};var _C=${JSON.stringify(
+    flags.capability
+  )};var _P=${JSON.stringify(
+    flags.profile
+  )};var _OWS=window.WebSocket;var _WSP=(location.protocol==="https:"?"wss://":"ws://")+location.host+"/api/ws?url=";function _SWS(u,p){try{var s=String(u);if(/^wss?:/i.test(s)){var t=_WSP+encodeURIComponent(s)+(_D?"&direct=1":"")+(_I?"&iso="+encodeURIComponent(_I):"")+(_P?"&profile="+encodeURIComponent(_P):"")+(_C?"&cap="+encodeURIComponent(_C):"");return p!==undefined?new _OWS(t,p):new _OWS(t)}}catch(e){}return p!==undefined?new _OWS(u,p):new _OWS(u)}try{_SWS.prototype=_OWS.prototype;_SWS.CONNECTING=0;_SWS.OPEN=1;_SWS.CLOSING=2;_SWS.CLOSED=3;window.WebSocket=_SWS}catch(e){}var _rtc=function(){throw new Error("WebRTC blocked by SecurityOS privacy proxy (would leak your real IP, bypassing Tor)")};try{window.RTCPeerConnection=_rtc;window.webkitRTCPeerConnection=_rtc;window.mozRTCPeerConnection=_rtc;window.RTCDataChannel=_rtc;if(navigator.mediaDevices){navigator.mediaDevices.getUserMedia=function(){return Promise.reject(new Error("blocked"))}}}catch(e){}var _MEM=function(){var d={};var o={getItem:function(k){return Object.prototype.hasOwnProperty.call(d,k)?d[k]:null},setItem:function(k,v){d[k]=String(v)},removeItem:function(k){delete d[k]},clear:function(){for(var k in d){delete d[k]}},key:function(i){return Object.keys(d)[i]||null}};try{Object.defineProperty(o,"length",{get:function(){return Object.keys(d).length}})}catch(e){}return o};function _shimStore(n){try{void window[n].length}catch(e){try{Object.defineProperty(window,n,{configurable:true,value:_MEM()})}catch(e2){}}}_shimStore("localStorage");_shimStore("sessionStorage");${
     flags.app
       ? 'try{try{void navigator.serviceWorker}catch(e){try{Object.defineProperty(navigator,"serviceWorker",{configurable:true,value:{controller:null,oncontrollerchange:null,onmessage:null,ready:new Promise(function(){}),register:function(){return Promise.reject(new Error("SecurityOS: service workers are disabled in the privacy sandbox"))},getRegistration:function(){return Promise.resolve(undefined)},getRegistrations:function(){return Promise.resolve([])},startMessages:function(){},addEventListener:function(){},removeEventListener:function(){}}})}catch(e2){}}}catch(x){}try{try{void window.caches}catch(e){try{var _nc={match:function(){return Promise.resolve(undefined)},add:function(){return Promise.resolve()},addAll:function(){return Promise.resolve()},put:function(){return Promise.resolve()},"delete":function(){return Promise.resolve(false)},keys:function(){return Promise.resolve([])}};Object.defineProperty(window,"caches",{configurable:true,value:{open:function(){return Promise.resolve(_nc)},match:function(){return Promise.resolve(undefined)},has:function(){return Promise.resolve(false)},"delete":function(){return Promise.resolve(false)},keys:function(){return Promise.resolve([])}}})}catch(e2){}}}catch(x){}function _idbShim(){var S={};function dsl(a){a.contains=function(x){return a.indexOf(x)>-1};a.item=function(i){return a[i]};return a}function rq(v){return{result:v,error:null,onsuccess:null,onerror:null,onupgradeneeded:null,readyState:"pending",addEventListener:function(t,f){this["on"+t]=f},removeEventListener:function(){}}}function done(r,e){setTimeout(function(){r.readyState="done";var h=r["on"+e];if(h){try{h.call(r,{target:r,type:e})}catch(x){}}},0);return r}function res(v){return done(rq(v),"success")}function idx(){return{get:function(){return res(undefined)},getAll:function(){return res([])},getAllKeys:function(){return res([])},count:function(){return res(0)},openCursor:function(){return res(null)},openKeyCursor:function(){return res(null)}}}function st(n){if(!S[n])S[n]=new Map();var m=S[n];var s={name:n,keyPath:null,autoIncrement:false,indexNames:dsl([]),get:function(k){return res(m.has(k)?m.get(k):undefined)},getAll:function(){return res(Array.from(m.values()))},getAllKeys:function(){return res(Array.from(m.keys()))},put:function(v,k){var key=k!==undefined?k:v&&v.key;m.set(key,v);return res(key)},add:function(v,k){var key=k!==undefined?k:v&&v.key;m.set(key,v);return res(key)},delete:function(k){m.delete(k);return res(undefined)},clear:function(){m.clear();return res(undefined)},count:function(){return res(m.size)},openCursor:function(){return res(null)},openKeyCursor:function(){return res(null)},index:function(){return idx()},createIndex:function(){return idx()},deleteIndex:function(){}};return s}function tx(){var t={objectStore:function(n){return st(n)},abort:function(){},oncomplete:null,onerror:null,onabort:null,addEventListener:function(e,f){this["on"+e]=f},removeEventListener:function(){}};setTimeout(function(){if(t.oncomplete){try{t.oncomplete({target:t,type:"complete"})}catch(x){}}},0);return t}function db(n){var d={name:n,version:1,objectStoreNames:dsl(Object.keys(S)),createObjectStore:function(nm){var s=st(nm);d.objectStoreNames=dsl(Object.keys(S));return s},deleteObjectStore:function(nm){delete S[nm];d.objectStoreNames=dsl(Object.keys(S))},transaction:function(){return tx()},close:function(){},addEventListener:function(){},removeEventListener:function(){},onversionchange:null,onerror:null,onabort:null,onclose:null};return d}var F={open:function(n,v){var r=rq(null);setTimeout(function(){var d=db(n);r.result=d;if(r.onupgradeneeded){r.transaction=tx();try{r.onupgradeneeded({target:r,type:"upgradeneeded",oldVersion:0,newVersion:v||1})}catch(x){}}r.readyState="done";if(r.onsuccess){try{r.onsuccess({target:r,type:"success"})}catch(x){}}},0);return r},deleteDatabase:function(){return res(undefined)},databases:function(){return Promise.resolve([])},cmp:function(a,b){return a<b?-1:a>b?1:0}};try{Object.defineProperty(window,"indexedDB",{configurable:true,value:F})}catch(x){try{window.indexedDB=F}catch(y){}}var KR={bound:function(){return{}},lowerBound:function(){return{}},upperBound:function(){return{}},only:function(){return{}}};try{if(!window.IDBKeyRange)window.IDBKeyRange=KR}catch(x){}try{console.warn("SecurityOS: in-memory IndexedDB shim active (amnesic) - non-persistent in this sandbox.")}catch(x){}}try{var _ni=false;try{if(!window.indexedDB)_ni=true;else void window.indexedDB.cmp}catch(x){_ni=true}if(_ni)_idbShim()}catch(x){}'
       : ""
@@ -966,18 +1034,22 @@ const rewriteHtml = (
   app: boolean,
   keywave: boolean,
   zupt: boolean,
-  iso: string
+  iso: string,
+  capability: string,
+  profile: ProxyProfile
 ): string => {
   const proxyPrefix = `${origin}/api/proxy?url=`;
   const flags: ProxyFlags = {
     adblock,
     app,
+    capability,
     injectExt,
     isDirect,
     iso,
     keywave,
     libreJs,
     noJs,
+    profile,
     zupt,
   };
   const px = (u: string): string => proxify(u, base, origin, flags);
@@ -1068,61 +1140,7 @@ const rewriteHtml = (
   // box is used). Move the target + flags into hidden inputs (which survive as query
   // params) and bare the action; the handler's __pxurl path reassembles the real URL
   // + appends the form fields.
-  out = out.replace(/<form\b([^>]*)>/gi, (whole: string, attrs: string) => {
-    const methodMatch = /\smethod\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(
-      attrs
-    );
-    const method = (
-      methodMatch?.[2] ??
-      methodMatch?.[3] ??
-      methodMatch?.[4] ??
-      "get"
-    )
-      .trim()
-      .toLowerCase();
-
-    // Non-GET (POST/PUT/...) forms: action already proxified; body forwarded by the
-    // handler. Nothing to rewrite here.
-    if (method !== "get") return whole;
-
-    const actionMatch = /\saction\s*=\s*("([^"]*)"|'([^']*)')/i.exec(attrs);
-
-    if (!actionMatch) return whole;
-
-    const action = actionMatch[2] ?? actionMatch[3] ?? "";
-    let pxTarget = "";
-
-    try {
-      const au = new URL(action);
-
-      // Only touch actions WE rewrote to this proxy.
-      if (!au.pathname.endsWith("/api/proxy")) return whole;
-      pxTarget = au.searchParams.get("url") || "";
-    } catch {
-      return whole;
-    }
-
-    if (!pxTarget) return whole;
-
-    const esc = (s: string): string =>
-      s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-    const newAttrs = attrs.replace(
-      /\saction\s*=\s*("[^"]*"|'[^']*')/i,
-      ` action="${origin}/api/proxy"`
-    );
-    const hidden =
-      `<input type="hidden" name="__pxurl" value="${esc(pxTarget)}">` +
-      (noJs ? `<input type="hidden" name="nojs" value="1">` : "") +
-      (injectExt ? `<input type="hidden" name="ext" value="1">` : "") +
-      (libreJs ? `<input type="hidden" name="librejs" value="1">` : "") +
-      (adblock ? `<input type="hidden" name="adblock" value="1">` : "") +
-      (isDirect ? `<input type="hidden" name="direct" value="1">` : "") +
-      (app ? `<input type="hidden" name="app" value="1">` : "") +
-      (zupt ? `<input type="hidden" name="zupt" value="1">` : "") +
-      (iso ? `<input type="hidden" name="iso" value="${esc(iso)}">` : "");
-
-    return `<form${newAttrs}>${hidden}`;
-  });
+  out = rewriteProxyGetForms(out, base, origin, flags);
 
   out = out.replace(
     /(\sxlink:href\s*=\s*)("([^"]*)"|'([^']*)')/gi,
@@ -1275,7 +1293,8 @@ const errorPage = (targetHost: string, kind: ErrorKind): string =>
       `<p>Try another bookmark, or make sure the hidden service is published and running on its host.</p>`
     : `<h1>🧅 Couldn't load <code>${targetHost}</code> through the privacy proxy</h1>` +
       `<p>The site may block proxies, require JavaScript/login, or be temporarily down.</p>` +
-      `<p>For interactive or logged-in sites, toggle the <b>shield</b> in the toolbar to load directly. ` +
+      `<p>If anonymity is not required, open the destination in <b>Clearnet Browser</b> and use its explicitly labelled ` +
+      `<b>Full site</b> action. The shield changes content policy, not network routing. ` +
       `For serious anonymous browsing, use the Linux VM via Tor Control.</p>`) +
   `</div></body></html>`;
 
@@ -1310,6 +1329,27 @@ const handler = async (
     return;
   }
 
+  const clientKey = req.socket.remoteAddress || "unknown";
+
+  if (!reserveProxyRequest(clientKey)) {
+    res
+      .status(503)
+      .setHeader("Retry-After", "2")
+      .setHeader("Content-Type", "text/plain")
+      .end("Proxy busy");
+    return;
+  }
+
+  let requestReleased = false;
+  const releaseRequest = (): void => {
+    if (requestReleased) return;
+    requestReleased = true;
+    releaseProxyRequest(clientKey);
+  };
+
+  res.once("finish", releaseRequest);
+  res.once("close", releaseRequest);
+
   const hasBody = !BODYLESS_METHODS.has(method);
 
   let raw = Array.isArray(req.query.url) ? req.query.url[0] : req.query.url;
@@ -1329,6 +1369,12 @@ const handler = async (
   const isDirect =
     req.query.direct === "1" ||
     (Array.isArray(req.query.direct) && req.query.direct.includes("1"));
+  const rawCapability = Array.isArray(req.query.cap)
+    ? req.query.cap[0]
+    : req.query.cap;
+  const routeCapability =
+    typeof rawCapability === "string" ? rawCapability : "";
+  const route = isDirect ? "direct" : "tor";
   // LibreJS-style filter: keep only first-party + trivial/free-licensed JS, strip
   // third-party/nonfree scripts (the Clearnet Browser enables this by default).
   const libreJs =
@@ -1339,7 +1385,7 @@ const handler = async (
   const adblock =
     req.query.adblock === "1" ||
     (Array.isArray(req.query.adblock) && req.query.adblock.includes("1"));
-  // Embedded-app mode (CryptPad/WhatsApp/Telegram): force the Node clientShim path
+  // Embedded-app mode (routed first-party apps): force the Node clientShim path
   // (the Rust sidecar injects none) and enable the in-memory IndexedDB shim. Strict
   // "1" equality like every other flag — never a truthy coercion.
   const isApp =
@@ -1351,13 +1397,117 @@ const handler = async (
   const requestedZupt =
     req.query.zupt === "1" ||
     (Array.isArray(req.query.zupt) && req.query.zupt.includes("1"));
+  const rawProfile = Array.isArray(req.query.profile)
+    ? req.query.profile[0]
+    : req.query.profile;
+  const requestedProfile = typeof rawProfile === "string" ? rawProfile : "";
+  const isoToken = sanitizeIsoToken(req.query.iso);
+  const scriptPolicy: ProxyScriptPolicy = noJs
+    ? "off"
+    : libreJs
+    ? "noscript"
+    : "all";
+  let expectedProfile: ProxyProfile = "browser";
+
+  if (requestedZupt) expectedProfile = "zupt";
+  else if (requestedKeywave) expectedProfile = "keywave";
+  else if (isApp && APP_PROFILES.has(requestedProfile as ProxyProfile)) {
+    expectedProfile = requestedProfile as ProxyProfile;
+  }
+
+  const hasPrivilegedFlags = isApp || requestedKeywave || requestedZupt;
+  const profileFlagsValid = routeCapability
+    ? requestedProfile === expectedProfile &&
+      !(noJs && libreJs) &&
+      (!isApp || APP_PROFILES.has(expectedProfile)) &&
+      (!requestedKeywave || expectedProfile === "keywave") &&
+      (!requestedZupt || expectedProfile === "zupt")
+    : !hasPrivilegedFlags && !requestedProfile;
+  const hasRouteCapability =
+    profileFlagsValid &&
+    verifyProxyCapability(routeCapability, route, {
+      iso: isoToken,
+      profile: expectedProfile,
+      scriptPolicy,
+    });
+
+  // Direct egress is never caller-selectable on its own. The opaque iframe gets a
+  // signed bearer from its same-origin parent and a Tor bearer cannot validate for
+  // this route. Embedded-app modes also require a bearer in Tor mode, which is what
+  // makes their narrowly scoped `Origin: null` CORS response safe to expose.
+  if (
+    (!hasRouteCapability &&
+      (isDirect || isApp || requestedKeywave || requestedZupt)) ||
+    (req.headers.origin === "null" && !hasRouteCapability)
+  ) {
+    res
+      .status(403)
+      .setHeader("Content-Type", "text/plain")
+      .end("Proxy route refused");
+    return;
+  }
+
+  if (hasRouteCapability) {
+    // The frame intentionally has an opaque origin. Grant access only to that
+    // literal origin and only after verifying the route-bound bearer; never allow
+    // credentials, wildcards, or the desktop origin through this CORS path.
+    res.setHeader("Access-Control-Allow-Origin", "null");
+    res.setHeader("Vary", "Origin");
+  }
+
+  if (
+    method === "OPTIONS" &&
+    req.headers.origin === "null" &&
+    req.headers["access-control-request-method"]
+  ) {
+    const requestedMethod =
+      req.headers["access-control-request-method"].toUpperCase();
+    const profileMethods = methodsForProfile(expectedProfile);
+
+    if (!profileMethods.has(requestedMethod)) {
+      res
+        .status(405)
+        .setHeader("Allow", [...profileMethods].join(", "))
+        .end();
+      return;
+    }
+
+    const requestedHeaders =
+      req.headers["access-control-request-headers"] || "";
+    const headerNames = requestedHeaders
+      .split(",")
+      .map((name) => name.trim().toLowerCase())
+      .filter(Boolean);
+    const corsHeaderAllowlist = new Set([
+      "accept",
+      "content-language",
+      "content-type",
+      "range",
+      "x-requested-with",
+    ]);
+
+    if (headerNames.some((name) => !corsHeaderAllowlist.has(name))) {
+      res.status(403).end();
+      return;
+    }
+
+    res.setHeader(
+      "Access-Control-Allow-Methods",
+      [...profileMethods].join(", ")
+    );
+    if (headerNames.length > 0) {
+      res.setHeader("Access-Control-Allow-Headers", headerNames.join(", "));
+    }
+    res.setHeader("Access-Control-Max-Age", "600");
+    res.status(204).end();
+    return;
+  }
   // Tor stream isolation: an opaque per-tab token (&iso=<token>) routes this fetch
   // through its own Tor circuit (separate exit IP), so different tabs can't be
   // correlated by a shared exit and "New Tor circuit" rotates a tab's token for a
   // fresh exit. Empty/invalid -> the shared default circuit (no behavior change).
   // This ONLY affects circuit selection; SSRF guard, pinning, fail-closed, header
   // allowlist and timeouts are all unchanged.
-  const isoToken = sanitizeIsoToken(req.query.iso);
   const torAgent = agentForToken(isoToken);
 
   // GET-form support: rewritten forms submit to /api/proxy with the real target in
@@ -1385,6 +1535,8 @@ const handler = async (
         "keywave",
         "zupt",
         "iso",
+        "profile",
+        "cap",
       ]);
 
       Object.entries(req.query).forEach(([key, value]) => {
@@ -1405,6 +1557,17 @@ const handler = async (
     target = new URL(raw || "");
   } catch {
     res.status(400).setHeader("Content-Type", "text/plain").end("Invalid url");
+    return;
+  }
+
+  if (
+    (hasRouteCapability && !profileAllowsUrl(expectedProfile, target)) ||
+    (hasRouteCapability && !methodsForProfile(expectedProfile).has(method))
+  ) {
+    res
+      .status(403)
+      .setHeader("Content-Type", "text/plain")
+      .end("Proxy scope refused");
     return;
   }
 
@@ -1473,7 +1636,7 @@ const handler = async (
     !isDirect &&
     !libreJs &&
     !adblock &&
-    // Embedded apps (CryptPad/WhatsApp/Telegram, &app=1) need the Node clientShim —
+    // Embedded apps (&app=1) need the Node clientShim —
     // the in-memory storage + IndexedDB shim and the fetch/XHR/WebSocket re-proxy —
     // which the Rust sidecar does NOT inject. Keep them on the Node path.
     !isApp &&
@@ -1530,6 +1693,9 @@ const handler = async (
     let hopHeaders = extraHeaders;
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+      if (hasRouteCapability && !profileAllowsUrl(expectedProfile, current)) {
+        throw new Error("profile-cross-origin-redirect");
+      }
       // eslint-disable-next-line no-await-in-loop
       const pinnedIp = await assertAllowedUrl(current, isDirect);
       // Recompute the server-owned cookie for EVERY hop. The jar itself requires
@@ -1661,7 +1827,9 @@ const handler = async (
           isApp,
           isKeywave && isKeywaveUrl(current),
           isZupt && current.origin === ZUPT_WEB_ORIGIN,
-          isoToken
+          isoToken,
+          routeCapability,
+          expectedProfile
         )
       );
     } else {

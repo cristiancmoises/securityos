@@ -1,4 +1,4 @@
 [InternetShortcut]
 BaseURL=GodsEye
-Comment=SecurityOps observability dashboard
-IconFile=/System/Icons/securityos.webp
+Comment=SecurityOps intelligence dashboard (selectable Tor or Clearnet)
+IconFile=/System/Icons/godseye.webp

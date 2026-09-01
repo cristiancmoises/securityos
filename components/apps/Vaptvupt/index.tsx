@@ -3,6 +3,7 @@ import type { ComponentProcessProps } from "components/system/Apps/RenderCompone
 import { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
 import { SANDBOXED_IFRAME_CONFIG } from "utils/constants";
+import useProxyCapability from "utils/useProxyCapability";
 
 // ZUPT's native site refuses framing. Both modes therefore use SecurityOS's
 // same-origin, SSRF-guarded proxy and render in an opaque-origin sandbox; only the
@@ -273,9 +274,22 @@ const Vaptvupt: FC<ComponentProcessProps> = ({ id }) => {
   }
 
   const isTor = mode === "tor";
-  const src = `${PROXY_PATH}${encodeURIComponent(VAPTVUPT_URL)}&zupt=1&iso=${
+  const {
+    capability: routeCapability,
+    error: capabilityError,
+    retry: retryCapability,
+  } = useProxyCapability(
+    isTor ? "tor" : "direct",
+    "zupt",
     sessionTokens.current[mode]
-  }${isTor ? "" : "&direct=1"}`;
+  );
+  const src = routeCapability
+    ? `${PROXY_PATH}${encodeURIComponent(VAPTVUPT_URL)}&zupt=1&iso=${
+        sessionTokens.current[mode]
+      }${isTor ? "" : "&direct=1"}&profile=zupt&cap=${encodeURIComponent(
+        routeCapability
+      )}`
+    : "";
 
   // Arm the "this is slow" hint whenever a (re)load starts; clear it on success.
   useEffect(() => {
@@ -384,15 +398,29 @@ const Vaptvupt: FC<ComponentProcessProps> = ({ id }) => {
           allow={VAPTVUPT_ALLOW}
           onError={() => setSlow(true)}
           onLoad={() => setLoading(false)}
-          src={src}
+          src={src || undefined}
           title={`${id} (${isTor ? "Tor" : "clearnet"})`}
           {...SANDBOXED_IFRAME_CONFIG}
         />
         {loading && (
           <div className={`overlay${slow ? "" : " pass"}`}>
             <span className="spinner" />
-            <span>Connecting to ZUPT {isTor ? "over Tor" : "directly"}…</span>
-            {slow && (
+            <span>
+              {routeCapability
+                ? `Connecting to ZUPT ${isTor ? "over Tor" : "directly"}…`
+                : `Authorizing the ${isTor ? "Tor" : "direct"} route…`}
+            </span>
+            {capabilityError ? (
+              <div className="actions">
+                <button
+                  className="overlay-action"
+                  onClick={retryCapability}
+                  type="button"
+                >
+                  Retry route authorization
+                </button>
+              </div>
+            ) : slow ? (
               <>
                 <span className="hint">
                   {isTor
@@ -417,7 +445,7 @@ const Vaptvupt: FC<ComponentProcessProps> = ({ id }) => {
                   </button>
                 </div>
               </>
-            )}
+            ) : undefined}
           </div>
         )}
       </div>

@@ -1,7 +1,6 @@
-// One-off generator for the "Undercover" (Windows 11 disguise) wallpaper: a light
-// blue "bloom" gradient that reads as a stock Win11 background, so Undercover mode
-// (dark neon -> light Win11) stays visually coherent (dark text on a light desktop).
-// Output -> public/Users/Public/Pictures/Wallpapers/Undercover/win11.webp.
+// One-off generator for the neutral Undercover enterprise wallpaper: an original
+// light-blue abstract bloom that keeps dark text readable on the light workspace.
+// Output -> public/Users/Public/Pictures/Wallpapers/Undercover/enterprise.webp.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -12,7 +11,7 @@ const W = 2560;
 const H = 1440;
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DIR = join(ROOT, "public/Users/Public/Pictures/Wallpapers/Undercover");
-const OUT = join(DIR, "win11.webp");
+const OUT = join(DIR, "enterprise.webp");
 mkdirSync(DIR, { recursive: true });
 
 const petal = (a, dist, len, wid, grad) => {
@@ -26,8 +25,7 @@ const layer = (count, off, dist, len, wid, grad) =>
     petal(off + (i / count) * 360, dist, len, wid, grad)
   ).join("");
 
-// Layered translucent petals form an abstract "bloom" — original art in the spirit
-// of a light Windows 11 wallpaper (NOT Microsoft's copyrighted Bloom image).
+// Layered translucent petals form original abstract artwork.
 const petals =
   layer(8, 0, 250, 440, 150, "g2") +
   layer(8, 22.5, 380, 560, 120, "g3") +

@@ -14,8 +14,8 @@ const { securityHeaders } = require("./scripts/securityHeaders");
  * @type {import("next").NextConfig}
  * */
 const nextConfig = {
-  // NOTE: headers() are applied by the Node server (`next start`, the Dockerfile
-  // default). A pure `next export` to a static host ignores them — that path is
+  // NOTE: headers() are applied by the custom Node server (`yarn start`, the
+  // Dockerfile default). A pure `next export` to a static host ignores them — that path is
   // covered by public/_headers, the <meta> CSP in pages/_document.tsx, and the
   // sample reverse-proxy configs under deploy/. See deploy/SECURITY-HEADERS.md.
   async headers() {
@@ -24,7 +24,14 @@ const nextConfig = {
     // our strict CSP (it would break the proxied page's own resources). Proxied
     // content is isolated by the opaque-origin sandbox in the Browser app instead,
     // and the proxy route sets its own minimal headers (no-store, no-referrer).
-    return [{ headers: securityHeaders, source: "/((?!api/proxy).*)" }];
+    return [
+      {
+        headers: securityHeaders,
+        // Exclude only the HTML relay itself. `/api/proxy-capability` is JSON and
+        // should retain the normal security headers.
+        source: "/((?!api/proxy(?:/|$)).*)",
+      },
+    ];
   },
   compiler: {
     reactRemoveProperties: isProduction,

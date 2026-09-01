@@ -2,7 +2,7 @@ import { useSession } from "contexts/session";
 
 // Start menu launcher icon, served same-origin (no third-party egress); themed-
 // button sizing lives in StyledStartButton. In Undercover mode the SecurityOS
-// emblem is swapped for the Windows-style logo so the disguise is convincing.
+// emblem is swapped for the original Undercover workspace mark.
 const StartButtonIcon: FC = () => {
   const { themeName } = useSession();
   const undercover = themeName === "undercover";

@@ -46,7 +46,6 @@ or unauthorized activity. See **`terms.md`** on this desktop.
 | --- | --- | --- |
 | **SecurityOS** | This web OS — a hardened, Tor-routed desktop full of security & privacy tools. *(fork of daedalOS by Dustin Brett)* | MIT |
 | **Vaptvupt** | The bundled encryption tool / `.zupt` format (PBKDF2→AES-256 + HMAC; ML-KEM-768 + X25519 hybrid PQ mode). | AGPL-3.0-or-later **or** commercial |
-| **whatsappel** | A WhatsApp-in-Emacs client. <https://github.com/cristiancmoises/whatsappel> | see repo |
 | **SecurityOps** | The self-hosted services around SecurityOS (chat, share, tube, git, matrix). | — |
 
 ## 🧭 Areas of work

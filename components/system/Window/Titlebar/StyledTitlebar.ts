@@ -69,7 +69,7 @@ const StyledTitlebar = styled.header<StyledTitlebarProps>`
       place-items: center;
       width: ${({ theme }) => theme.sizes.titleBar.buttonWidth};
 
-      /* Win11 caption buttons read as clean, borderless cells with a softly
+      /* Undercover caption buttons use clean, borderless cells with a softly
          rounded hover; Undercover drops the dividing border-left and rounds the
          hover fill (applied below). Default (Emacs) keeps its bordered cells. */
       ${({ theme }) =>
@@ -95,7 +95,7 @@ const StyledTitlebar = styled.header<StyledTitlebarProps>`
         background-color: ${({ theme }) =>
           theme.colors.titleBar.backgroundHover};
 
-        /* Win11 hover fill is a clean, softly rounded cell rather than a hard
+        /* Its hover fill is a clean, softly rounded cell rather than a hard
            full-height block; Undercover only. Just rounds the corners of the
            fill — no padding/margin, so button geometry never shifts. Colors
            stay token-driven. */
@@ -110,7 +110,7 @@ const StyledTitlebar = styled.header<StyledTitlebarProps>`
           background-color: ${({ theme }) => theme.colors.titleBar.closeHover};
           transition: background-color 0.25s ease;
 
-          /* The Win11 red close hover needs white glyph for contrast. */
+          /* The red close hover needs a white glyph for contrast. */
           ${({ theme }) =>
             theme.name === "Undercover"
               ? "svg { fill: rgb(255, 255, 255); }"

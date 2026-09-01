@@ -4,7 +4,7 @@ All wallpaper images in this directory tree are licensed under **CC0 1.0 / Publi
 
 Images licensed under **CC BY** and **CC BY-SA** require attribution. This file provides that attribution: the creator name, license + version, and a link to the original source page for every such image. Reuse of these images must preserve the attribution recorded below, and CC BY-SA images additionally require that derivatives be shared under the same license.
 
-> Note: the `Matrix/`, `Security/securityos-brand.webp` (the SecurityOS brand / default wallpaper), `Undercover/win11.webp`, and the fully procedural theme dirs `Anime/`, `BSD/`, `Unix/`, `Space/`, and `Art/` (generated SVG art via `scripts/genWallpapers.mjs`) are project-original / functional assets and are not listed here.
+> Note: the `Matrix/`, `Security/securityos-brand.webp` (the SecurityOS brand / default wallpaper), `Undercover/enterprise.webp`, and the fully procedural theme dirs `Anime/`, `BSD/`, `Unix/`, `Space/`, and `Art/` (generated SVG art via `scripts/genWallpapers.mjs`) are project-original / functional assets and are not listed here.
 
 | File | Title | Creator | License | Source |
 |------|-------|---------|---------|--------|

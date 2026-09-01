@@ -31,6 +31,7 @@ const resourceAliasMap: Record<string, string> = {
   explorer: "FileExplorer",
   monaco: "MonacoEditor",
   vlc: "VideoPlayer",
+  zupt: "Vaptvupt",
 };
 
 const MESSAGE = `Type the name of a program, folder, document, or Internet resource, and ${PACKAGE_DATA.alias} will open it for you.`;
