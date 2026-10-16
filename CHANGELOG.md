@@ -13,6 +13,9 @@ follows [Keep a Changelog](https://keepachangelog.com/).
   continuing to report degraded services. Add isolated regression checks.
 - Document the Tor loading measurement protocol and the current CT deployment
   boundary, with English and Portuguese user guidance.
+- Record the verified Torch comparison: 17 advertising resources neutralized,
+  no banner requests, and full loads of 6.004 s cold and 2.566/2.512 s warm;
+  baseline loads remained pending through 45 additional seconds of observation.
 - Keep local execution instructions out of the published source tree.
 
 ## [2.24.0] — 2026-09-01

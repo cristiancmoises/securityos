@@ -1,0 +1,206 @@
+{
+  "schema_version": 1,
+  "measurement": "SecurityOS Tor Browser: Torch before and after default advertisement blocking",
+  "production_source_revision": "0b7372283c8315cba5f8042dade415f402505ec4",
+  "baseline_source_revision": "e2b0c8139232fe41d562f7787aa85857390812db",
+  "browser": "Chromium 153.0.8010.47",
+  "origin": "https://os.securityops.co/",
+  "destination": "Torch homepage",
+  "started_utc": "2026-10-16T22:39:16.922424+00:00",
+  "finished_utc": "2026-10-16T22:40:41.889210+00:00",
+  "routing": "Tor SOCKS5h; no direct fallback",
+  "javascript_policy": "off",
+  "ad_blocking_default": true,
+  "fresh_browser_profiles": true,
+  "tls_validation_enabled": true,
+  "same_tab_isolation_preserved": true,
+  "sample_design": {
+    "cold_tab_navigations": 1,
+    "warm_navigations": 2,
+    "warm_action": "Native Home button; same destination, tab and isolation token",
+    "tail_window_maximum_seconds": 45,
+    "tail_window_start": "First parsed searchable document DOM",
+    "baseline_censoring": "Full window load was not observed before the 45 s extra tail ended in any baseline sample; baseline values are censored and must not be used as completed load times.",
+    "after_censoring": "All three loads completed within the same maximum observation window."
+  },
+  "baseline": {
+    "samples": [
+      {
+        "sample": 0,
+        "circuit": "cold_tab",
+        "ttfb_ms": 4196.8,
+        "dom_content_loaded_ms": 4213.3,
+        "first_contentful_paint_ms": 7000,
+        "window_load_observed": false,
+        "window_load_ms": null,
+        "advertisement_images": 17
+      },
+      {
+        "sample": 1,
+        "circuit": "same_tab_warm",
+        "ttfb_ms": 2306.7,
+        "dom_content_loaded_ms": 2332.5,
+        "first_contentful_paint_ms": 5236,
+        "window_load_observed": false,
+        "window_load_ms": null,
+        "advertisement_images": 17
+      },
+      {
+        "sample": 2,
+        "circuit": "same_tab_warm",
+        "ttfb_ms": 2566.0,
+        "dom_content_loaded_ms": 2588.3,
+        "first_contentful_paint_ms": 4388,
+        "window_load_observed": false,
+        "window_load_ms": null,
+        "advertisement_images": 17
+      }
+    ]
+  },
+  "after": {
+    "samples": [
+      {
+        "sample": 0,
+        "circuit": "cold_tab",
+        "http_status": 200,
+        "ttfb_ms": 3254.0,
+        "dom_content_loaded_ms": 3297.2,
+        "first_contentful_paint_ms": 5488,
+        "window_load_observed": true,
+        "window_load_ms": 6004.3,
+        "advertisement_network_requests": 0,
+        "advertisement_image_elements_neutralized": 17,
+        "first_party_logo_loaded": true,
+        "first_party_logo_natural_width": 600,
+        "first_party_resource_timings": [
+          {
+            "path": "/css/style.min.css",
+            "start_ms": 3274.9,
+            "duration_ms": 1952.8,
+            "end_ms": 5227.7
+          },
+          {
+            "path": "/images/torch-logo.png",
+            "start_ms": 3278.8,
+            "duration_ms": 2723.5,
+            "end_ms": 6002.3
+          }
+        ],
+        "spinner_active_at_observation_end": false,
+        "script_elements": 0
+      },
+      {
+        "sample": 1,
+        "circuit": "same_tab_warm",
+        "http_status": 200,
+        "ttfb_ms": 1083.8,
+        "dom_content_loaded_ms": 1101.7,
+        "first_contentful_paint_ms": 2528,
+        "window_load_observed": true,
+        "window_load_ms": 2566.3,
+        "advertisement_network_requests": 0,
+        "advertisement_image_elements_neutralized": 17,
+        "first_party_logo_loaded": true,
+        "first_party_logo_natural_width": 600,
+        "first_party_resource_timings": [
+          {
+            "path": "/css/style.min.css",
+            "start_ms": 1097.4,
+            "duration_ms": 1194.9,
+            "end_ms": 2292.3
+          },
+          {
+            "path": "/images/torch-logo.png",
+            "start_ms": 1100.6,
+            "duration_ms": 1463.3,
+            "end_ms": 2563.9
+          }
+        ],
+        "spinner_active_at_observation_end": false,
+        "script_elements": 0
+      },
+      {
+        "sample": 2,
+        "circuit": "same_tab_warm",
+        "http_status": 200,
+        "ttfb_ms": 1065.0,
+        "dom_content_loaded_ms": 1078.4,
+        "first_contentful_paint_ms": 2736,
+        "window_load_observed": true,
+        "window_load_ms": 2511.6,
+        "advertisement_network_requests": 0,
+        "advertisement_image_elements_neutralized": 17,
+        "first_party_logo_loaded": true,
+        "first_party_logo_natural_width": 600,
+        "first_party_resource_timings": [
+          {
+            "path": "/css/style.min.css",
+            "start_ms": 1076.3,
+            "duration_ms": 1433.5,
+            "end_ms": 2509.8
+          },
+          {
+            "path": "/images/torch-logo.png",
+            "start_ms": 1077.6,
+            "duration_ms": 1094.1,
+            "end_ms": 2171.7
+          }
+        ],
+        "spinner_active_at_observation_end": false,
+        "script_elements": 0
+      }
+    ],
+    "warm_ttfb_median_ms": 1074.4,
+    "warm_window_load_median_ms": 2538.95
+  },
+  "security_checks": {
+    "default_adblock_route_enabled": true,
+    "script_src_none_csp": true,
+    "sandbox": "allow-downloads allow-forms allow-popups",
+    "sandbox_allows_scripts": false,
+    "sandbox_allows_same_origin": false,
+    "same_tab_isolation_preserved_after_toggle": true,
+    "tor_project_check_http_200": true,
+    "tor_project_check_is_tor": true,
+    "exit_ip_in_this_artifact": false
+  },
+  "functional_checks": {
+    "torch_home_http_200": true,
+    "native_torch_get_search_http_200": true,
+    "native_search_time_to_headers_ms": 1855.0,
+    "enter_opt_out_reloaded_http_200": true,
+    "space_restored_blocking_and_isolation": true,
+    "opt_out_scope": "Verified aria-pressed=false, route adblock flag removed and HTTP200 document; immediately restored before measuring eventual advertisement delivery."
+  },
+  "shield_ui_checks": {
+    "viewport_widths": [320, 768],
+    "visible_and_hit_testable": true,
+    "focus_outline_width_px": 2,
+    "focus_visible": true,
+    "focus_method": "Native pointer-down on shield and pointer-up outside without activation, then a native key establishes keyboard modality.",
+    "full_toolbar_responsive_compliance_claimed": false,
+    "limitations": [
+      "Existing generic toolbar buttons cancel Tab keydown; reverse Tab from the address field is trapped before the new shield. The first timing run stopped at that separate check after preserving all three samples.",
+      "The 320 px toolbar has a 466 px scroll width and the existing maximized window position was offset by -92 px. The shield remained visible and unobstructed; the entire toolbar was not certified for narrow screens."
+    ]
+  },
+  "gate_verdict": {
+    "tor_performance_and_functional_checks_passed": true,
+    "all_browser_accessibility_checks_passed": false,
+    "scope": "Measured Torch resource loading, default blocking, security policy, native search, Tor exit and limited shield UI checks."
+  },
+  "measurement_limits": [
+    "One cold and two warm navigations are a small diagnostic sample, not a Tor performance guarantee.",
+    "The before/after requests were made at different times over a variable external Tor network; TTFB changes are not isolated causal estimates.",
+    "The third-party advertisement set may change between visits.",
+    "Baseline full-load times were censored; no percentage speedup is claimed.",
+    "The timing-series receipt has a later unrelated keyboard-path assertion failure. Its three completed timing samples were preserved; the remaining targeted checks passed in a separate fresh profile."
+  ],
+  "evidence_sha256": {
+    "baseline_public_summary": "96cbe124d669714006eef1832ea45ab0220bd0c1808ccf57130063e376845d00",
+    "postdeployment_series_receipt": "8a02d3063325be7276ae0103f9d59038bf59f1255ad96649c38272bbf69ab1d2",
+    "targeted_browser_receipt": "f0c36c2e9f51e48a9e48d25f688ede4c1c77a7062e2e1983d22cce0025f064e6"
+  },
+  "browsers_closed": true,
+  "contains_tokens_or_query_urls": false
+}

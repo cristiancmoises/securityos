@@ -67,6 +67,62 @@ The watchdog was separately observed for 155 seconds, spanning two new timer
 cycles: its shared tunnel PID stayed unchanged; all 14 SecurityOS home/Tor-status
 probes returned HTTP 200. The unrelated failed probe remained visibly failed.
 
+## After deployment
+
+Source revision: `0b7372283c8315cba5f8042dade415f402505ec4`. Measurements used
+the same destination, browser version, JavaScript policy and maximum observation
+window, in a fresh profile after deployment.
+
+| Navigation       |    TTFB | DOMContentLoaded | First contentful paint | Full load |
+| ---------------- | ------: | ---------------: | ---------------------: | --------: |
+| New tab          | 3.254 s |          3.297 s |                5.488 s |   6.004 s |
+| Same tab, warm 1 | 1.084 s |          1.102 s |                2.528 s |   2.566 s |
+| Same tab, warm 2 | 1.065 s |          1.078 s |                2.736 s |   2.512 s |
+
+Each page neutralized the 17 advertising image elements and made **zero banner
+network requests**. The first-party logo and stylesheet loaded, and the loading
+indicator stopped in all three samples. Native search returned HTTP 200 and
+Tor Project's check returned `IsTor: true`. CSP retained `script-src 'none'`,
+the sandbox excluded scripts/same-origin access, and tab isolation was preserved.
+
+The baseline never completed its full load within the observation window.
+These results demonstrate elimination of the measured resource tail; they do
+not establish a percentage speedup or a guaranteed latency for other onions.
+Requests were measured at different times on a variable external network.
+
+The shield was visible and hit-testable at 320 and 768 px. Native Enter disabled
+filtering and reloaded the document; Space restored it without changing isolation.
+The short opt-out check restored blocking before eventual ad delivery was measured.
+An existing generic-button Tab trap interrupted the first harness only after its
+three timing samples were saved. The remaining scoped checks passed in a separate
+session using pointer focus followed by native keys. The existing 320 px toolbar
+overflow remains a layout limitation; these checks do not certify the full toolbar
+for accessibility or narrow-screen layout.
+
+The [reviewed JSON summary](measurements/tor-20261016.json) contains both series,
+functional results, limitations and hashes of the private source receipts.
+Raw captures, query URLs and exit IPs are excluded.
+
+## Build and runtime verification
+
+- 36 Jest tests in five suites passed, including forms, capability binding,
+  filter boundaries, tab policy changes and clearnet defaults.
+- The watchdog's 12 isolated scenarios passed in five test methods.
+- TypeScript and a complete webpack production build passed on CT128 using
+  Node 26.10.0, Next 16.3.4 and the existing dependency graph. The official Node
+  checksum manifest signature was verified before using that toolchain.
+- Compilation ran with a 1.5 GiB memory limit, no swap, one CPU, 128 tasks,
+  filesystem restrictions and denied IPv4/IPv6 sockets. Observed peak: 1.2G;
+  full build stage: 93.262 seconds.
+- All 292 runtime artifacts (20,476,272 bytes) were checked by SHA-256 after
+  transfer. CT119 assembled the runtime layer over its existing image without
+  compiling code or installing dependencies.
+- Candidate and production home/Tor-status checks passed. The web container kept
+  its user, environment, resource limits, read-only root, memory mounts, dropped
+  capabilities and disabled logging. The Tor container's identity, start time
+  and restart count were preserved; the old web container remains available for
+  rollback.
+
 ## Português
 
 O ajuste reduz o trabalho necessário para carregar o Torch: bloqueia recursos
@@ -82,3 +138,13 @@ o formulário de busca aparecer e informe se o carregamento completo não ocorre
 Verifique a busca e `IsTor: true`. Não publique URLs do proxy nem capturas brutas:
 elas contêm valores temporários de isolamento e autorização. Os resultados desta
 pequena amostra não representam uma garantia de velocidade para toda a rede Tor.
+
+**Resultado observado:** antes, nenhuma das três navegações concluiu o
+carregamento durante os 45 segundos adicionais de observação. Após o ajuste,
+a primeira concluiu em **6,004 s** e as seguintes em **2,566 s** e **2,512 s**.
+As 17 imagens publicitárias foram neutralizadas sem requisições aos banners;
+logo, estilo, busca e saída pelo Tor foram verificados. O filtro pôde ser
+desativado com Enter e restaurado com Espaço, preservando o isolamento.
+Essa amostra não permite calcular uma porcentagem de aceleração da rede Tor.
+Os botões antigos ainda limitam a navegação por Tab e a barra completa apresenta
+overflow em 320 px; a verificação de interface abrangeu o novo controle.
