@@ -5958,10 +5958,10 @@ music-metadata-browser@^0.6.1:
     remove "^0.1.5"
     typedarray-to-buffer "^3.1.5"
 
-music-metadata@^11.15.0, music-metadata@^3.4.0:
-  version "11.15.0"
-  resolved "https://registry.yarnpkg.com/music-metadata/-/music-metadata-11.15.0.tgz#1341338fa008ab97461e3d5a7b8b0b8178d2cc0d"
-  integrity sha512-TN+kO1/oOc8UzDW5N3vSDncBcv9WyNnQQe/NFMcFWq6G1+zVeYUkGvkYpQ/S8wb8vKtUD7i78dIaY0cv+cmPRA==
+music-metadata@^11.16.0, music-metadata@^3.4.0:
+  version "11.16.0"
+  resolved "https://registry.yarnpkg.com/music-metadata/-/music-metadata-11.16.0.tgz#0c9807b0831ec6e65029f9f1b675461fff18c7bc"
+  integrity sha512-D5zZHjQUbfR+JhHjnwdbgeB4qj7zVJtisCB1I0GAI5sjSPGqPLoY14WMIzMeR8iA+4nSFswVLpO4crksZUybBg==
   dependencies:
     "@borewit/text-codec" "^0.2.2"
     "@tokenizer/token" "^0.3.0"
