@@ -69,6 +69,24 @@ target, so the .onion is protected identically.
 
 ---
 
+## Faster onion loading / Carregamento de sites onion
+
+**English:** Tor Browser starts with ad filtering enabled. The shield button
+(**Block ads and trackers**) shows **Ads: Blocked** in its tooltip. Use it to allow advertising and reload tabs if a page needs it. This setting does not
+enable JavaScript, change your circuit token or use a direct connection. The
+maintained filter blocks known ad resources; it cannot identify every ad.
+Torch's advertising images can keep its loading indicator active long after
+the search form appears. Cold Tor connections and unavailable sites can still
+be slow. Avoid repeatedly choosing **New circuit** while waiting for a page.
+
+**Português:** O Tor Browser inicia com o filtro de anúncios ativo. O botão de
+escudo (**Block ads and trackers**) mostra **Ads: Blocked** na dica. Ele permite liberar anúncios e recarregar as abas caso a página precise deles. Essa opção não ativa
+JavaScript, não troca o token de isolamento e não usa conexão direta. O filtro
+bloqueia recursos publicitários conhecidos; ele não identifica todos os anúncios.
+No Torch, imagens de publicidade podem manter o indicador de carregamento ativo
+depois que a busca já apareceu. Conexões novas e sites indisponíveis ainda podem
+demorar. Evite acionar **New circuit** repetidamente enquanto aguarda a página.
+
 ## Most private posture
 
 Tor Browser + the .onion address, VM relay set to **Tor** (or **Disabled** if the

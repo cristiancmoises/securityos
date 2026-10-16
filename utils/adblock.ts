@@ -147,16 +147,23 @@ export const isAdHost = (hostname: string): boolean => {
 };
 
 /**
- * True when the absolute URL points at an ad/tracking host. Non-http(s) and
- * unparseable URLs are never treated as ads (they're handled elsewhere).
+ * True when the absolute URL points at an ad/tracking host or known banner
+ * inventory. Non-http(s) and unparseable URLs are handled elsewhere.
  */
 export const isAdUrl = (absoluteUrl: string): boolean => {
   try {
-    const { hostname, protocol } = new URL(absoluteUrl);
+    const { hostname, pathname, protocol } = new URL(absoluteUrl);
 
     if (protocol !== "http:" && protocol !== "https:") return false;
 
-    return isAdHost(hostname);
+    return (
+      isAdHost(hostname) ||
+      // Torch embeds this inventory from Tordex. Keep the search engine itself,
+      // its results, styles and logo reachable; only this asset prefix is an ad.
+      (hostname.replace(/\.$/, "") ===
+        "tordexu73joywapk2txdr54jed4imqledpcvcuf75qsas2gwdgksvnyd.onion" &&
+        pathname.startsWith("/banners/"))
+    );
   } catch {
     return false;
   }
@@ -167,30 +174,29 @@ export const isAdUrl = (absoluteUrl: string): boolean => {
 // are deliberately conservative, structural selectors (mirroring EasyList's
 // generic cosmetic rules) to minimize false positives. Injected into proxied
 // pages and effective even with scripts stripped (LibreJS / no-JS modes).
-export const ADBLOCK_COSMETIC_CSS =
-  [
-    "ins.adsbygoogle",
-    "iframe[src*='doubleclick']",
-    "iframe[src*='googlesyndication']",
-    "iframe[src*='/ads/']",
-    "iframe[id^='google_ads']",
-    "div[id^='google_ads']",
-    "div[id^='div-gpt-ad']",
-    "div[id^='taboola']",
-    "div[class^='taboola']",
-    "div[class*='trc_rbox']",
-    "div[id^='outbrain']",
-    "div[class^='OUTBRAIN']",
-    "[id*='sponsored']",
-    "[class*='-sponsored']",
-    "[class*='sponsored-']",
-    "[class*='advertisement']",
-    "[class*='ad-banner']",
-    "[class*='banner-ad']",
-    "[id*='ad-banner']",
-    "[class*='adsbox']",
-    "[class*='ad-slot']",
-    "[id*='ad-slot']",
-    "[data-ad-slot]",
-    "[data-adunit]",
-  ].join(",") + "{display:none!important;height:0!important;}";
+export const ADBLOCK_COSMETIC_CSS = `${[
+  "ins.adsbygoogle",
+  "iframe[src*='doubleclick']",
+  "iframe[src*='googlesyndication']",
+  "iframe[src*='/ads/']",
+  "iframe[id^='google_ads']",
+  "div[id^='google_ads']",
+  "div[id^='div-gpt-ad']",
+  "div[id^='taboola']",
+  "div[class^='taboola']",
+  "div[class*='trc_rbox']",
+  "div[id^='outbrain']",
+  "div[class^='OUTBRAIN']",
+  "[id*='sponsored']",
+  "[class*='-sponsored']",
+  "[class*='sponsored-']",
+  "[class*='advertisement']",
+  "[class*='ad-banner']",
+  "[class*='banner-ad']",
+  "[id*='ad-banner']",
+  "[class*='adsbox']",
+  "[class*='ad-slot']",
+  "[id*='ad-slot']",
+  "[data-ad-slot]",
+  "[data-adunit]",
+].join(",")}{display:none!important;height:0!important;}`;

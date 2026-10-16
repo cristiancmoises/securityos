@@ -4,6 +4,17 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
+## Unreleased — 2026-10-16
+
+- Enable reversible ad filtering in Tor Browser and block the identified onion
+  banner path without blocking the search engine itself. Keep JavaScript Off,
+  separate tab isolation and fail-closed routing.
+- Preserve healthy shared Evelin forwards during partial probe failures while
+  continuing to report degraded services. Add isolated regression checks.
+- Document the Tor loading measurement protocol and the current CT deployment
+  boundary, with English and Portuguese user guidance.
+- Keep local execution instructions out of the published source tree.
+
 ## [2.24.0] — 2026-09-01
 
 - Renamed the user-facing **Vaptvupt** application to **Zupt**, while preserving

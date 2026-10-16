@@ -8,6 +8,9 @@ out
 .cursor
 .aider*
 *.orig
+AGENTS.md
+CLAUDE.md
+docs/GOD_TIER_IMPROVEMENT_PROMPT.md
 
 # Build artifacts / non-yarn lockfiles (this project uses yarn.lock)
 tsconfig.tsbuildinfo

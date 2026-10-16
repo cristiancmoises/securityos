@@ -20,6 +20,7 @@ import type { ComponentProcessProps } from "components/system/Apps/RenderCompone
 import useTitle from "components/system/Window/useTitle";
 import { useProcesses } from "contexts/process";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import styled from "styled-components";
 import Button from "styles/common/Button";
 import {
   NOSCRIPT_IFRAME_CONFIG,
@@ -241,6 +242,16 @@ const JS_MODE_LABEL: Record<JsMode, string> = {
   off: "Scripts: OFF — Safest (all JavaScript blocked). Click for NoScript mode (first-party scripts only).",
 };
 
+const AdblockToggle = styled.button`
+  background-color: transparent;
+  font-family: inherit;
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+`;
+
 type BrowserProps = ComponentProcessProps & { mode?: BrowserMode };
 
 // Shared browser engine. Tor mode always uses SOCKS5h through the server-side Tor
@@ -269,6 +280,7 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
     isTor ? DEFAULT_TOR_JS_MODE : DEFAULT_CLEARNET_JS_MODE
   );
   const [capabilityError, setCapabilityError] = useState(false);
+  const [adblockEnabled, setAdblockEnabled] = useState(isTor);
   const [extEnabled, setExtEnabled] = useState(false);
   const [tabs, setTabs] = useState<Tab[]>(() => [blankTab(0, initialUrl)]);
   const [activeKey, setActiveKey] = useState(0);
@@ -344,14 +356,16 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
             : jsMode === "noscript"
             ? "&librejs=1"
             : ""
-        }${extEnabled ? "&ext=1" : ""}${isKeywave ? "&keywave=1" : ""}${
+        }${isTor && adblockEnabled ? "&adblock=1" : ""}${
+          extEnabled ? "&ext=1" : ""
+        }${isKeywave ? "&keywave=1" : ""}${
           isZupt ? "&zupt=1" : ""
         }&profile=${profile}${iso ? `&iso=${iso}` : ""}${
           isTor ? "" : "&direct=1"
         }&cap=${encodeURIComponent(routeCapability)}`,
       };
     },
-    [extEnabled, isTor, jsMode, searchQuery]
+    [adblockEnabled, extEnabled, isTor, jsMode, searchQuery]
   );
 
   const navigateTab = useCallback(
@@ -531,6 +545,10 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
     []
   );
   const toggleExt = useCallback((): void => setExtEnabled((prev) => !prev), []);
+  const toggleAdblock = useCallback(
+    (): void => setAdblockEnabled((prev) => !prev),
+    []
+  );
 
   // "New Tor circuit" for the active tab: rotate its isolation token (new SOCKS
   // creds => Tor builds a fresh circuit => new exit IP) and reload the current
@@ -677,22 +695,23 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
     }
   }, [activeTab, prependFileToTitle]);
 
-  const appliedPolicy = useRef({ extEnabled, jsMode });
+  const appliedPolicy = useRef({ adblockEnabled, extEnabled, jsMode });
 
-  // Reload every tab when a mode toggle (JS / extension) really changes. The
+  // Reload every tab when a mode toggle (JS / extension / ad blocking) changes. The
   // iframe sandbox is global to this browser window, so leaving background tabs on
   // stale proxy flags would make the badge disagree with their effective policy.
   // Comparing values instead of a first-render boolean also survives React Strict
   // Mode's development effect replay without opening a second cold Tor circuit.
   useEffect(() => {
     if (
+      appliedPolicy.current.adblockEnabled === adblockEnabled &&
       appliedPolicy.current.extEnabled === extEnabled &&
       appliedPolicy.current.jsMode === jsMode
     ) {
       return;
     }
 
-    appliedPolicy.current = { extEnabled, jsMode };
+    appliedPolicy.current = { adblockEnabled, extEnabled, jsMode };
 
     tabsRef.current.forEach((tab) => {
       if (tab.address) {
@@ -700,7 +719,7 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jsMode, extEnabled]);
+  }, [adblockEnabled, extEnabled, jsMode]);
 
   const canGoBack = (activeTab?.position ?? 0) > 0;
   const canGoForward =
@@ -821,6 +840,36 @@ export const Browser: FC<BrowserProps> = ({ id, mode = "tor" }) => {
                 />
               </svg>
             </Button>
+          )}
+          {isTor && (
+            <AdblockToggle
+              aria-label="Block ads and trackers"
+              aria-pressed={adblockEnabled}
+              onClick={toggleAdblock}
+              title={
+                adblockEnabled
+                  ? "Ads: Blocked — click to allow ads and reload tabs"
+                  : "Ads: Allowed — click to block ads and reload tabs"
+              }
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                height="16"
+                opacity={adblockEnabled ? 1 : 0.4}
+                viewBox="0 0 24 24"
+                width="16"
+              >
+                <path
+                  d="M12 3 4 6v6c0 4 4 7 8 9 4-2 8-5 8-9V6l-8-3ZM8 12h8"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.8"
+                />
+              </svg>
+            </AdblockToggle>
           )}
           <Button
             onClick={toggleJs}

@@ -1,5 +1,16 @@
 # Production deployment
 
+> Topology note (2026-10-16): the active web runtime now runs in Proxmox CT119;
+> the VPS fronts it through an Evelin forward. The VPS Compose procedure below
+> describes the earlier deployment and must not be applied to CT119. Build work
+> belongs in the bounded CT128 workspace. Inspect the live container before a
+> release: the current CT119 runtime was created without Compose labels. Preserve
+> its exact non-root user, read-only root, dropped capabilities, resource limits,
+> RAM scratch mounts, disabled logging and existing Tor network. Replace only the
+> web container; retain the old container/image for rollback and verify Tor's
+> container ID, start time and restart count remain unchanged. Never recreate a
+> deployment from the historical paths below without revalidating its topology.
+
 This runbook covers the audited SecurityOS topology on the IONOS VPS. A normal
 release replaces the **web container only**. Tor and the reverse proxy stay
 running throughout the deployment. Cloudmacs remains available in the repository

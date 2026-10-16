@@ -218,6 +218,28 @@ chat/calls require the explicit direct top-level client and are not anonymous.
 
 ---
 
+## Onion loading and advertising
+
+Tor Browser enables ad filtering by default. The shield button is labelled
+**Block ads and trackers**; its tooltip shows **Ads: Blocked** or **Ads: Allowed**.
+The control can switch to **Ads: Allowed** and reload open tabs without rotating their isolation tokens
+or changing the JavaScript policy. Clearnet Browser keeps its existing default.
+The filter uses a small maintained host list and an exact onion banner path rule;
+it does not recognize every advertisement or block an entire onion search engine.
+
+Torch's home page includes advertising images hosted on a second onion. Its
+`loading="lazy"` attributes do not defer those requests when scripting is disabled:
+the [HTML loading algorithm](https://html.spec.whatwg.org/multipage/urls-and-fetching.html#will-lazy-load-element-steps)
+returns false in that case. Blocking the identified resources before the browser
+requests them avoids those transfers while retaining the search form, stylesheet
+and Torch logo. JavaScript remains **Off** by default.
+
+A cold onion connection can still take seconds to establish. Repeatedly using
+**New circuit** discards the warmed isolation token and can increase that delay.
+An unreachable onion also remains unreachable: this optimization never switches
+to a direct connection. See [measurements and reproduction](TOR-PERFORMANCE.md)
+for the tested workload and its limits.
+
 ## Layer 4 — Quick reference
 
 - **Anonymize your access to SecurityOS** → open it in the **Tor Browser**, ideally
