@@ -72,6 +72,12 @@ that runs entirely in your browser. No install and no app telemetry.
 
 ## 🚀 Start here
 
+**New independent apps:** Liberty Office, Crow Studio, Deeper and Call of Roque
+have separate shortcuts here and in Start. Their English/Portuguese launch windows
+open the full service only after your click, in another browser window or tab.
+These connections are **direct and not anonymous**, not Tor/proxy sessions.
+Service accounts and saved files are independent of the SecurityOS session.
+
 | Want to… | Open |
 | --- | --- |
 | Find & launch any app | **Start menu** → start typing |
@@ -80,6 +86,10 @@ that runs entirely in your browser. No install and no app telemetry.
 | Open the observability dashboard | **GODS EYE** (Tor / Clearnet selector) |
 | Join SecurityOps IRC | **IRC** (Tor / Clearnet selector) |
 | Read the SecurityOps knowledge base | **Wiki** (Tor / Clearnet selector) |
+| Work on documents and spreadsheets | **Liberty Office** ([workspace](https://office.securityops.co/) / [demo](https://office.securityops.co/demo)) |
+| Open Crow Studio | **Crow Studio** ([native client](https://crow.securityops.co/)) |
+| Open Deeper | **Deeper** ([native client](https://deeper.securityops.co/)) |
+| Play the tactical browser FPS | **Call of Roque** ([English client](https://callofroque.roqueos.com/en/), WebGPU/WebGL 2) |
 | Chat end-to-end encrypted (over Tor) | **Matrix** |
 | Compress, encrypt or recover files | **Zupt** (Tor / Clearnet selector) |
 | Encrypted video chat | **Keywave** (full client is direct, not anonymous) |

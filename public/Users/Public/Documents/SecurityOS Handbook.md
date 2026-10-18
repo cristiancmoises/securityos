@@ -3,7 +3,14 @@
 Welcome. SecurityOS is a **privacy-first, security-education web desktop**. This
 handbook is your starting point — everything here runs in your browser.
 
-## What's new (v2.24)
+## What's new (v2.25)
+
+- **Independent service apps.** **Liberty Office**, **Crow Studio**, **Deeper** and
+  **Call of Roque** now have separate desktop/Start shortcuts and app windows.
+  Each starts in English and offers Brazilian Portuguese. The explicit launch
+  action opens the full native client outside the web desktop, like Keywave;
+  these services restrict framing. Connections are **direct, not anonymous**.
+  Closing SecurityOS does not erase account data stored by these services.
 
 - **Two explicit browsing modes.** **Tor Browser** supports tabbed navigation of
   `.onion` and public sites over Tor, with per-tab circuit isolation and an opt-in
@@ -54,6 +61,10 @@ handbook is your starting point — everything here runs in your browser.
 | **GODS EYE** | Desktop / Start ▸ *GODS EYE* | Best-effort Tor-sandboxed dashboard for `eye.securityops.co`; Clearnet embeds the native service origin for full Cesium compatibility and is not anonymous. |
 | **IRC** | Desktop / Start ▸ *IRC* | SecurityOps The Lounge client at `irc.securityops.com.br`; Tor HTTP/Socket.IO is best-effort through the fail-closed proxy, while Clearnet connects natively to the service rather than `/api/ws`. |
 | **Wiki** | Desktop / Start ▸ *Wiki* | SecurityOps knowledge base at `wiki.securityops.co` with explicit **Tor / Clearnet** routing. |
+| **Liberty Office** | Desktop / Start ▸ *Liberty Office* | [Office workspace](https://office.securityops.co/) and [demo](https://office.securityops.co/demo). Explicit direct full client; free accounts include 100 MB. Export demo work before finishing. |
+| **Crow Studio** | Desktop / Start ▸ *Crow Studio* | [Crow Studio](https://crow.securityops.co/) in its native browser client, opened only after your click. Direct/not anonymous. |
+| **Deeper** | Desktop / Start ▸ *Deeper* | [Deeper](https://deeper.securityops.co/) in its native browser client. Direct/not anonymous; service storage rules apply. |
+| **Call of Roque** | Desktop / Start ▸ *Call of Roque* | [English tactical FPS client](https://callofroque.roqueos.com/en/), requiring WebGPU or WebGL 2. Independent RoqueOS service; direct/not anonymous. |
 | **Zupt** | Start ▸ *Zupt* | First-party compression/encryption tools with selectable **Tor** (default, fail-closed) and **Clearnet** (not anonymous) routes. The ephemeral proxy session supports key generation, uploads and downloads; **Full client · DIRECT** leaves the sandbox. |
 | **Cloudmacs source** | Optional local profile only | Its Emacs/Gotty source remains in the project, but the launcher, service, and *Open with* entry are excluded from this production image. It is not deployed on the IONOS VPS. |
 | **Screen Capture** | Start ▸ *Screen Capture* | Screen recording + screenshots (mic/system audio, presets) with an optional webcam overlay and effect themes. |

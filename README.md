@@ -7,6 +7,8 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
 
 🌐 [os.securityops.co](https://os.securityops.co)
 
+English is the primary documentation language. [Português (Brasil)](README.pt-BR.md).
+
 ---
 
 ## ✨ Highlights
@@ -118,6 +120,30 @@ practitioners who want an anonymous, amnesic, self-contained workspace.
   adjustable fit. **📋 Paste** any file/image from the clipboard straight onto the Desktop.
 
 ---
+
+## Desktop service apps
+
+Four separate apps are available on the desktop and in the Start menu:
+
+| App            | Full client                                                | Notes                                                                                                 |
+| -------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Liberty Office | [office.securityops.co](https://office.securityops.co/)    | Office workspace and [public demo](https://office.securityops.co/demo). Free accounts include 100 MB. |
+| Crow Studio    | [crow.securityops.co](https://crow.securityops.co/)        | Opens the complete Crow Studio workspace.                                                             |
+| Deeper         | [deeper.securityops.co](https://deeper.securityops.co/)    | Opens the native Deeper client.                                                                       |
+| Call of Roque  | [English game client](https://callofroque.roqueos.com/en/) | Tactical browser FPS; requires WebGPU or WebGL 2.                                                     |
+
+Each has its own process, window and shortcut, with English as the default and a
+Brazilian Portuguese language selector. Like Keywave's full-client action, the
+launch window opens the service in a **separate native browser window or tab only
+after your click**. These services restrict framing; SecurityOS does not bypass
+their policies or copy their application code into a proxy.
+
+The connection is **direct and not anonymous**: the service sees your network
+address. Account sessions, uploads and saved files follow the service's own
+privacy/storage rules; closing SecurityOS does **not** erase remote account data.
+The Liberty demo keeps documents in the browser only—export before finishing or
+clearing it. Third-party services, including Call of Roque, keep their own terms
+and licenses; listing a launcher does not imply affiliation or endorsement.
 
 ## 🧅 Tor Browser
 
