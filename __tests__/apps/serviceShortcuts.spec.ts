@@ -44,3 +44,33 @@ describe.each(["Desktop", "Start Menu"])("%s service shortcuts", (location) => {
     }
   });
 });
+
+it("publishes the current desktop release notes in English and Portuguese", () => {
+  const { version } = JSON.parse(
+    readFileSync(join(process.cwd(), "package.json"), "utf8")
+  ) as { version: string };
+  const release = version.split(".").slice(0, 2).join(".");
+  const path = join(
+    process.cwd(),
+    "public/Users/Public/Desktop",
+    `What's New (v${release}).md`
+  );
+  const notes = existsSync(path) ? readFileSync(path, "utf8") : "";
+
+  expect(notes).toContain(`# What's New in SecurityOS ${release}`);
+  expect(notes.indexOf("## English")).toBeGreaterThanOrEqual(0);
+  expect(notes.indexOf("## Português (Brasil)")).toBeGreaterThan(
+    notes.indexOf("## English")
+  );
+  for (const url of [
+    "https://office.securityops.co/",
+    "https://office.securityops.co/demo",
+    "https://crow.securityops.co/",
+    "https://deeper.securityops.co/",
+    "https://callofroque.roqueos.com/en/",
+  ]) {
+    expect(notes).toContain(url);
+  }
+  expect(notes).toMatch(/not anonymous/i);
+  expect(notes).toMatch(/não anônim/i);
+});
