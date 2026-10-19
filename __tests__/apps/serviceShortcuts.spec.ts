@@ -1,5 +1,5 @@
 import directory from "contexts/process/directory";
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readdirSync, readFileSync } from "fs";
 import ini from "ini";
 import { basename, join } from "path";
 
@@ -9,6 +9,14 @@ const APPS = [
   ["Deeper", "Deeper"],
   ["Call of Roque", "CallOfRoque"],
 ] as const;
+
+it("shows only the current What's New document on the desktop", () => {
+  const notes = readdirSync(
+    join(process.cwd(), "public/Users/Public/Desktop")
+  ).filter((name) => /^What's New.*\.md$/.test(name));
+
+  expect(notes).toEqual(["What's New (v2.25).md"]);
+});
 
 describe.each(["Desktop", "Start Menu"])("%s service shortcuts", (location) => {
   it.each(APPS)("resolves %s to its independent application", (title, id) => {

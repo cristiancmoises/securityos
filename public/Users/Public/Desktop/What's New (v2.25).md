@@ -2,6 +2,9 @@
 
 ## English
 
+The desktop now shows only this current release notice. Previous release notes
+remain available in the repository history instead of cluttering the desktop.
+
 ### Four new desktop apps
 
 Each app has its own window and shortcuts on the desktop and in the Start menu:
@@ -32,6 +35,9 @@ finishing or clearing it. Free Liberty accounts provide 100 MB of separate
 storage. Third-party services retain their own terms and licenses.
 
 ## Português (Brasil)
+
+A área de trabalho agora mostra apenas este aviso da versão atual. As notas
+anteriores continuam no histórico do repositório, sem ocupar o desktop.
 
 ### Quatro novos aplicativos
 

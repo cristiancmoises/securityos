@@ -4,7 +4,18 @@ All notable changes to **SecurityOS** (the privacy/security‑first web desktop,
 fork of [daedalOS](https://github.com/DustinBrett/daedalOS)). Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/).
 
-## Unreleased — 2026-10-16
+## [2.25.0] — 2026-10-19
+
+- Add independent desktop and Start-menu apps for Liberty Office, Crow Studio,
+  Deeper and Call of Roque, with English-first launch windows and optional
+  Brazilian Portuguese. Liberty also links its public demo.
+- Keep the full clients on their own origins through explicit, clearly labelled
+  direct links. Preserve upstream embedding protections and SecurityOS routing.
+- Replace the three older desktop What's New documents with one current,
+  bilingual notice. Keep earlier notes recoverable in Git history.
+- Update the English README, secondary Portuguese README and in-system handbook.
+
+## Earlier unreleased changes — 2026-10-16
 
 - Enable reversible ad filtering in Tor Browser and block the identified onion
   banner path without blocking the search engine itself. Keep JavaScript Off,
