@@ -156,7 +156,7 @@
     "stylelint-config-standard": "^30.0.1",
     "stylelint-order": "^6.0.3",
     "terser": "^5.51.2",
-    "tinymce": "^8.9.0",
+    "tinymce": "^8.9.3",
     "ts-prune": "^0.10.3",
     "typescript": "^5.9.3",
     "webamp": "^1.5.0"
